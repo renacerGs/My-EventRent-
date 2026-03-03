@@ -6,6 +6,12 @@ export default function EventDetail({ events }) {
   const navigate = useNavigate();
   const [event, setEvent] = useState(null);
   const [isLiked, setIsLiked] = useState(false);
+  
+  // STATE BARU
+  const [isBuying, setIsBuying] = useState(false);
+  const [ticketQty, setTicketQty] = useState(1); // Default beli 1
+
+  const user = JSON.parse(localStorage.getItem('user'));
 
   useEffect(() => {
     if (events && events.length > 0) {
@@ -13,8 +19,7 @@ export default function EventDetail({ events }) {
       if (found) {
         setEvent(found);
         const savedLikes = JSON.parse(localStorage.getItem('likedEvents')) || [];
-        const alreadyLiked = savedLikes.some(item => String(item.id) === String(found.id));
-        setIsLiked(alreadyLiked);
+        setIsLiked(savedLikes.some(item => String(item.id) === String(found.id)));
       }
     }
     window.scrollTo(0, 0);
@@ -24,7 +29,6 @@ export default function EventDetail({ events }) {
     if (!event) return;
     const savedLikes = JSON.parse(localStorage.getItem('likedEvents')) || [];
     let updatedLikes;
-    
     if (!isLiked) {
       updatedLikes = [...savedLikes, event];
       setIsLiked(true);
@@ -36,6 +40,58 @@ export default function EventDetail({ events }) {
     window.dispatchEvent(new Event("storage"));
   };
 
+  // --- LOGIKA TAMBAH/KURANG TIKET ---
+  const increaseQty = () => {
+    if (ticketQty < event.stock) {
+      setTicketQty(prev => prev + 1);
+    }
+  };
+
+  const decreaseQty = () => {
+    if (ticketQty > 1) {
+      setTicketQty(prev => prev - 1);
+    }
+  };
+
+  // --- LOGIKA BELI TIKET ---
+  const handleBuyTicket = async () => {
+    if (!user) {
+      alert("Please login first to buy tickets!");
+      return;
+    }
+
+    const totalPrice = Number(event.price) * ticketQty;
+    const confirmMsg = `Buy ${ticketQty} ticket(s) for "${event.title}"?\nTotal: Rp ${totalPrice.toLocaleString()}`;
+
+    if (window.confirm(confirmMsg)) {
+      setIsBuying(true);
+      try {
+        const res = await fetch('http://localhost:3000/api/tickets/buy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            userId: user.id, 
+            eventId: event.id, 
+            quantity: ticketQty // <--- Kirim Jumlah
+          })
+        });
+        
+        if (res.ok) {
+          alert("Purchase Successful! See you at the event! 🎉");
+          navigate('/my-tickets');
+        } else {
+          const err = await res.json();
+          alert(err.message || "Failed to buy ticket");
+        }
+      } catch (error) {
+        console.error(error);
+        alert("Something went wrong");
+      } finally {
+        setIsBuying(false);
+      }
+    }
+  };
+
   if (!event) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
       <div className="w-10 h-10 border-4 border-[#FF6B35] border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -45,64 +101,36 @@ export default function EventDetail({ events }) {
   return (
     <div className="min-h-screen bg-gray-50 pb-20 font-sans">
       
-      {/* --- 1. HERO IMAGE SECTION --- */}
+      {/* HERO IMAGE */}
       <div className="relative w-full h-[450px] bg-gray-900">
-        <img 
-          src={event.img} 
-          className="w-full h-full object-cover opacity-80" 
-          alt="Banner" 
-        />
-        
-        {/* Tombol Back (Sesuai Desain: Bulat, Abu-abu transparan) */}
-        <button 
-          onClick={() => navigate(-1)} 
-          className="absolute top-8 left-8 w-12 h-12 flex items-center justify-center bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white hover:text-gray-900 transition-all z-20"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
+        <img src={event.img} className="w-full h-full object-cover opacity-80" alt="Banner" />
+        <button onClick={() => navigate(-1)} className="absolute top-8 left-8 w-12 h-12 flex items-center justify-center bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white hover:text-gray-900 transition-all z-20">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
         </button>
       </div>
 
-      {/* --- 2. MAIN CARD CONTENT (OVERLAP) --- */}
+      {/* CONTENT */}
       <div className="max-w-6xl mx-auto px-4 relative z-10 -mt-32">
         <div className="bg-white rounded-[30px] shadow-xl p-8 md:p-12 flex flex-col lg:flex-row gap-12 min-h-[400px]">
           
-          {/* --- BAGIAN KIRI: DETAIL INFO --- */}
+          {/* LEFT: DETAIL */}
           <div className="flex-1">
+            <span className="inline-block bg-[#FF6B35] text-white px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide mb-5">{event.category}</span>
+            <h1 className="text-3xl md:text-5xl font-black text-gray-900 leading-tight mb-8">{event.title}</h1>
             
-            {/* Category Pill */}
-            <span className="inline-block bg-[#FF6B35] text-white px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide mb-5">
-              {event.category || "Event"}
-            </span>
-
-            {/* Title */}
-            <h1 className="text-3xl md:text-5xl font-black text-gray-900 leading-tight mb-8">
-              {event.title}
-            </h1>
-            
-            {/* Info Rows (Icon + Text) */}
             <div className="space-y-5 mb-10">
-              {/* Date */}
               <div className="flex items-center gap-4">
                 <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                 <p className="text-base font-bold text-gray-800">{event.date}</p>
               </div>
-
-              {/* Location */}
               <div className="flex items-center gap-4">
                 <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 <p className="text-base font-bold text-gray-800">{event.location}</p>
               </div>
-
-              {/* Author */}
               <div className="flex items-center gap-4">
                 <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                 <p className="text-base font-bold text-gray-800">{event.author || 'EventRent Official'}</p>
               </div>
-            </div>
-
-            {/* --- 4. PHONE / CONTACT (BARU) --- */}
               {event.phone && (
                 <div className="flex items-center gap-4">
                   <div className="w-6 h-6 flex items-center justify-center rounded-full bg-green-100 text-green-600">
@@ -111,49 +139,64 @@ export default function EventDetail({ events }) {
                   <p className="text-base font-bold text-gray-800 tracking-wide">{event.phone}</p>
                 </div>
               )}
-
-            {/* Description */}
+            </div>
             <div>
               <h3 className="text-xl font-black text-gray-900 mb-3">About this event</h3>
-              <p className="text-gray-500 leading-relaxed text-sm md:text-base whitespace-pre-line">
-                {event.description || "No description provided."}
-              </p>
+              <p className="text-gray-500 leading-relaxed whitespace-pre-line">{event.description || "No description provided."}</p>
             </div>
           </div>
 
-          {/* --- BAGIAN KANAN: LOVE & TICKET --- */}
+          {/* RIGHT: TICKET CARD */}
           <div className="w-full lg:w-[320px] flex flex-col items-end gap-6">
             
-            {/* 1. Tombol Like (Terpisah di atas) */}
-            <button 
-              onClick={handleLikeClick}
-              className={`w-12 h-12 flex items-center justify-center rounded-xl border transition-all
-                ${isLiked ? 'border-red-500 bg-red-50 text-red-500' : 'border-gray-200 text-gray-400 hover:border-[#FF6B35] hover:text-[#FF6B35]'}`}
-            >
-              <svg className={`w-6 h-6 ${isLiked ? 'fill-current' : 'fill-none'}`} stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-              </svg>
+            <button onClick={handleLikeClick} className={`w-12 h-12 flex items-center justify-center rounded-xl border transition-all ${isLiked ? 'border-red-500 bg-red-50 text-red-500' : 'border-gray-200 text-gray-400 hover:border-[#FF6B35] hover:text-[#FF6B35]'}`}>
+              <svg className={`w-6 h-6 ${isLiked ? 'fill-current' : 'fill-none'}`} stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
             </button>
 
-            {/* 2. Kotak Ticket (Background Abu-abu) */}
-            <div className="w-full bg-gray-100/80 rounded-[24px] p-6">
-              <div className="flex justify-between items-center mb-6">
-                <span className="text-lg font-bold text-gray-900">Ticket</span>
-                <span className="text-lg font-black text-gray-900">
-                   {Number(event.price) === 0 ? 'Free' : `${parseInt(event.price).toLocaleString()}`}
-                </span>
+            <div className="w-full bg-gray-100/80 rounded-[24px] p-6 shadow-sm border border-gray-100">
+              <div className="mb-4">
+                 <span className="block text-gray-500 text-xs font-bold uppercase mb-1">Price per Ticket</span>
+                 <span className="text-2xl font-black text-gray-900">
+                    {Number(event.price) === 0 ? 'Free' : `Rp ${parseInt(event.price).toLocaleString()}`}
+                 </span>
+              </div>
+
+              {/* TICKET COUNTER (BARU) */}
+              {Number(event.stock) > 0 && (
+                <div className="flex items-center justify-between bg-white rounded-xl p-2 mb-4 shadow-sm">
+                  <button onClick={decreaseQty} className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200 font-bold text-lg disabled:opacity-50" disabled={ticketQty <= 1}>-</button>
+                  <span className="font-bold text-gray-900 text-lg w-8 text-center">{ticketQty}</span>
+                  <button onClick={increaseQty} className="w-8 h-8 flex items-center justify-center bg-[#FF6B35] rounded-lg text-white hover:bg-orange-600 font-bold text-lg disabled:opacity-50 disabled:bg-gray-300" disabled={ticketQty >= event.stock}>+</button>
+                </div>
+              )}
+
+              {/* TOTAL PRICE DISPLAY */}
+              {Number(event.stock) > 0 && (
+                <div className="flex justify-between items-center mb-6 pt-4 border-t border-gray-200">
+                   <span className="text-sm font-bold text-gray-500">Total:</span>
+                   <span className="text-lg font-black text-[#FF6B35]">
+                      Rp {(Number(event.price) * ticketQty).toLocaleString()}
+                   </span>
+                </div>
+              )}
+
+              <div className="text-right text-xs font-bold text-gray-500 mb-2">
+                Available: <span className="text-[#FF6B35]">{event.stock || 0}</span> tickets
               </div>
               
-              <button className="w-full bg-[#E85526] hover:bg-[#d1461b] text-white py-3.5 rounded-xl font-bold text-sm shadow-md transition-all active:scale-95">
-                Get Tickets
+              <button 
+                onClick={handleBuyTicket} 
+                disabled={isBuying || event.stock < 1} 
+                className={`w-full py-3.5 rounded-xl font-bold text-sm shadow-md transition-all active:scale-95
+                  ${event.stock < 1 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#E85526] hover:bg-[#d1461b] text-white'}`}
+              >
+                {isBuying ? 'Processing...' : (event.stock < 1 ? 'Sold Out' : `Checkout (${ticketQty})`)}
               </button>
             </div>
-
           </div>
 
         </div>
       </div>
-
     </div>
   );
 }

@@ -12,7 +12,9 @@ import EventDetail from './pages/EventDetail';
 import Likes from './pages/Likes'; 
 import CreateEvent from "./components/CreateEvent"; 
 import ManageEvent from "./components/ManageEvent"; 
-import EditEvent from "./components/EditEvent"; // <--- 1. JANGAN LUPA IMPORT INI
+import EditEvent from "./components/EditEvent"; 
+import Profile from "./components/Profile"; 
+import MyTickets from "./components/MyTickets"; 
 
 export default function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -80,7 +82,7 @@ export default function App() {
             <Route path="/likes" element={<Likes />} />
             <Route path="/event/:id" element={<EventDetail events={events} />} />
             
-            {/* HALAMAN YANG DIKUNCI */}
+            {/* HALAMAN YANG DIKUNCI (Harus Login) */}
             <Route path="/create" element={
               <ProtectedRoute>
                 <CreateEvent />
@@ -93,10 +95,22 @@ export default function App() {
               </ProtectedRoute>
             } />
 
-            {/* <--- 2. TAMBAHKAN ROUTE EDIT DISINI */}
             <Route path="/edit/:id" element={
               <ProtectedRoute>
                 <EditEvent />
+              </ProtectedRoute>
+            } />
+
+            {/* <--- 2. TAMBAHKAN ROUTE PROFILE DISINI */}
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/my-tickets" element={
+              <ProtectedRoute>
+                <MyTickets />
               </ProtectedRoute>
             } />
             

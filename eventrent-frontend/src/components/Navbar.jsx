@@ -153,7 +153,7 @@ export default function Navbar({ user, events, onSearchSelect, onOpenLogin, onLo
                     </Link>
 
                     {/* Profile */}
-                    <Link to="/profile" className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-all">
+                    <Link to="/profile" onClick={() => setIsDropdownOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-all">
                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
                        </div>
@@ -161,26 +161,26 @@ export default function Navbar({ user, events, onSearchSelect, onOpenLogin, onLo
                     </Link>
                     
                     {/* Manage */}
-                    <Link to="/manage" className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-all">
+                    <Link to="/manage" onClick={() => setIsDropdownOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-all">
                       <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
                       </div>
                       Manage My Event
                     </Link>
                     
-                    {/* Tickets */}
-                    <Link to="/tickets" className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-all">
+                    {/* Tickets (DIPERBAIKI DISINI) */}
+                    <Link to="/my-tickets" onClick={() => setIsDropdownOpen(false)} className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-gray-600 hover:bg-gray-50 hover:text-gray-900 rounded-xl transition-all">
                       <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>
                       </div>
-                      Tickets
+                      My Tickets
                     </Link>
                   </div>
 
                   {/* FOOTER: LOGOUT */}
                   <div className="p-2 mt-1 border-t border-gray-100 bg-gray-50/50">
                     <button 
-                      onClick={onLogout}
+                      onClick={() => { onLogout(); setIsDropdownOpen(false); }}
                       className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-gray-700 hover:bg-white hover:text-red-500 hover:shadow-sm rounded-xl transition-all group"
                     >
                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 group-hover:bg-red-50 group-hover:text-red-500 transition-colors">

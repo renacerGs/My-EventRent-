@@ -135,7 +135,10 @@ export default function ManageEvent() {
 
                   {/* 2. Sold */}
                   <div className="col-span-2 text-center">
-                    <span className="inline-block px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-600">0 / 100</span>
+                    {/* Tampilkan Stock Asli */}
+                    <span className="inline-block px-3 py-1 bg-gray-100 rounded-full text-xs font-bold text-gray-600">
+                      0 / {event.stock || 0}
+                    </span>
                   </div>
 
                   {/* 3. Price */}

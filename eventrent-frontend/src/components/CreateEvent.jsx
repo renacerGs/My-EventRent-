@@ -14,12 +14,13 @@ export default function CreateEvent() {
 
   const [formData, setFormData] = useState({
     title: '',
-    phone: '', // <--- FIELD BARU
+    phone: '',
     category: '',
     location: '',
     date: '',
     time: '',
     price: '',
+    stock: '', // <--- Tambah ini
     description: '',
   });
   
@@ -151,11 +152,20 @@ export default function CreateEvent() {
               </div>
             </div>
 
-            <div>
-              <label htmlFor="price" className={labelStyle}>Price (Rp)</label>
-              <div className="relative">
-                <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">Rp</span>
-                <input type="text" id="price" name="price" value={formData.price} onChange={handleChange} placeholder="0.00" className={`${inputStyle} pl-12`} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Input Price */}
+              <div>
+                <label htmlFor="price" className={labelStyle}>Price (Rp)</label>
+                <div className="relative">
+                  <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">Rp</span>
+                  <input type="number" id="price" name="price" value={formData.price} onChange={handleChange} placeholder="0" className={`${inputStyle} pl-12`} />
+                </div>
+              </div>
+              
+              {/* Input Stock (BARU) */}
+              <div>
+                <label htmlFor="stock" className={labelStyle}>Ticket Stock / Quota</label>
+                <input type="number" id="stock" name="stock" value={formData.stock || ''} onChange={handleChange} placeholder="Ex: 100" required className={inputStyle} />
               </div>
             </div>
 

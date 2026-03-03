@@ -33,12 +33,13 @@ export default function EditEvent() {
         if (found) {
           setFormData({
             title: found.title,
-            phone: found.phone || '', // <--- ISI DARI DATABASE
+            phone: found.phone || '',
             category: found.category,
             location: found.location,
             date: '', 
             time: '', 
             price: found.price,
+            stock: found.stock || 0, // <--- Load stock lama
             description: found.description,
           });
           setImagePreview(found.img);
@@ -137,6 +138,8 @@ export default function EditEvent() {
                   </select>
                </div>
                <div><label className={labelStyle}>Price (Rp)</label><input type="number" name="price" value={formData.price} onChange={handleChange} className={inputStyle} /></div>
+               {/* INPUT STOCK BARU */}
+               <div><label className={labelStyle}>Stock</label><input type="number" name="stock" value={formData.stock} onChange={handleChange} required className={inputStyle} /></div>
             </div>
           </div>
 
