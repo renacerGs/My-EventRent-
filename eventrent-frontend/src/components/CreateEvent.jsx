@@ -3,11 +3,8 @@ import { useNavigate } from 'react-router-dom';
 
 export default function CreateEvent() {
   const navigate = useNavigate();
-  
-  // Ambil user dari localStorage
   const user = JSON.parse(localStorage.getItem('user'));
 
-  // Proteksi Halaman
   useEffect(() => {
     if (!user) {
       alert("Please login first!");
@@ -17,6 +14,7 @@ export default function CreateEvent() {
 
   const [formData, setFormData] = useState({
     title: '',
+    phone: '', // <--- FIELD BARU
     category: '',
     location: '',
     date: '',
@@ -26,7 +24,7 @@ export default function CreateEvent() {
   });
   
   const [imagePreview, setImagePreview] = useState(null);
-  const [imageBase64, setImageBase64] = useState(''); // <--- STATE PENTING BUAT NYIMPEN GAMBAR
+  const [imageBase64, setImageBase64] = useState(''); 
   const [isLoading, setIsLoading] = useState(false);
 
   const categories = ['Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports'];
@@ -36,14 +34,10 @@ export default function CreateEvent() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // <--- BAGIAN INI SAYA PERBAIKI: Convert Gambar ke Base64
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // 1. Buat preview biar tampil di layar
       setImagePreview(URL.createObjectURL(file));
-
-      // 2. Ubah file jadi string panjang (Base64) buat dikirim ke backend
       const reader = new FileReader();
       reader.onloadend = () => {
         setImageBase64(reader.result);
@@ -60,7 +54,7 @@ export default function CreateEvent() {
         const payload = {
             ...formData,
             userId: user.id,
-            img: imageBase64 // <--- KIRIM GAMBAR YANG SUDAH JADI STRING
+            img: imageBase64 
         };
 
         const response = await fetch('http://localhost:3000/api/events', {
@@ -74,11 +68,10 @@ export default function CreateEvent() {
         } else {
             const errorData = await response.json();
             console.error("Backend Error:", errorData);
-            alert("Failed to create event. Check console for details.");
+            alert("Failed to create event.");
         }
     } catch (error) {
         console.error("Error creating event:", error);
-        alert("Something went wrong!");
     } finally {
         setIsLoading(false);
     }
@@ -117,10 +110,16 @@ export default function CreateEvent() {
               </div>
             </div>
 
-            {/* Form Input Lainnya (Tetap Sama) */}
-            <div>
-              <label htmlFor="title" className={labelStyle}>Event Title</label>
-              <input type="text" id="title" name="title" value={formData.title} onChange={handleChange} placeholder="Enter your title event" required className={inputStyle} />
+            {/* Input Title & Phone */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label htmlFor="title" className={labelStyle}>Event Title</label>
+                  <input type="text" id="title" name="title" value={formData.title} onChange={handleChange} placeholder="Enter your title event" required className={inputStyle} />
+                </div>
+                <div>
+                  <label htmlFor="phone" className={labelStyle}>WhatsApp / Contact Person</label>
+                  <input type="text" id="phone" name="phone" value={formData.phone} onChange={handleChange} placeholder="Ex: 08123456789" required className={inputStyle} />
+                </div>
             </div>
 
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

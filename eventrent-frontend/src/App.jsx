@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { GoogleOAuthProvider } from '@react-oauth/google'; // <--- 1. Import Provider Google
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // Import Komponen
 import Navbar from './components/Navbar';
@@ -12,17 +12,18 @@ import EventDetail from './pages/EventDetail';
 import Likes from './pages/Likes'; 
 import CreateEvent from "./components/CreateEvent"; 
 import ManageEvent from "./components/ManageEvent"; 
+import EditEvent from "./components/EditEvent"; // <--- 1. JANGAN LUPA IMPORT INI
 
 export default function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [events, setEvents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // <--- 2. STATE USER (Wajib ada buat nyimpen data login)
+  // STATE USER
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // A. Cek apakah user sudah login sebelumnya (disimpan di localStorage)
+    // A. Cek login
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
@@ -40,17 +41,15 @@ export default function App() {
       });
   }, []);
 
-  // <--- 3. KOMPONEN PROTEKSI (Biar yang belum login gak bisa masuk /create)
+  // KOMPONEN PROTEKSI
   const ProtectedRoute = ({ children }) => {
     if (!user) {
-      // Kalau belum login, buka modal login & lempar ke Home
       setIsLoginOpen(true);
       return <Navigate to="/" replace />;
     }
     return children;
   };
 
-  // Tampilan Halaman Utama
   const HomePage = () => (
     <>
       <Hero />
@@ -61,11 +60,9 @@ export default function App() {
   );
 
   return (
-    // <--- 4. BUNGKUS DENGAN GOOGLE PROVIDER (Paste Client ID lo disini)
     <GoogleOAuthProvider clientId="561806317736-eq0ktc36954e6vftgp7q2bgi46bnhvqg.apps.googleusercontent.com">
       <div className="bg-white min-h-screen font-sans flex flex-col">
         
-        {/* Navbar: Kirim data user & fungsi logout */}
         <Navbar 
           user={user} 
           events={events} 
@@ -73,7 +70,7 @@ export default function App() {
           onOpenLogin={() => setIsLoginOpen(true)}
           onLogout={() => {
             setUser(null);
-            localStorage.removeItem('user'); // Hapus sesi
+            localStorage.removeItem('user');
           }}
         />
 
@@ -83,15 +80,23 @@ export default function App() {
             <Route path="/likes" element={<Likes />} />
             <Route path="/event/:id" element={<EventDetail events={events} />} />
             
-            {/* <--- 5. HALAMAN YANG DIKUNCI (Harus Login Dulu) */}
+            {/* HALAMAN YANG DIKUNCI */}
             <Route path="/create" element={
               <ProtectedRoute>
                 <CreateEvent />
               </ProtectedRoute>
             } />
+            
             <Route path="/manage" element={
               <ProtectedRoute>
                 <ManageEvent />
+              </ProtectedRoute>
+            } />
+
+            {/* <--- 2. TAMBAHKAN ROUTE EDIT DISINI */}
+            <Route path="/edit/:id" element={
+              <ProtectedRoute>
+                <EditEvent />
               </ProtectedRoute>
             } />
             
@@ -106,7 +111,6 @@ export default function App() {
         <LoginModal 
           isOpen={isLoginOpen} 
           onClose={() => setIsLoginOpen(false)} 
-          // <--- 6. Logika sukses login sekarang aman karena setUser sudah ada
           onLoginSuccess={(userData) => {
             console.log("User berhasil login:", userData);
             setUser(userData); 

@@ -31,6 +31,7 @@ export class AppService implements OnModuleInit {
         SELECT e.id, e.title, TO_CHAR(e.date_time, 'Dy, Mon YYYY - HH12.MI AM') as date, 
                e.location, e.image_url as img, c.name as category, e.price,
                e.description,  
+               e.phone, -- <--- TAMBAH INI
                u.name as author 
         FROM events e
         JOIN categories c ON e.category_id = c.id
@@ -52,6 +53,7 @@ export class AppService implements OnModuleInit {
         SELECT e.id, e.title, TO_CHAR(e.date_time, 'Dy, Mon YYYY - HH12.MI AM') as date, 
                e.location, e.image_url as img, c.name as category, e.price,
                e.description, 
+               e.phone, -- <--- TAMBAH INI JUGA
                u.name as author
         FROM events e
         JOIN categories c ON e.category_id = c.id
@@ -73,12 +75,13 @@ export class AppService implements OnModuleInit {
       const fullDateTime = `${data.date} ${data.time}`; 
 
       const query = `
-        INSERT INTO events (title, date_time, location, description, price, image_url, category_id, created_by)
+        INSERT INTO events (title, date_time, location, description, price, image_url, category_id, created_by, phone)
         VALUES (
             $1, $2, $3, $4, $5, 
             $6, 
             (SELECT id FROM categories WHERE name = $7 LIMIT 1), 
-            $8
+            $8,
+            $9 -- <--- Placeholder baru untuk phone
         )
         RETURNING *
       `;
@@ -91,7 +94,8 @@ export class AppService implements OnModuleInit {
         data.price || 0, 
         data.img || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=1000&q=80', 
         data.category, 
-        data.userId 
+        data.userId,
+        data.phone || null // <--- Masukkan data phone dari frontend
       ];
       
       const res = await this.pool.query(query, values);
@@ -102,7 +106,53 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 4. Login Google
+  // 4. Update Event
+  async updateEvent(eventId: number, userId: number, data: any) {
+    try {
+      const fullDateTime = `${data.date} ${data.time}`; 
+      
+      const query = `
+        UPDATE events 
+        SET title = $1, 
+            date_time = $2, 
+            location = $3, 
+            description = $4, 
+            price = $5, 
+            image_url = COALESCE($6, image_url), 
+            category_id = (SELECT id FROM categories WHERE name = $7 LIMIT 1),
+            phone = $8 -- <--- Update kolom phone
+        WHERE id = $9 AND created_by = $10
+        RETURNING *
+      `;
+
+      const values = [
+        data.title, 
+        fullDateTime, 
+        data.location, 
+        data.description, 
+        data.price, 
+        data.img, 
+        data.category,
+        data.phone, // <--- Data phone baru
+        eventId,
+        userId
+      ];
+
+      const res = await this.pool.query(query, values);
+
+      if (res.rowCount === 0) {
+        throw new InternalServerErrorException('Event not found or unauthorized');
+      }
+
+      return res.rows[0];
+    } catch (err) {
+      console.error(err);
+      throw new InternalServerErrorException('Gagal update event');
+    }
+  }
+
+  // ... (Fungsi loginWithGoogle dan deleteEvent TETAP SAMA, tidak perlu diubah)
+  // Login Google
   async loginWithGoogle(user: { email: string; name: string; picture: string; googleId: string }) {
     try {
       const checkQuery = 'SELECT * FROM users WHERE email = $1';
@@ -125,7 +175,7 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 5. Hapus Event
+  // Hapus Event
   async deleteEvent(eventId: number, userId: number) {
     try {
       const query = 'DELETE FROM events WHERE id = $1 AND created_by = $2 RETURNING *';

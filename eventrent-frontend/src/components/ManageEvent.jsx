@@ -72,8 +72,7 @@ export default function ManageEvent() {
 
   // Fitur Edit & Copy Event (Sementara alert dulu, nanti kita buat halamannya)
   const handleEdit = (event) => {
-    // navigate('/create', { state: { eventData: event, isEdit: true } }); // Nanti kita aktifkan ini
-    alert("Fitur Edit akan segera hadir!"); 
+    navigate(`/edit/${event.id}`); 
     setActiveMenuId(null);
   };
 
