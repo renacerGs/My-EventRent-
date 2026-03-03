@@ -138,6 +138,7 @@ export default function EditEvent() {
                   </select>
                </div>
                <div><label className={labelStyle}>Price (Rp)</label><input type="number" name="price" value={formData.price} onChange={handleChange} className={inputStyle} /></div>
+               
                {/* INPUT STOCK BARU */}
                <div><label className={labelStyle}>Stock</label><input type="number" name="stock" value={formData.stock} onChange={handleChange} required className={inputStyle} /></div>
             </div>

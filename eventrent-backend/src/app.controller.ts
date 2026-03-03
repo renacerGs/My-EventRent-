@@ -43,6 +43,12 @@ export class AppController {
   async getMyTickets(@Query('userId') userId: number) {
     return await this.appService.getMyTickets(userId);
   }
+
+  // <--- BARU: Endpoint Lihat Peserta
+  @Get('events/:id/attendees')
+  async getAttendees(@Param('id') id: number, @Query('userId') userId: number) {
+    return await this.appService.getEventAttendees(id, userId);
+  }
   
   // --- AUTH ENDPOINTS ---
 
@@ -72,5 +78,11 @@ export class AppController {
   @Put('users/:id/password')
   async changePassword(@Param('id') id: number, @Body() data: { oldPass: string; newPass: string }) {
     return await this.appService.changePassword(id, data);
+  }
+
+  // <--- BARU: Endpoint Increment View
+  @Post('events/:id/view')
+  async incrementView(@Param('id') id: number) {
+    return await this.appService.incrementView(id);
   }
 }

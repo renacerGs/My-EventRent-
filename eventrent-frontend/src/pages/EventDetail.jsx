@@ -18,8 +18,15 @@ export default function EventDetail({ events }) {
       const found = events.find(e => String(e.id) === String(id));
       if (found) {
         setEvent(found);
+        
+        // --- BARU: HIT API VIEW COUNTER ---
+        fetch(`http://localhost:3000/api/events/${id}/view`, { method: 'POST' })
+          .catch(err => console.error("Gagal update view:", err));
+        // ---------------------------------
+
         const savedLikes = JSON.parse(localStorage.getItem('likedEvents')) || [];
-        setIsLiked(savedLikes.some(item => String(item.id) === String(found.id)));
+        const alreadyLiked = savedLikes.some(item => String(item.id) === String(found.id));
+        setIsLiked(alreadyLiked);
       }
     }
     window.scrollTo(0, 0);

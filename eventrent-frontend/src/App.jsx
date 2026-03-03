@@ -15,6 +15,7 @@ import ManageEvent from "./components/ManageEvent";
 import EditEvent from "./components/EditEvent"; 
 import Profile from "./components/Profile"; 
 import MyTickets from "./components/MyTickets"; 
+import EventDashboard from "./components/EventDashboard";
 
 export default function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -111,6 +112,12 @@ export default function App() {
             <Route path="/my-tickets" element={
               <ProtectedRoute>
                 <MyTickets />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/manage/event/:id" element={
+              <ProtectedRoute>
+                <EventDashboard />
               </ProtectedRoute>
             } />
             
