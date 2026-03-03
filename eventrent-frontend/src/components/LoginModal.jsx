@@ -1,14 +1,56 @@
 import React, { useState } from 'react';
+import { useGoogleLogin } from '@react-oauth/google'; // <--- 1. Import Hook ini
 
-export default function LoginModal({ isOpen, onClose }) {
+export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
   const [isSignUp, setIsSignUp] = useState(false);
+
+  // 2. Pasang Logika Login Google
+  const loginWithGoogle = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      try {
+        console.log("Dapat Token Google:", tokenResponse); // Debugging
+
+        // A. Ambil Info User dari Google
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        });
+        const googleUser = await res.json();
+        console.log("Data User Google:", googleUser); // Debugging
+
+        // B. Kirim ke Backend NestJS
+        const backendRes = await fetch('http://localhost:3000/api/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: googleUser.email,
+            name: googleUser.name,
+            picture: googleUser.picture,
+            googleId: googleUser.sub
+          }),
+        });
+
+        if (!backendRes.ok) throw new Error("Gagal simpan ke database");
+
+        const loggedInUser = await backendRes.json();
+        console.log("Login Sukses:", loggedInUser); // Debugging
+        
+        // C. Kabari App.jsx & Tutup Modal
+        onLoginSuccess(loggedInUser); 
+        onClose();
+
+      } catch (err) {
+        console.error("Login Error:", err);
+        alert("Gagal login. Cek console browser.");
+      }
+    },
+    onError: () => alert('Login Gagal dari Google-nya langsung!'),
+  });
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white w-full max-w-[380px] rounded-[32px] p-6 relative shadow-2xl animate-fadeIn">
-        {/* Tombol Close */}
         <button 
           onClick={onClose} 
           className="absolute top-4 right-6 text-gray-400 hover:text-gray-600 text-xl transition-colors"
@@ -16,7 +58,6 @@ export default function LoginModal({ isOpen, onClose }) {
           &times;
         </button>
         
-        {/* Header Section - Lebih Ringkas */}
         <div className="flex flex-col items-center mb-4">
           <div className="w-16 h-16 bg-[#87CEEB] rounded-full mb-3 overflow-hidden border-4 border-white shadow-sm">
             <img 
@@ -25,7 +66,6 @@ export default function LoginModal({ isOpen, onClose }) {
               className="w-full h-full object-cover"
             />
           </div>
-          
           <h2 className="text-xl font-black text-gray-900 tracking-tight text-center">
             {isSignUp ? 'Create Account' : 'Welcome Back'}
           </h2>
@@ -34,20 +74,16 @@ export default function LoginModal({ isOpen, onClose }) {
           </p>
         </div>
 
-        {/* Form Section - Spasi Dirapatkan */}
         <form className="space-y-3" onSubmit={(e) => e.preventDefault()}>
-          {isSignUp && (
+          {/* ... (Bagian Input Form Manual Tetap Sama) ... */}
+           {isSignUp && (
             <div>
               <label className="block text-[10px] font-bold text-gray-700 mb-1 ml-1 uppercase tracking-wide">Full Name</label>
               <div className="relative group">
                 <div className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center">
                   <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 text-[#5D3F9B]" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                 </div>
-                <input 
-                  type="text" 
-                  placeholder="Enter your name" 
-                  className="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-[#FF6B35] outline-none transition-all text-sm placeholder:text-gray-400" 
-                />
+                <input type="text" placeholder="Enter your name" className="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-[#FF6B35] outline-none transition-all text-sm placeholder:text-gray-400" />
               </div>
             </div>
           )}
@@ -58,11 +94,7 @@ export default function LoginModal({ isOpen, onClose }) {
               <div className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center">
                 <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 text-[#5D3F9B]" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
               </div>
-              <input 
-                type="email" 
-                placeholder="Enter email" 
-                className="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-[#FF6B35] outline-none transition-all text-sm placeholder:text-gray-400" 
-              />
+              <input type="email" placeholder="Enter email" className="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-[#FF6B35] outline-none transition-all text-sm placeholder:text-gray-400" />
             </div>
           </div>
 
@@ -72,11 +104,7 @@ export default function LoginModal({ isOpen, onClose }) {
               <div className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 flex items-center justify-center">
                 <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4 text-[#F4B400]" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
               </div>
-              <input 
-                type="password" 
-                placeholder="Enter password" 
-                className="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-[#FF6B35] outline-none transition-all text-sm placeholder:text-gray-400" 
-              />
+              <input type="password" placeholder="Enter password" className="w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-gray-100 rounded-xl focus:bg-white focus:border-[#FF6B35] outline-none transition-all text-sm placeholder:text-gray-400" />
             </div>
           </div>
 
@@ -94,9 +122,13 @@ export default function LoginModal({ isOpen, onClose }) {
           </span>
         </div>
 
-        <button className="w-full py-2.5 border border-gray-200 rounded-xl flex items-center justify-center gap-3 hover:bg-gray-50 font-bold text-gray-700 text-xs transition-all shadow-sm">
+        {/* 3. TOMBOL GOOGLE SEKARANG MANGGIL FUNGSI LOGIN */}
+        <button 
+          onClick={() => loginWithGoogle()} // <--- INI KUNCINYA
+          className="w-full py-2.5 border border-gray-200 rounded-xl flex items-center justify-center gap-3 hover:bg-gray-50 font-bold text-gray-700 text-xs transition-all shadow-sm active:scale-95"
+        >
           <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-4 h-4" alt="Google" />
-          Google
+          Continue with Google
         </button>
 
         <p className="text-center mt-5 text-[11px] text-gray-500 font-medium">
