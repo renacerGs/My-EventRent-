@@ -65,7 +65,7 @@ function PaymentModal({ isOpen, onClose, onConfirm, event, quantity, totalPrice,
                 disabled={isBuying}
                 className="w-full py-5 bg-[#FF6B35] text-white rounded-2xl font-bold shadow-xl shadow-orange-100 hover:bg-[#e85526] transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-3 uppercase text-xs tracking-widest"
               >
-                {isBuying ? 'Verifikasi...' : 'Cek Tiket'}
+                {isBuying ? 'Verifikasi...' : 'Bayar'}
               </button>
               
               <button 
@@ -153,6 +153,9 @@ export default function EventDetail({ events }) {
 
   if (!event) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-400 uppercase tracking-widest">Loading...</div>;
 
+  // Cek apakah tiket sold out
+  const isSoldOut = event.stock < 1;
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20 font-sans">
       <PaymentModal 
@@ -183,13 +186,30 @@ export default function EventDetail({ events }) {
             <h1 className="text-3xl md:text-5xl font-bold text-gray-900 leading-tight mb-8 uppercase">{event.title}</h1>
             
             <div className="space-y-5 mb-10 text-left">
+              
+              {/* IKON KALENDER - OUTLINE */}
               <div className="flex items-center gap-4 text-gray-700 font-semibold">
-                <svg className="w-6 h-6 text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7H5v14z" /></svg>
+                <svg className="w-6 h-6 text-[#FF6B35] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
                 <p>{event.date}</p>
               </div>
+
+              {/* IKON LOKASI - OUTLINE */}
               <div className="flex items-center gap-4 text-gray-700 font-semibold">
-                <svg className="w-6 h-6 text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>
-                <p>{event.location}</p>
+                <svg className="w-6 h-6 text-[#FF6B35] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <p>{event.location}</p> 
+              </div>
+
+              {/* IKON TELEPON - OUTLINE */}
+              <div className="flex items-center gap-4 text-gray-700 font-semibold">
+                <svg className="w-6 h-6 text-[#FF6B35] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                </svg>
+                <p>{event.phone}</p>
               </div>
             </div>
 
@@ -209,23 +229,38 @@ export default function EventDetail({ events }) {
             </button>
 
             <div className="w-full bg-gray-100/80 rounded-3xl p-6 shadow-sm border border-gray-100 text-left">
-              <div className="mb-4">
-                 <span className="block text-gray-400 text-[10px] font-bold uppercase mb-1">Price per Ticket</span>
-                 <span className="text-2xl font-bold text-gray-900 tracking-tight uppercase">{Number(event.price) === 0 ? 'Free' : `Rp ${parseInt(event.price).toLocaleString()}`}</span>
+              
+              {/* PERUBAHAN DI SINI: Harga dan Stok sejajar pakai Flexbox */}
+              <div className="mb-5 flex justify-between items-end border-b border-gray-200/60 pb-4">
+                 <div>
+                   <span className="block text-gray-400 text-[10px] font-bold uppercase mb-1">Price per Ticket</span>
+                   <span className="text-2xl font-bold text-gray-900 tracking-tight uppercase">{Number(event.price) === 0 ? 'Free' : `Rp ${parseInt(event.price).toLocaleString()}`}</span>
+                 </div>
+                 <div className="text-right">
+                   <span className="block text-gray-400 text-[10px] font-bold uppercase mb-1">Available</span>
+                   <span className={`text-xl font-bold tracking-tight ${isSoldOut ? 'text-red-500' : 'text-[#FF6B35]'}`}>
+                     {isSoldOut ? 'Habis' : event.stock}
+                   </span>
+                 </div>
               </div>
               
-              <div className="flex items-center justify-between bg-white rounded-xl p-2 mb-4 shadow-sm border border-gray-100">
-                <button onClick={() => ticketQty > 1 && setTicketQty(ticketQty - 1)} className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200 font-bold">-</button>
-                <span className="font-bold text-gray-900">{ticketQty}</span>
-                <button onClick={() => ticketQty < event.stock && setTicketQty(ticketQty + 1)} className="w-8 h-8 flex items-center justify-center bg-[#FF6B35] rounded-lg text-white hover:bg-orange-600 font-bold">+</button>
+              <div className={`flex items-center justify-between bg-white rounded-xl p-2 mb-4 shadow-sm border border-gray-100 ${isSoldOut ? 'opacity-50 pointer-events-none' : ''}`}>
+                <button onClick={() => ticketQty > 1 && setTicketQty(ticketQty - 1)} disabled={isSoldOut} className="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200 font-bold">-</button>
+                <span className="font-bold text-gray-900">{isSoldOut ? 0 : ticketQty}</span>
+                <button onClick={() => ticketQty < event.stock && setTicketQty(ticketQty + 1)} disabled={isSoldOut} className="w-8 h-8 flex items-center justify-center bg-[#FF6B35] rounded-lg text-white hover:bg-orange-600 font-bold">+</button>
               </div>
 
+              {/* TOMBOL CHECKOUT CONDITIONAL STYLING */}
               <button 
                 onClick={handleBuyTicket} 
-                disabled={isBuying || event.stock < 1} 
-                className="w-full py-4 rounded-xl font-bold text-xs uppercase tracking-widest bg-[#E85526] hover:bg-[#d1461b] text-white transition-all shadow-lg active:scale-95"
+                disabled={isBuying || isSoldOut} 
+                className={`w-full py-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${
+                  isSoldOut 
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none' // Style saat Sold Out
+                    : 'bg-[#E85526] hover:bg-[#d1461b] text-white shadow-lg active:scale-95' // Style Normal
+                }`}
               >
-                {event.stock < 1 ? 'Sold Out' : `Checkout (${ticketQty})`}
+                {isSoldOut ? 'SOLD OUT' : `Checkout (${ticketQty})`}
               </button>
             </div>
           </div>

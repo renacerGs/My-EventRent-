@@ -250,9 +250,13 @@ export class AppService implements OnModuleInit {
     try {
       const checkRes = await this.pool.query('SELECT * FROM users WHERE email = $1', [user.email]);
       if (checkRes.rows.length > 0) return checkRes.rows[0];
+      
+      // Jika Google tidak ngasih foto, kasih avatar karakter random berdasarkan nama
+      const defaultPic = user.picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name)}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4`;
+      
       const insertRes = await this.pool.query(
         `INSERT INTO users (email, name, picture, google_id) VALUES ($1, $2, $3, $4) RETURNING *`,
-        [user.email, user.name, user.picture, user.googleId]
+        [user.email, user.name, defaultPic, user.googleId]
       );
       return insertRes.rows[0];
     } catch (err) {
@@ -263,8 +267,12 @@ export class AppService implements OnModuleInit {
   async registerUser(data: any) {
     const checkRes = await this.pool.query('SELECT * FROM users WHERE email = $1', [data.email]);
     if (checkRes.rows.length > 0) throw new BadRequestException('Email sudah terdaftar!');
+    
     const hashedPassword = await bcrypt.hash(data.password, 10);
-    const defaultPic = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name)}&background=random`;
+    
+    // PERUBAHAN DI SINI: Pakai DiceBear API buat ngasih avatar karakter random berdasarkan nama user
+    const defaultPic = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(data.name)}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4`;
+    
     const insertRes = await this.pool.query(
       `INSERT INTO users (name, email, password, picture) VALUES ($1, $2, $3, $4) RETURNING *`,
       [data.name, data.email, hashedPassword, defaultPic]

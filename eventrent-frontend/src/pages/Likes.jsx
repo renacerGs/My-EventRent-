@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 export default function Likes() {
   const [likedEvents, setLikedEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
   
   // Ambil data user yang login
   const user = JSON.parse(localStorage.getItem('user'));
@@ -33,9 +34,30 @@ export default function Likes() {
     };
 
     fetchLikedEvents();
-  }, []);
+  }, [user?.id]); // Dependency array di-update
 
-  // FUNGSI BAGIKAN (Web Share API)
+  // --- FUNGSI DIRECT UNLIKE ---
+  const handleUnlike = async (e, eventId) => {
+    e.preventDefault(); // Mencegah pindah halaman saat tombol di-klik
+    
+    // Hapus dari tampilan layar secara instan (Optimistic UI Update)
+    const updatedLikes = likedEvents.filter(event => event.id !== eventId);
+    setLikedEvents(updatedLikes);
+    localStorage.setItem('likedEvents', JSON.stringify(updatedLikes)); // Update localStorage juga
+    
+    try {
+      // Kirim perintah hapus ke database
+      await axios.post('http://localhost:3000/api/likes/toggle', {
+        userId: user.id,
+        eventId: eventId
+      });
+    } catch (error) {
+      console.error("Gagal unlike event:", error);
+      alert("Terjadi kesalahan saat menghapus like.");
+    }
+  };
+
+  // --- FUNGSI BAGIKAN (Web Share API) ---
   const handleShare = async (e, event) => {
     e.preventDefault(); 
     const shareData = {
@@ -65,11 +87,24 @@ export default function Likes() {
   }
 
   return (
-    <div className="min-h-screen bg-white py-10 px-6 font-sans text-left">
+    <div className="min-h-screen bg-white py-10 px-6 font-sans text-left relative">
       <div className="max-w-5xl mx-auto">
-        {/* JUDUL BIASA (Tanpa Italic/Black) */}
-        <h1 className="text-4xl font-bold text-gray-900 mb-10 uppercase tracking-tight">Likes</h1>
+        
+        {/* --- HEADER: TOMBOL BACK & JUDUL --- */}
+        <div className="flex items-center gap-4 mb-10">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-50 border border-gray-200 text-gray-500 hover:bg-[#FF6B35] hover:text-white hover:border-[#FF6B35] transition-all"
+            title="Go Back"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h1 className="text-4xl font-bold text-gray-900 uppercase tracking-tight m-0">Likes</h1>
+        </div>
 
+        {/* --- CONTENT AREA --- */}
         {!user ? (
           <div className="text-center py-20 bg-gray-50 rounded-[40px] border border-dashed border-gray-200">
             <p className="text-gray-500 mb-6 font-semibold uppercase">Please login to see your liked events.</p>
@@ -77,6 +112,9 @@ export default function Likes() {
           </div>
         ) : likedEvents.length === 0 ? (
           <div className="text-center py-20 bg-gray-50 rounded-[40px] border border-dashed border-gray-200">
+            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+               <svg className="w-10 h-10 text-gray-300" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+            </div>
             <p className="text-gray-500 font-bold uppercase tracking-widest">No liked events yet.</p>
           </div>
         ) : (
@@ -87,9 +125,9 @@ export default function Likes() {
                 key={event.id} 
                 className="flex flex-col md:flex-row items-center justify-between bg-white rounded-[32px] border border-gray-100 p-2 shadow-sm hover:shadow-md transition-all group overflow-hidden"
               >
-                {/* INFO CONTENT (KIRI) - Font Bold Standar */}
+                {/* INFO CONTENT (KIRI) */}
                 <div className="flex-1 p-8">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2 uppercase tracking-tight group-hover:text-[#FF6B35] transition-colors">
+                  <h3 className="text-2xl font-bold text-gray-900 mb-2 uppercase tracking-tight group-hover:text-[#FF6B35] transition-colors line-clamp-2">
                     {event.title}
                   </h3>
                   <p className="text-[#FF6B35] text-sm font-bold uppercase mb-1 tracking-widest">
@@ -112,14 +150,18 @@ export default function Likes() {
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
                     />
                     
-                    {/* BUTTON ACTIONS SESUAI GAMBAR */}
+                    {/* BUTTON ACTIONS */}
                     <div className="absolute bottom-3 right-3 flex gap-2">
-                      {/* Tombol Like Merah */}
-                      <div className="bg-white p-2 rounded-full text-red-500 shadow-xl border border-gray-50 transition-transform active:scale-90">
+                      {/* Tombol Unlike (Langsung Hapus) */}
+                      <button 
+                        onClick={(e) => handleUnlike(e, event.id)}
+                        className="bg-white p-2 rounded-full text-red-500 shadow-xl border border-gray-50 transition-transform active:scale-90 hover:bg-red-50"
+                        title="Remove from Likes"
+                      >
                         <svg className="w-5 h-5 fill-current" viewBox="0 0 24 24">
                           <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                         </svg>
-                      </div>
+                      </button>
 
                       {/* Tombol Share */}
                       <button 

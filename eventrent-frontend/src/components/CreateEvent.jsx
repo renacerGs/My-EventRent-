@@ -175,7 +175,7 @@ export default function CreateEvent() {
             </div>
 
             <div className="flex justify-end items-center gap-4 pt-4">
-              <button type="button" onClick={() => navigate('/')} className="text-gray-400 hover:text-gray-600 px-6 py-2.5 font-bold text-sm transition">Cancel</button>
+              <button type="button" onClick={() => navigate('/')} className="bg-slate-100 text-gray-400 hover:text-orange-400 hover:font-extrabold rounded-full  px-6 py-2.5 font-bold text-sm transition">Cancel</button>
               <button 
                 type="submit" 
                 disabled={isLoading}

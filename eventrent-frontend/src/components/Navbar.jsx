@@ -73,14 +73,16 @@ export default function Navbar({ user, events, onSearchSelect, onOpenLogin, onLo
   }, []);
 
   return (
-    <nav className="bg-white flex items-center justify-between px-8 py-4 shadow-sm relative z-50 text-left font-sans">
+    <nav className="bg-white/80 backdrop-blur-md flex items-center justify-between px-8 py-4 shadow-sm sticky top-0 z-[100] text-left font-sans transition-all duration-300">
       
       {/* LOGO */}
       <div className="flex items-center gap-3">
-        <Link to="/" className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-[#FF6B35] rounded-full shadow-inner flex items-center justify-center">
-             <div className="w-6 h-6 bg-white/20 rounded-full blur-sm"></div>
-          </div>
+        <Link to="/" className="flex items-center gap-3 select-none cursor-pointer hover:opacity-80 transition-opacity">
+          <img 
+            src="/logo.png" 
+            alt="EventRent Logo" 
+            className="w-10 h-10 rounded-lg shadow-sm object-cover" 
+          />
           <div>
             <h1 className="text-xl font-extrabold text-[#FF6B35] leading-none tracking-tight">EventRent</h1>
           </div>
@@ -149,7 +151,6 @@ export default function Navbar({ user, events, onSearchSelect, onOpenLogin, onLo
             </div>
           </>
         ) : (
-          /* LOGIN BUTTON - SEKARANG WARNA ORANGE */
           <button 
             onClick={onOpenLogin} 
             className="bg-[#FF6B35] text-white px-8 py-2.5 rounded-full font-bold text-xs uppercase tracking-widest hover:bg-orange-600 transition shadow-md shadow-orange-100 active:scale-95"

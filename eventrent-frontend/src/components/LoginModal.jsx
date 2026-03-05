@@ -22,6 +22,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
           headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
         });
         const googleUser = await res.json();
+        
         const backendRes = await fetch('http://localhost:3000/api/auth/google', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -32,17 +33,22 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
             googleId: googleUser.sub
           }),
         });
-        if (!backendRes.ok) throw new Error("Gagal login dengan Google");
+        
+        if (!backendRes.ok) throw new Error("Gagal login dengan Google dari Server");
+        
         const loggedInUser = await backendRes.json();
+        
+        // Panggil onLoginSuccess, App.jsx yang bakal nangani nyimpen ke localStorage
         onLoginSuccess(loggedInUser); 
-        onClose();
+        
       } catch (err) {
-        setErrorMsg("Google login failed. Please try again.");
+        console.error("Error saat Google Login:", err);
+        setErrorMsg("Koneksi ke server gagal. Coba lagi.");
       } finally {
         setIsLoading(false);
       }
     },
-    onError: () => setErrorMsg('Login Gagal dari Google!'),
+    onError: () => setErrorMsg('Akses Google ditolak!'),
   });
 
   const handleSubmit = async (e) => {

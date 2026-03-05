@@ -22,17 +22,15 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // STATE USER
-  const [user, setUser] = useState(null);
+  // --- PERBAIKAN DI SINI ---
+  // Langsung cek localStorage saat state pertama kali dibuat (Synchronous)
+  const [user, setUser] = useState(() => {
+    const storedUser = localStorage.getItem('user');
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
 
   useEffect(() => {
-    // A. Cek login
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-
-    // B. Ambil data events
+    // Ambil data events
     fetch('http://localhost:3000/api/events')
       .then(res => res.json())
       .then(data => {
@@ -44,10 +42,12 @@ export default function App() {
       });
   }, []);
 
-  // KOMPONEN PROTEKSI (Tetap Sama)
+  // KOMPONEN PROTEKSI
   const ProtectedRoute = ({ children }) => {
     if (!user) {
-      setIsLoginOpen(true);
+      // Jika benar-benar belum login, buka modal dan lempar ke home
+      // timeout digunakan agar tidak memblokir render
+      setTimeout(() => setIsLoginOpen(true), 0);
       return <Navigate to="/" replace />;
     }
     return children;
@@ -114,7 +114,6 @@ export default function App() {
               </ProtectedRoute>
             } />
 
-            {/* UPDATE PATH: Dikembalikan ke /manage/event/:id agar sesuai URL browser */}
             <Route path="/manage/event/:id" element={
               <ProtectedRoute>
                 <EventDashboard />
@@ -135,8 +134,18 @@ export default function App() {
           onLoginSuccess={(userData) => {
             console.log("User berhasil login:", userData);
             setUser(userData); 
-            localStorage.setItem('user', JSON.stringify(userData)); 
-            setIsLoginOpen(false); 
+            
+            // --- SABUK PENGAMAN QUOTA EXCEEDED ---
+            try {
+              localStorage.setItem('user', JSON.stringify(userData)); 
+            } catch (error) {
+              console.warn("Memori browser penuh! Menyimpan sesi login tanpa gambar lokal.");
+              // Simpan tanpa gambar di browser biar nggak error
+              const safeUserData = { ...userData, picture: null };
+              localStorage.setItem('user', JSON.stringify(safeUserData));
+            }
+            
+            setIsLoginOpen(false); // Pastikan modal ketutup!
           }}
         />
 

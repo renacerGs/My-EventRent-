@@ -3,16 +3,13 @@ import { useNavigate } from 'react-router-dom';
 
 export default function Profile() {
   const navigate = useNavigate();
-  // Ambil user dari localStorage
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null);
   
-  // State Edit Profile
   const [name, setName] = useState('');
   const [imagePreview, setImagePreview] = useState(null);
   const [imageBase64, setImageBase64] = useState(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
-  // State Ganti Password
   const [passData, setPassData] = useState({ oldPass: '', newPass: '', confirmPass: '' });
   const [isLoadingPass, setIsLoadingPass] = useState(false);
 
@@ -21,18 +18,52 @@ export default function Profile() {
       navigate('/'); 
       return;
     }
-    // Set data awal
     setName(user.name);
     setImagePreview(user.picture);
-  }, []);
+  }, [navigate, user]);
 
-  // --- HANDLER UPDATE PROFILE ---
+  // --- FITUR BARU: AUTO COMPRESS IMAGE ---
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Buat preview instan (URL lokal sementara)
       setImagePreview(URL.createObjectURL(file));
+      
       const reader = new FileReader();
-      reader.onloadend = () => setImageBase64(reader.result);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          // Buat Canvas untuk nge-resize gambar
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 300; // Maksimal lebar 300px
+          const MAX_HEIGHT = 300; // Maksimal tinggi 300px
+          let width = img.width;
+          let height = img.height;
+
+          // Hitung rasio
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Kompres ke format JPEG dengan kualitas 70%
+          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+          setImageBase64(compressedBase64); // Simpan hasil kompresan
+        };
+        img.src = event.target.result;
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -47,28 +78,38 @@ export default function Profile() {
         body: JSON.stringify({ name, img: imageBase64 })
       });
       const data = await res.json();
+      
       if (res.ok) {
-        // Update LocalStorage biar Navbar berubah
-        const updatedUser = { ...user, name: data.name, picture: data.picture };
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        setUser(updatedUser); // Update state lokal
+        const newPicture = data.picture || imagePreview; 
+        const updatedUser = { ...user, name: data.name, picture: newPicture };
+        
+        // Simpan ke localStorage dengan aman
+        try {
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+        } catch (error) {
+          console.warn("Memori browser penuh! Menyimpan data tanpa gambar.");
+          const safeUser = { ...updatedUser, picture: null };
+          localStorage.setItem('user', JSON.stringify(safeUser));
+        }
+
+        setUser(updatedUser); 
+        setImageBase64(null); // Kosongkan state setelah berhasil
+        
         alert("Profile updated successfully!");
-        window.location.reload(); // Reload biar Navbar segar
+        window.location.reload(); 
       } else {
         alert("Failed to update profile");
       }
     } catch (err) {
       console.error(err);
+      alert("Something went wrong");
     } finally {
       setIsLoadingProfile(false);
     }
   };
 
-  // --- HANDLER GANTI PASSWORD ---
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    
-    // 1. Validasi Frontend
     if (passData.newPass !== passData.confirmPass) {
       alert("New Password and Confirmation do not match!");
       return;
@@ -83,12 +124,8 @@ export default function Profile() {
       const res = await fetch(`http://localhost:3000/api/users/${user.id}/password`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          oldPass: passData.oldPass, 
-          newPass: passData.newPass 
-        })
+        body: JSON.stringify({ oldPass: passData.oldPass, newPass: passData.newPass })
       });
-      
       const data = await res.json();
       if (res.ok) {
         alert("Password changed successfully!");
@@ -104,13 +141,12 @@ export default function Profile() {
   };
 
   if (!user) return null;
-
-  // Cek apakah user login via Google (Biasanya google_id ada isinya, password kosong/null di DB, 
-  // tapi di localStorage kita gak simpan password. Kita cek googleId aja)
   const isGoogleUser = !!user.googleId; 
 
   const inputStyle = "w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[#FF6B35] focus:ring-1 focus:ring-orange-200 transition bg-white";
   const labelStyle = "block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide";
+
+  const currentImage = imagePreview || user.picture;
 
   return (
     <div className="bg-gray-50 min-h-screen pt-10 pb-20 font-sans">
@@ -119,20 +155,26 @@ export default function Profile() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           
-          {/* KOLOM KIRI: EDIT PUBLIC PROFILE */}
           <div className="bg-white p-8 rounded-[24px] shadow-sm border border-gray-100 h-fit">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Personal Information</h2>
             
             <form onSubmit={handleUpdateProfile}>
-              {/* Foto Profil */}
               <div className="flex flex-col items-center mb-8">
-                <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-gray-100 shadow-md mb-4 relative group">
-                   <img src={imagePreview || user.picture} alt="Profile" className="w-full h-full object-cover" />
+                
+                <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-gray-100 shadow-md mb-4 relative group bg-gray-100 flex items-center justify-center">
+                   {currentImage && currentImage.length > 10 ? (
+                     <img src={currentImage} alt="Profile" className="w-full h-full object-cover" />
+                   ) : (
+                     <svg className="w-16 h-16 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                       <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                     </svg>
+                   )}
                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer">
                       <span className="text-white text-xs font-bold">Change</span>
                    </div>
                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" />
                 </div>
+                
                 <p className="text-xs text-gray-400">Allowed *.jpeg, *.jpg, *.png</p>
               </div>
 
@@ -159,7 +201,6 @@ export default function Profile() {
             </form>
           </div>
 
-          {/* KOLOM KANAN: CHANGE PASSWORD (HANYA MUNCUL KALAU BUKAN GOOGLE USER) */}
           <div className="bg-white p-8 rounded-[24px] shadow-sm border border-gray-100 h-fit">
             <h2 className="text-xl font-bold text-gray-900 mb-6">Security</h2>
             
@@ -177,40 +218,18 @@ export default function Profile() {
               <form onSubmit={handleChangePassword} className="space-y-5">
                 <div>
                   <label className={labelStyle}>Current Password</label>
-                  <input 
-                    type="password" 
-                    value={passData.oldPass} 
-                    onChange={e => setPassData({...passData, oldPass: e.target.value})} 
-                    className={inputStyle} placeholder="Enter current password" required
-                  />
+                  <input type="password" value={passData.oldPass} onChange={e => setPassData({...passData, oldPass: e.target.value})} className={inputStyle} placeholder="Enter current password" required />
                 </div>
-
                 <div>
                   <label className={labelStyle}>New Password</label>
-                  <input 
-                    type="password" 
-                    value={passData.newPass} 
-                    onChange={e => setPassData({...passData, newPass: e.target.value})} 
-                    className={inputStyle} placeholder="Enter new password" required
-                  />
+                  <input type="password" value={passData.newPass} onChange={e => setPassData({...passData, newPass: e.target.value})} className={inputStyle} placeholder="Enter new password" required />
                 </div>
-
                 <div>
                   <label className={labelStyle}>Confirm New Password</label>
-                  <input 
-                    type="password" 
-                    value={passData.confirmPass} 
-                    onChange={e => setPassData({...passData, confirmPass: e.target.value})} 
-                    className={inputStyle} placeholder="Re-enter new password" required
-                  />
+                  <input type="password" value={passData.confirmPass} onChange={e => setPassData({...passData, confirmPass: e.target.value})} className={inputStyle} placeholder="Re-enter new password" required />
                 </div>
-
                 <div className="pt-2">
-                   <button 
-                    type="submit" 
-                    disabled={isLoadingPass}
-                    className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold text-sm shadow-lg hover:bg-gray-800 transition disabled:opacity-50"
-                  >
+                   <button type="submit" disabled={isLoadingPass} className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold text-sm shadow-lg hover:bg-gray-800 transition disabled:opacity-50">
                     {isLoadingPass ? 'Updating...' : 'Update Password'}
                   </button>
                 </div>
