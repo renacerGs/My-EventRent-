@@ -18,9 +18,9 @@ export default function CreateEvent() {
     category: '',
     location: '',
     date: '',
-    time: '',
+    time: '', // Format akhirnya tetap akan jadi "HH:MM"
     price: '',
-    stock: '', // <--- Tambah ini
+    stock: '', 
     description: '',
   });
   
@@ -106,7 +106,7 @@ export default function CreateEvent() {
                       <p className="text-xs text-gray-500 font-medium">Click to upload or drag & drop</p>
                     </div>
                   )}
-                  <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} />
+                  <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} required />
                 </label>
               </div>
             </div>
@@ -146,9 +146,48 @@ export default function CreateEvent() {
                 <label htmlFor="date" className={labelStyle}>Date</label>
                 <input type="date" id="date" name="date" value={formData.date} onChange={handleChange} required className={`${inputStyle} cursor-pointer`} />
               </div>
+              
+              {/* --- PERUBAHAN DI SINI: INPUT JAM DIBUAT DROPDOWN --- */}
               <div className="group">
-                <label htmlFor="time" className={labelStyle}>Time</label>
-                <input type="time" id="time" name="time" value={formData.time} onChange={handleChange} required className={`${inputStyle} cursor-pointer`} />
+                <label className={labelStyle}>Time</label>
+                <div className="flex items-center gap-3">
+                  
+                  {/* Dropdown Jam */}
+                  <select
+                    value={formData.time ? formData.time.split(':')[0] : ''}
+                    onChange={(e) => {
+                      const currentMin = formData.time ? formData.time.split(':')[1] : '00';
+                      setFormData(prev => ({ ...prev, time: `${e.target.value}:${currentMin}` }));
+                    }}
+                    className={`${inputStyle} text-center px-2 cursor-pointer appearance-none`}
+                    required
+                  >
+                    <option value="" disabled hidden>HH</option>
+                    {Array.from({ length: 24 }, (_, i) => {
+                      const h = i.toString().padStart(2, '0');
+                      return <option key={h} value={h}>{h}</option>;
+                    })}
+                  </select>
+                  
+                  <span className="text-gray-400 font-bold">:</span>
+                  
+                  {/* Dropdown Menit (Kelipatan 5 Menit) */}
+                  <select
+                    value={formData.time ? formData.time.split(':')[1] : ''}
+                    onChange={(e) => {
+                      const currentHour = formData.time ? formData.time.split(':')[0] : '09';
+                      setFormData(prev => ({ ...prev, time: `${currentHour}:${e.target.value}` }));
+                    }}
+                    className={`${inputStyle} text-center px-2 cursor-pointer appearance-none`}
+                    required
+                  >
+                    <option value="" disabled hidden>MM</option>
+                    {['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'].map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+
+                </div>
               </div>
             </div>
 
@@ -162,7 +201,7 @@ export default function CreateEvent() {
                 </div>
               </div>
               
-              {/* Input Stock (BARU) */}
+              {/* Input Stock */}
               <div>
                 <label htmlFor="stock" className={labelStyle}>Ticket Stock / Quota</label>
                 <input type="number" id="stock" name="stock" value={formData.stock || ''} onChange={handleChange} placeholder="Ex: 100" required className={inputStyle} />
@@ -171,7 +210,7 @@ export default function CreateEvent() {
 
             <div>
               <label htmlFor="description" className={labelStyle}>Description</label>
-              <textarea id="description" name="description" value={formData.description} onChange={handleChange} placeholder="Tell people about event" rows="4" className="w-full border border-gray-200 rounded-[20px] px-5 py-4 text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:border-[#FF6B35] transition resize-none min-h-[120px]" />
+              <textarea id="description" name="description" value={formData.description} onChange={handleChange} placeholder="Tell people about event" rows="4" required className="w-full border border-gray-200 rounded-[20px] px-5 py-4 text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:border-[#FF6B35] transition resize-none min-h-[120px]" />
             </div>
 
             <div className="flex justify-end items-center gap-4 pt-4">

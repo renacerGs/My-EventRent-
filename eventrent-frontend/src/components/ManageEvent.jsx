@@ -77,9 +77,11 @@ export default function ManageEvent() {
           </div>
         </div>
 
-        <div className="bg-white rounded-[24px] shadow-sm border border-gray-200 overflow-hidden min-h-[500px]">
-          {/* Header Tabel */}
-          <div className="grid grid-cols-12 gap-4 px-8 py-4 bg-gray-50/50 border-b border-gray-100 text-xs font-bold text-gray-400 uppercase tracking-wider">
+        {/* PERUBAHAN: Hapus class 'overflow-hidden' agar dropdown tidak kepotong */}
+        <div className="bg-white rounded-[24px] shadow-sm border border-gray-200 min-h-[500px]">
+          
+          {/* PERUBAHAN: Tambah 'rounded-t-[24px]' agar background abu-abu header tidak keluar dari border */}
+          <div className="grid grid-cols-12 gap-4 px-8 py-4 bg-gray-50/50 rounded-t-[24px] border-b border-gray-100 text-xs font-bold text-gray-400 uppercase tracking-wider">
             <div className="col-span-6">Event Details</div>
             <div className="col-span-2 text-center">Stock</div>
             <div className="col-span-2 text-center">Price</div>
@@ -91,7 +93,7 @@ export default function ManageEvent() {
               myEvents.map((event) => (
                 <div 
                   key={event.id} 
-                  onClick={() => handleCardClick(event.id)} // <--- KLIK CARD PINDAH KE DASHBOARD
+                  onClick={() => handleCardClick(event.id)} 
                   className="grid grid-cols-12 gap-4 px-8 py-5 items-center hover:bg-gray-50 transition-colors group cursor-pointer"
                 >
                   
@@ -126,7 +128,7 @@ export default function ManageEvent() {
                   <div className="col-span-2 flex justify-end relative">
                     <button 
                       onClick={(e) => {
-                        e.stopPropagation(); // Stop biar gak trigger masuk ke dashboard
+                        e.stopPropagation(); 
                         setActiveMenuId(activeMenuId === event.id ? null : event.id);
                       }}
                       className="p-2 text-gray-400 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors"

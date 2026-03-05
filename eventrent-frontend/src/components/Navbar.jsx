@@ -79,7 +79,7 @@ export default function Navbar({ user, events, onSearchSelect, onOpenLogin, onLo
       <div className="flex items-center gap-3">
         <Link to="/" className="flex items-center gap-3 select-none cursor-pointer hover:opacity-80 transition-opacity">
           <img 
-            src="/logo.png" 
+            src="/logo.jpeg" 
             alt="EventRent Logo" 
             className="w-10 h-10 rounded-lg shadow-sm object-cover" 
           />

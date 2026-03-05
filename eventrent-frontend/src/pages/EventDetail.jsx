@@ -2,6 +2,71 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// --- KOMPONEN POPUP STATUS (BARU) ---
+function StatusModal({ status, onClose, onGoToTickets }) {
+  if (!status) return null;
+
+  const isSuccess = status === 'success';
+
+  return (
+    <AnimatePresence>
+      <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.8, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.8, y: 20 }}
+          className="bg-white w-full max-w-sm rounded-[32px] shadow-2xl overflow-hidden p-8 flex flex-col items-center text-center"
+        >
+          {isSuccess ? (
+            <div className="w-24 h-24 bg-green-50 text-green-500 rounded-full flex items-center justify-center mb-6 border-[6px] border-green-100">
+              <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+            </div>
+          ) : (
+            <div className="w-24 h-24 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-6 border-[6px] border-red-100">
+              <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </div>
+          )}
+
+          <h3 className="text-2xl font-bold text-gray-900 mb-2 uppercase tracking-tight">
+            {isSuccess ? 'Payment Success!' : 'Payment Failed'}
+          </h3>
+          <p className="text-gray-500 text-xs font-medium mb-8 leading-relaxed">
+            {isSuccess 
+              ? 'Mantap bro! Tiket berhasil dibeli dan sudah masuk ke My Tickets.' 
+              : 'Waduh, transaksi gagal. Silakan periksa kembali koneksi atau metode pembayaran kamu.'}
+          </p>
+
+          <div className="w-full flex flex-col gap-3">
+            {isSuccess ? (
+              <>
+                <button 
+                  onClick={onGoToTickets} 
+                  className="w-full py-4 bg-[#FF6B35] text-white rounded-2xl font-bold uppercase text-xs tracking-widest shadow-xl hover:scale-[1.02] transition-all active:scale-95"
+                >
+                  Lihat Tiket Saya
+                </button>
+                <button 
+                  onClick={onClose} 
+                  className="w-full py-3 bg-gray-100 text-gray-500 rounded-2xl font-bold uppercase text-xs tracking-widest hover:bg-gray-200 transition-all"
+                >
+                  Tutup
+                </button>
+              </>
+            ) : (
+              <button 
+                onClick={onClose} 
+                className="w-full py-4 bg-red-500 text-white rounded-2xl font-bold uppercase text-xs tracking-widest shadow-xl hover:scale-[1.02] transition-all active:scale-95"
+              >
+                Coba Lagi
+              </button>
+            )}
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>
+  );
+}
+
 // --- KOMPONEN MODAL PAYMENT (FONT STANDAR) ---
 function PaymentModal({ isOpen, onClose, onConfirm, event, quantity, totalPrice, isBuying }) {
   if (!isOpen) return null;
@@ -93,6 +158,9 @@ export default function EventDetail({ events }) {
   const [ticketQty, setTicketQty] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // STATE BARU BUAT POPUP STATUS
+  const [paymentStatus, setPaymentStatus] = useState(null);
+
   const user = JSON.parse(localStorage.getItem('user'));
 
   useEffect(() => {
@@ -128,6 +196,7 @@ export default function EventDetail({ events }) {
     setIsModalOpen(true);
   };
 
+  // FUNGSI INI AJA YANG DIUPDATE BIAR MANGGIL POPUP
   const verifyAndRedirect = async () => {
     setIsBuying(true);
     setTimeout(async () => {
@@ -137,14 +206,18 @@ export default function EventDetail({ events }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId: user.id, eventId: event.id, quantity: ticketQty })
         });
+        
+        setIsModalOpen(false); // Tutup modal QRIS
+
         if (res.ok) {
-          setIsModalOpen(false);
-          navigate('/my-tickets'); 
+          setPaymentStatus('success');
+          setTicketQty(1);
         } else {
-          alert("Gagal memverifikasi tiket");
+          setPaymentStatus('failed');
         }
       } catch (error) {
-        alert("Koneksi bermasalah");
+        setIsModalOpen(false);
+        setPaymentStatus('failed');
       } finally {
         setIsBuying(false);
       }
@@ -158,6 +231,14 @@ export default function EventDetail({ events }) {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 font-sans">
+      
+      {/* RENDER POPUP STATUS DI SINI */}
+      <StatusModal 
+        status={paymentStatus} 
+        onClose={() => setPaymentStatus(null)} 
+        onGoToTickets={() => navigate('/my-tickets')} 
+      />
+
       <PaymentModal 
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -230,7 +311,6 @@ export default function EventDetail({ events }) {
 
             <div className="w-full bg-gray-100/80 rounded-3xl p-6 shadow-sm border border-gray-100 text-left">
               
-              {/* PERUBAHAN DI SINI: Harga dan Stok sejajar pakai Flexbox */}
               <div className="mb-5 flex justify-between items-end border-b border-gray-200/60 pb-4">
                  <div>
                    <span className="block text-gray-400 text-[10px] font-bold uppercase mb-1">Price per Ticket</span>
