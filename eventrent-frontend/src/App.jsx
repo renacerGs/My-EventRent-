@@ -44,7 +44,7 @@ export default function App() {
       });
   }, []);
 
-  // KOMPONEN PROTEKSI
+  // KOMPONEN PROTEKSI (Tetap Sama)
   const ProtectedRoute = ({ children }) => {
     if (!user) {
       setIsLoginOpen(true);
@@ -102,7 +102,6 @@ export default function App() {
               </ProtectedRoute>
             } />
 
-            {/* <--- 2. TAMBAHKAN ROUTE PROFILE DISINI */}
             <Route path="/profile" element={
               <ProtectedRoute>
                 <Profile />
@@ -115,6 +114,7 @@ export default function App() {
               </ProtectedRoute>
             } />
 
+            {/* UPDATE PATH: Dikembalikan ke /manage/event/:id agar sesuai URL browser */}
             <Route path="/manage/event/:id" element={
               <ProtectedRoute>
                 <EventDashboard />

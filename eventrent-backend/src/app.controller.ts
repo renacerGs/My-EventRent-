@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
+  // --- EVENTS ---
   @Get('events') 
   async getEvents() {
     return await this.appService.getEvents();
@@ -30,59 +31,63 @@ export class AppController {
     return await this.appService.updateEvent(id, userId, eventData);
   }
 
-  // <--- Endpoint Beli Tiket (Update menerima quantity)
-  @Post('tickets/buy')
-  async buyTicket(@Body() data: { userId: number; eventId: number; quantity: number }) {
-    // Default quantity = 1 kalau tidak dikirim
-    const qty = data.quantity || 1;
-    return await this.appService.buyTicket(data.userId, data.eventId, qty);
+  @Post('events/:id/view')
+  async incrementView(@Param('id') id: number) {
+    return await this.appService.incrementView(id);
   }
 
-  // <--- BARU: Endpoint Tiket Saya
+  // --- LIKES ---
+  @Post('likes/toggle')
+  async toggleLike(@Body() data: { userId: number; eventId: number }) {
+    // Pastikan mengirim data.eventId ke service
+    return await this.appService.toggleLike(data.userId, data.eventId);
+  }
+
+  @Get('likes/my')
+  async getMyLikes(@Query('userId') userId: number) {
+    // Nama fungsi ini harus ada di app.service.ts
+    return await this.appService.getMyLikes(userId);
+  }
+
+  // --- TICKETS ---
+  @Post('tickets/buy')
+  async buyTicket(@Body() data: { userId: number; eventId: number; quantity: number }) {
+    return await this.appService.buyTicket(data.userId, data.eventId, data.quantity || 1);
+  }
+
   @Get('tickets/my')
   async getMyTickets(@Query('userId') userId: number) {
     return await this.appService.getMyTickets(userId);
   }
 
-  // <--- BARU: Endpoint Lihat Peserta
   @Get('events/:id/attendees')
   async getAttendees(@Param('id') id: number, @Query('userId') userId: number) {
     return await this.appService.getEventAttendees(id, userId);
   }
   
-  // --- AUTH ENDPOINTS ---
-
+  // --- AUTH & USERS ---
   @Post('auth/google')
-  async googleLogin(@Body() userData: { email: string; name: string; picture: string; googleId: string }) {
+  async googleLogin(@Body() userData: any) {
     return await this.appService.loginWithGoogle(userData);
   }
 
-  // <--- PINTU REGISTER YANG SEBELUMNYA HILANG --->
   @Post('auth/register')
-  async register(@Body() userData: { name: string; email: string; password: string }) {
+  async register(@Body() userData: any) {
     return await this.appService.registerUser(userData);
   }
 
-  // <--- PINTU LOGIN MANUAL YANG SEBELUMNYA HILANG --->
   @Post('auth/login')
-  async login(@Body() userData: { email: string; password: string }) {
+  async login(@Body() userData: any) {
     return await this.appService.loginUser(userData);
   }
 
   @Put('users/:id')
-  async updateProfile(@Param('id') id: number, @Body() data: { name: string; img?: string }) {
+  async updateProfile(@Param('id') id: number, @Body() data: any) {
     return await this.appService.updateProfile(id, data);
   }
 
-  // <--- BARU: Ganti Password
   @Put('users/:id/password')
-  async changePassword(@Param('id') id: number, @Body() data: { oldPass: string; newPass: string }) {
+  async changePassword(@Param('id') id: number, @Body() data: any) {
     return await this.appService.changePassword(id, data);
   }
-
-  // <--- BARU: Endpoint Increment View
-  @Post('events/:id/view')
-  async incrementView(@Param('id') id: number) {
-    return await this.appService.incrementView(id);
-  }
-}
+} 

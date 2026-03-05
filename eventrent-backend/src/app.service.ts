@@ -29,7 +29,6 @@ export class AppService implements OnModuleInit {
 
   async getEvents() {
     try {
-      // TAMBAH e.views DISINI
       const query = `
         SELECT e.id, e.title, TO_CHAR(e.date_time, 'Dy, Mon YYYY - HH12.MI AM') as date, 
                e.location, e.image_url as img, c.name as category, e.price,
@@ -49,7 +48,6 @@ export class AppService implements OnModuleInit {
 
   async getMyEvents(userId: number) {
     try {
-      // TAMBAH e.views DISINI
       const query = `
         SELECT e.id, e.title, TO_CHAR(e.date_time, 'Dy, Mon YYYY - HH12.MI AM') as date, 
                e.location, e.image_url as img, c.name as category, e.price,
@@ -68,46 +66,13 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // <--- BARU: Increment Views (Counter)
   async incrementView(eventId: number) {
     try {
       await this.pool.query('UPDATE events SET views = views + 1 WHERE id = $1', [eventId]);
       return { message: 'View counted' };
     } catch (err) {
       console.error(err);
-      // Gak perlu throw error fatal, biar user gak sadar kalau counter error dikit
       return { message: 'Error counting view' };
-    }
-  }
-
-  // ... (SISA KODE Create, Update, Delete, Auth, Profile, Tickets TETAP SAMA SEPERTI SEBELUMNYA) ...
-  // Paste ulang kode Create, Update, Delete, Auth, Profile, BuyTicket, GetMyTickets, GetAttendees dari versi terakhir.
-  // Biar gak kepanjangan di chat, asumsikan bagian bawahnya sama persis ya bro!
-  
-  // (Pastikan fungsi getEventAttendees ada di sini juga)
-  async getEventAttendees(eventId: number, userId: number) {
-    try {
-      const eventCheck = await this.pool.query('SELECT created_by FROM events WHERE id = $1', [eventId]);
-      if (eventCheck.rows.length === 0) throw new BadRequestException('Event tidak ditemukan');
-      
-      if (eventCheck.rows[0].created_by != userId) {
-        throw new UnauthorizedException('Anda bukan pemilik event ini!');
-      }
-
-      const query = `
-        SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price,
-               u.name as buyer_name, u.email as buyer_email, u.picture as buyer_pic
-        FROM tickets t
-        JOIN users u ON t.user_id = u.id
-        WHERE t.event_id = $1
-        ORDER BY t.purchase_date DESC
-      `;
-      const { rows } = await this.pool.query(query, [eventId]);
-      return rows;
-    } catch (err) {
-      if (err instanceof UnauthorizedException) throw err;
-      console.error(err);
-      throw new InternalServerErrorException('Gagal mengambil data peserta');
     }
   }
 
@@ -174,88 +139,59 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  async loginWithGoogle(user: { email: string; name: string; picture: string; googleId: string }) {
-    try {
-      const checkQuery = 'SELECT * FROM users WHERE email = $1';
-      const checkRes = await this.pool.query(checkQuery, [user.email]);
+  // ... (kode atas tetap sama)
 
-      if (checkRes.rows.length > 0) {
-        return checkRes.rows[0];
+  // --- LIKES FEATURE ---
+
+  async toggleLike(userId: number, event_id: number) {
+    try {
+      const check = await this.pool.query(
+        'SELECT id FROM user_likes WHERE user_id = $1 AND event_id = $2',
+        [userId, event_id]
+      );
+
+      if (check.rows.length > 0) {
+        await this.pool.query('DELETE FROM user_likes WHERE user_id = $1 AND event_id = $2', [userId, event_id]);
+        return { liked: false };
       } else {
-        const insertQuery = `INSERT INTO users (email, name, picture, google_id) VALUES ($1, $2, $3, $4) RETURNING *`;
-        const insertRes = await this.pool.query(insertQuery, [user.email, user.name, user.picture, user.googleId]);
-        return insertRes.rows[0];
+        await this.pool.query('INSERT INTO user_likes (user_id, event_id) VALUES ($1, $2)', [userId, event_id]);
+        return { liked: true };
       }
     } catch (err) {
       console.error(err);
-      throw new InternalServerErrorException('Gagal memproses login Google');
+      throw new InternalServerErrorException('Gagal memproses Like');
     }
   }
 
-  async registerUser(data: { name: string; email: string; password: string }) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(data.email)) throw new BadRequestException('Format email tidak valid!');
-      if (data.password.length < 6) throw new BadRequestException('Password minimal 6 karakter!');
-      const checkQuery = 'SELECT * FROM users WHERE email = $1';
-      const checkRes = await this.pool.query(checkQuery, [data.email]);
-      if (checkRes.rows.length > 0) throw new BadRequestException('Email is already registered!');
-      const hashedPassword = await bcrypt.hash(data.password, 10);
-      const defaultPic = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name)}&background=random`;
-      const insertQuery = `INSERT INTO users (name, email, password, picture) VALUES ($1, $2, $3, $4) RETURNING *`;
-      const insertRes = await this.pool.query(insertQuery, [data.name, data.email, hashedPassword, defaultPic]);
-      const { password, ...userWithoutPassword } = insertRes.rows[0];
-      return userWithoutPassword;
-  }
-
-  async loginUser(data: { email: string; password: string }) {
-      const query = 'SELECT * FROM users WHERE email = $1';
-      const res = await this.pool.query(query, [data.email]);
-      if (res.rows.length === 0) throw new UnauthorizedException('Invalid email or password');
-      const user = res.rows[0];
-      if (!user.password) throw new UnauthorizedException('Please login with Google');
-      const isMatch = await bcrypt.compare(data.password, user.password);
-      if (!isMatch) throw new UnauthorizedException('Invalid email or password');
-      const { password, ...userWithoutPassword } = user;
-      return userWithoutPassword;
-  }
-
-  async updateProfile(userId: number, data: { name: string; img?: string }) {
+  // Nama fungsi ini harus getMyLikes agar tidak merah di controller
+  async getMyLikes(userId: number) {
     try {
-      const query = `UPDATE users SET name = $1, picture = COALESCE($2, picture) WHERE id = $3 RETURNING id, name, email, picture, google_id`;
-      const res = await this.pool.query(query, [data.name, data.img || null, userId]);
-      if (res.rowCount === 0) throw new InternalServerErrorException('User not found');
-      return res.rows[0];
+      const query = `
+        SELECT e.id, e.title, TO_CHAR(e.date_time, 'Dy, Mon YYYY - HH12.MI AM') as date, 
+               e.location, e.image_url as img, c.name as category, e.price, e.views
+        FROM events e
+        JOIN user_likes ul ON e.id = ul.event_id
+        JOIN categories c ON e.category_id = c.id
+        WHERE ul.user_id = $1
+        ORDER BY ul.created_at DESC
+      `;
+      const { rows } = await this.pool.query(query, [userId]);
+      return rows;
     } catch (err) {
       console.error(err);
-      throw new InternalServerErrorException('Gagal update profile');
+      throw new InternalServerErrorException('Gagal mengambil daftar Like');
     }
   }
 
-  async changePassword(userId: number, data: { oldPass: string; newPass: string }) {
-    try {
-      const query = 'SELECT password FROM users WHERE id = $1';
-      const res = await this.pool.query(query, [userId]);
-      const user = res.rows[0];
-      if (!user || !user.password) throw new BadRequestException('User tidak memiliki password (Login Google)');
-      const isMatch = await bcrypt.compare(data.oldPass, user.password);
-      if (!isMatch) throw new BadRequestException('Password lama salah!');
-      const hashedNewPass = await bcrypt.hash(data.newPass, 10);
-      await this.pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedNewPass, userId]);
-      return { message: 'Password berhasil diubah' };
-    } catch (err) {
-      if (err instanceof BadRequestException) throw err;
-      console.error(err);
-      throw new InternalServerErrorException('Gagal ganti password');
-    }
-  }
+  // --- TICKETS & ATTENDEES ---
 
   async buyTicket(userId: number, eventId: number, quantity: number) {
     try {
-      const eventQuery = 'SELECT * FROM events WHERE id = $1';
-      const eventRes = await this.pool.query(eventQuery, [eventId]);
+      const eventRes = await this.pool.query('SELECT * FROM events WHERE id = $1', [eventId]);
       const event = eventRes.rows[0];
       if (!event) throw new BadRequestException('Event tidak ditemukan');
       if (event.stock < quantity) throw new BadRequestException(`Stok tidak cukup!`);
+      
       await this.pool.query('UPDATE events SET stock = stock - $1 WHERE id = $2', [quantity, eventId]);
       const totalPrice = event.price * quantity;
       const insertQuery = `INSERT INTO tickets (event_id, user_id, quantity, total_price) VALUES ($1, $2, $3, $4) RETURNING *`;
@@ -284,5 +220,85 @@ export class AppService implements OnModuleInit {
       console.error(err);
       throw new InternalServerErrorException('Gagal mengambil tiket saya');
     }
+  }
+
+  async getEventAttendees(eventId: number, userId: number) {
+    try {
+      const eventCheck = await this.pool.query('SELECT created_by FROM events WHERE id = $1', [eventId]);
+      if (eventCheck.rows.length === 0) throw new BadRequestException('Event tidak ditemukan');
+      if (eventCheck.rows[0].created_by != userId) throw new UnauthorizedException('Bukan pemilik event!');
+
+      const query = `
+        SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price,
+               u.name as buyer_name, u.email as buyer_email, u.picture as buyer_pic
+        FROM tickets t
+        JOIN users u ON t.user_id = u.id
+        WHERE t.event_id = $1
+        ORDER BY t.purchase_date DESC
+      `;
+      const { rows } = await this.pool.query(query, [eventId]);
+      return rows;
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
+      throw new InternalServerErrorException('Gagal mengambil data peserta');
+    }
+  }
+
+  // --- AUTH & PROFILE ---
+
+  async loginWithGoogle(user: any) {
+    try {
+      const checkRes = await this.pool.query('SELECT * FROM users WHERE email = $1', [user.email]);
+      if (checkRes.rows.length > 0) return checkRes.rows[0];
+      const insertRes = await this.pool.query(
+        `INSERT INTO users (email, name, picture, google_id) VALUES ($1, $2, $3, $4) RETURNING *`,
+        [user.email, user.name, user.picture, user.googleId]
+      );
+      return insertRes.rows[0];
+    } catch (err) {
+      throw new InternalServerErrorException('Gagal login Google');
+    }
+  }
+
+  async registerUser(data: any) {
+    const checkRes = await this.pool.query('SELECT * FROM users WHERE email = $1', [data.email]);
+    if (checkRes.rows.length > 0) throw new BadRequestException('Email sudah terdaftar!');
+    const hashedPassword = await bcrypt.hash(data.password, 10);
+    const defaultPic = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.name)}&background=random`;
+    const insertRes = await this.pool.query(
+      `INSERT INTO users (name, email, password, picture) VALUES ($1, $2, $3, $4) RETURNING *`,
+      [data.name, data.email, hashedPassword, defaultPic]
+    );
+    const { password, ...user } = insertRes.rows[0];
+    return user;
+  }
+
+  async loginUser(data: any) {
+    const res = await this.pool.query('SELECT * FROM users WHERE email = $1', [data.email]);
+    if (res.rows.length === 0) throw new UnauthorizedException('Email/Password salah');
+    const user = res.rows[0];
+    if (!user.password) throw new UnauthorizedException('Gunakan Login Google');
+    const isMatch = await bcrypt.compare(data.password, user.password);
+    if (!isMatch) throw new UnauthorizedException('Email/Password salah');
+    const { password, ...userWithoutPassword } = user;
+    return userWithoutPassword;
+  }
+
+  async updateProfile(userId: number, data: any) {
+    const res = await this.pool.query(
+      `UPDATE users SET name = $1, picture = COALESCE($2, picture) WHERE id = $3 RETURNING id, name, email, picture`,
+      [data.name, data.img || null, userId]
+    );
+    return res.rows[0];
+  }
+
+  async changePassword(userId: number, data: any) {
+    const res = await this.pool.query('SELECT password FROM users WHERE id = $1', [userId]);
+    const user = res.rows[0];
+    if (!user?.password) throw new BadRequestException('User tidak punya password');
+    if (!(await bcrypt.compare(data.oldPass, user.password))) throw new BadRequestException('Password lama salah!');
+    const hashedNew = await bcrypt.hash(data.newPass, 10);
+    await this.pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedNew, userId]);
+    return { message: 'Berhasil diubah' };
   }
 }
