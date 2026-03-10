@@ -2,7 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// --- KOMPONEN POPUP STATUS (BARU) ---
+// --- FUNGSI FORMAT TANGGAL CANTIK (Fri, 16 Apr 2026) ---
+const formatPrettyDate = (dateString) => {
+  if (!dateString) return '';
+  try {
+    let rawDate = dateString;
+    let timePart = '';
+
+    if (dateString.includes(' - ')) {
+      const parts = dateString.split(' - ');
+      rawDate = parts[0].trim();
+      timePart = ` - ${parts[1]}`;
+    }
+
+    const dateObj = new Date(rawDate);
+    if (isNaN(dateObj.getTime())) return dateString;
+
+    const options = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
+    const formattedDate = new Intl.DateTimeFormat('en-US', options).format(dateObj);
+
+    return `${formattedDate}${timePart}`;
+  } catch (error) {
+    return dateString;
+  }
+};
+
+// --- KOMPONEN POPUP STATUS ---
 function StatusModal({ status, onClose, onGoToTickets }) {
   if (!status) return null;
 
@@ -67,7 +92,7 @@ function StatusModal({ status, onClose, onGoToTickets }) {
   );
 }
 
-// --- KOMPONEN MODAL PAYMENT (FONT STANDAR) ---
+// --- KOMPONEN MODAL PAYMENT ---
 function PaymentModal({ isOpen, onClose, onConfirm, event, quantity, totalPrice, isBuying }) {
   if (!isOpen) return null;
 
@@ -80,7 +105,6 @@ function PaymentModal({ isOpen, onClose, onConfirm, event, quantity, totalPrice,
           exit={{ opacity: 0, scale: 0.9 }}
           className="bg-white w-full max-w-4xl rounded-[32px] overflow-hidden shadow-2xl flex flex-col md:flex-row"
         >
-          {/* KOLOM KIRI: QRIS */}
           <div className="flex-1 p-10 bg-white border-r border-gray-100 flex flex-col items-center justify-center min-h-[400px]">
             <div className="text-center mb-8">
               <h3 className="text-3xl font-bold text-gray-900 mb-2 uppercase">QRIS Payment</h3>
@@ -97,7 +121,6 @@ function PaymentModal({ isOpen, onClose, onConfirm, event, quantity, totalPrice,
             <p className="mt-8 text-[10px] text-gray-300 font-bold uppercase tracking-[0.3em]">EventRent Automatic System</p>
           </div>
 
-          {/* KOLOM KANAN: RINCIAN */}
           <div className="w-full md:w-[380px] bg-gray-50 p-10 flex flex-col justify-between text-left">
             <div>
               <h3 className="text-xl font-bold text-gray-900 mb-8 uppercase tracking-tight">Rincian Tagihan</h3>
@@ -158,7 +181,6 @@ export default function EventDetail({ events }) {
   const [ticketQty, setTicketQty] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // STATE BARU BUAT POPUP STATUS
   const [paymentStatus, setPaymentStatus] = useState(null);
 
   const user = JSON.parse(localStorage.getItem('user'));
@@ -196,7 +218,6 @@ export default function EventDetail({ events }) {
     setIsModalOpen(true);
   };
 
-  // FUNGSI INI AJA YANG DIUPDATE BIAR MANGGIL POPUP
   const verifyAndRedirect = async () => {
     setIsBuying(true);
     setTimeout(async () => {
@@ -207,7 +228,7 @@ export default function EventDetail({ events }) {
           body: JSON.stringify({ userId: user.id, eventId: event.id, quantity: ticketQty })
         });
         
-        setIsModalOpen(false); // Tutup modal QRIS
+        setIsModalOpen(false); 
 
         if (res.ok) {
           setPaymentStatus('success');
@@ -226,13 +247,11 @@ export default function EventDetail({ events }) {
 
   if (!event) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-400 uppercase tracking-widest">Loading...</div>;
 
-  // Cek apakah tiket sold out
   const isSoldOut = event.stock < 1;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 font-sans">
       
-      {/* RENDER POPUP STATUS DI SINI */}
       <StatusModal 
         status={paymentStatus} 
         onClose={() => setPaymentStatus(null)} 
@@ -249,7 +268,6 @@ export default function EventDetail({ events }) {
         isBuying={isBuying}
       />
 
-      {/* BANNER */}
       <div className="relative w-full h-[450px] bg-gray-900">
         <img src={event.img} className="w-full h-full object-cover opacity-80" alt="Banner" />
         <button onClick={() => navigate(-1)} className="absolute top-8 left-8 w-12 h-12 flex items-center justify-center bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white hover:text-gray-900 transition-all z-20">
@@ -257,26 +275,23 @@ export default function EventDetail({ events }) {
         </button>
       </div>
 
-      {/* CONTENT CARD */}
       <div className="max-w-6xl mx-auto px-4 relative z-10 -mt-32">
         <div className="bg-white rounded-[32px] shadow-xl p-8 md:p-12 flex flex-col lg:flex-row gap-12 min-h-[400px]">
           
-          {/* LEFT COLUMN: INFO & DESKRIPSI */}
           <div className="flex-1 text-left">
             <span className="inline-block bg-[#FF6B35] text-white px-4 py-1.5 rounded-full text-xs font-bold uppercase mb-5">{event.category}</span>
             <h1 className="text-3xl md:text-5xl font-bold text-gray-900 leading-tight mb-8 uppercase">{event.title}</h1>
             
             <div className="space-y-5 mb-10 text-left">
               
-              {/* IKON KALENDER - OUTLINE */}
               <div className="flex items-center gap-4 text-gray-700 font-semibold">
                 <svg className="w-6 h-6 text-[#FF6B35] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <p>{event.date}</p>
+                {/* --- FORMAT TANGGAL CANTIK DIPANGGIL DI SINI --- */}
+                <p>{formatPrettyDate(event.date)}</p>
               </div>
 
-              {/* IKON LOKASI - OUTLINE */}
               <div className="flex items-center gap-4 text-gray-700 font-semibold">
                 <svg className="w-6 h-6 text-[#FF6B35] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -285,7 +300,6 @@ export default function EventDetail({ events }) {
                 <p>{event.location}</p> 
               </div>
 
-              {/* IKON TELEPON - OUTLINE */}
               <div className="flex items-center gap-4 text-gray-700 font-semibold">
                 <svg className="w-6 h-6 text-[#FF6B35] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -294,7 +308,6 @@ export default function EventDetail({ events }) {
               </div>
             </div>
 
-            {/* DESKRIPSI UTAMA */}
             <div className="mt-8">
               <h3 className="text-lg font-bold text-gray-900 mb-4 uppercase tracking-wide">Description</h3>
               <p className="text-gray-500 leading-relaxed font-medium whitespace-pre-line text-justify">
@@ -303,7 +316,6 @@ export default function EventDetail({ events }) {
             </div>
           </div>
 
-          {/* RIGHT COLUMN: TICKET SELECTOR */}
           <div className="w-full lg:w-[320px] flex flex-col items-end gap-6 text-left">
             <button onClick={handleLikeClick} className={`w-12 h-12 flex items-center justify-center rounded-xl border transition-all ${isLiked ? 'border-red-500 bg-red-50 text-red-500' : 'border-gray-200 text-gray-400 hover:border-[#FF6B35] hover:text-[#FF6B35]'}`}>
               <svg className={`w-6 h-6 ${isLiked ? 'fill-current' : 'fill-none'}`} stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
@@ -330,14 +342,13 @@ export default function EventDetail({ events }) {
                 <button onClick={() => ticketQty < event.stock && setTicketQty(ticketQty + 1)} disabled={isSoldOut} className="w-8 h-8 flex items-center justify-center bg-[#FF6B35] rounded-lg text-white hover:bg-orange-600 font-bold">+</button>
               </div>
 
-              {/* TOMBOL CHECKOUT CONDITIONAL STYLING */}
               <button 
                 onClick={handleBuyTicket} 
                 disabled={isBuying || isSoldOut} 
                 className={`w-full py-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${
                   isSoldOut 
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none' // Style saat Sold Out
-                    : 'bg-[#E85526] hover:bg-[#d1461b] text-white shadow-lg active:scale-95' // Style Normal
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed shadow-none' 
+                    : 'bg-[#E85526] hover:bg-[#d1461b] text-white shadow-lg active:scale-95' 
                 }`}
               >
                 {isSoldOut ? 'SOLD OUT' : `Checkout (${ticketQty})`}

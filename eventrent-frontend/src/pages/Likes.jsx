@@ -2,12 +2,30 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
+// --- FUNGSI FORMAT TANGGAL (Fri, 16 Apr 2026) ---
+const formatPrettyDate = (dateString) => {
+  if (!dateString) return '';
+  try {
+    const rawDate = dateString.split(' - ')[0].trim();
+    const timePart = dateString.includes(' - ') ? ` - ${dateString.split(' - ')[1]}` : '';
+
+    const dateObj = new Date(rawDate);
+    if (isNaN(dateObj.getTime())) return dateString;
+
+    const options = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
+    const formattedDate = new Intl.DateTimeFormat('en-US', options).format(dateObj);
+
+    return `${formattedDate}${timePart}`;
+  } catch (error) {
+    return dateString;
+  }
+};
+
 export default function Likes() {
   const [likedEvents, setLikedEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   
-  // Ambil data user yang login
   const user = JSON.parse(localStorage.getItem('user'));
 
   useEffect(() => {
@@ -19,7 +37,6 @@ export default function Likes() {
 
       try {
         setLoading(true);
-        // AMBIL DATA DARI DATABASE
         const response = await axios.get(`http://localhost:3000/api/likes/my?userId=${user.id}`);
         
         if (response.data) {
@@ -34,19 +51,16 @@ export default function Likes() {
     };
 
     fetchLikedEvents();
-  }, [user?.id]); // Dependency array di-update
+  }, [user?.id]); 
 
-  // --- FUNGSI DIRECT UNLIKE ---
   const handleUnlike = async (e, eventId) => {
-    e.preventDefault(); // Mencegah pindah halaman saat tombol di-klik
+    e.preventDefault(); 
     
-    // Hapus dari tampilan layar secara instan (Optimistic UI Update)
     const updatedLikes = likedEvents.filter(event => event.id !== eventId);
     setLikedEvents(updatedLikes);
-    localStorage.setItem('likedEvents', JSON.stringify(updatedLikes)); // Update localStorage juga
+    localStorage.setItem('likedEvents', JSON.stringify(updatedLikes)); 
     
     try {
-      // Kirim perintah hapus ke database
       await axios.post('http://localhost:3000/api/likes/toggle', {
         userId: user.id,
         eventId: eventId
@@ -57,7 +71,6 @@ export default function Likes() {
     }
   };
 
-  // --- FUNGSI BAGIKAN (Web Share API) ---
   const handleShare = async (e, event) => {
     e.preventDefault(); 
     const shareData = {
@@ -90,7 +103,6 @@ export default function Likes() {
     <div className="min-h-screen bg-white py-10 px-6 font-sans text-left relative">
       <div className="max-w-5xl mx-auto">
         
-        {/* --- HEADER: TOMBOL BACK & JUDUL --- */}
         <div className="flex items-center gap-4 mb-10">
           <button 
             onClick={() => navigate(-1)} 
@@ -104,7 +116,6 @@ export default function Likes() {
           <h1 className="text-4xl font-bold text-gray-900 uppercase tracking-tight m-0">Likes</h1>
         </div>
 
-        {/* --- CONTENT AREA --- */}
         {!user ? (
           <div className="text-center py-20 bg-gray-50 rounded-[40px] border border-dashed border-gray-200">
             <p className="text-gray-500 mb-6 font-semibold uppercase">Please login to see your liked events.</p>
@@ -125,13 +136,13 @@ export default function Likes() {
                 key={event.id} 
                 className="flex flex-col md:flex-row items-center justify-between bg-white rounded-[32px] border border-gray-100 p-2 shadow-sm hover:shadow-md transition-all group overflow-hidden"
               >
-                {/* INFO CONTENT (KIRI) */}
                 <div className="flex-1 p-8">
                   <h3 className="text-2xl font-bold text-gray-900 mb-2 uppercase tracking-tight group-hover:text-[#FF6B35] transition-colors line-clamp-2">
                     {event.title}
                   </h3>
+                  {/* --- IMPLEMENTASI FORMAT TANGGAL DI SINI --- */}
                   <p className="text-[#FF6B35] text-sm font-bold uppercase mb-1 tracking-widest">
-                    {event.date}
+                    {formatPrettyDate(event.date)}
                   </p>
                   <p className="text-gray-400 text-xs font-bold mb-4 uppercase">
                     {event.location}
@@ -141,7 +152,6 @@ export default function Likes() {
                   </p>
                 </div>
 
-                {/* IMAGE & ACTIONS (KANAN) */}
                 <div className="relative w-full md:w-[280px] h-[180px] md:h-[180px] p-2">
                   <div className="w-full h-full rounded-[24px] overflow-hidden relative">
                     <img 
@@ -150,9 +160,7 @@ export default function Likes() {
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
                     />
                     
-                    {/* BUTTON ACTIONS */}
                     <div className="absolute bottom-3 right-3 flex gap-2">
-                      {/* Tombol Unlike (Langsung Hapus) */}
                       <button 
                         onClick={(e) => handleUnlike(e, event.id)}
                         className="bg-white p-2 rounded-full text-red-500 shadow-xl border border-gray-50 transition-transform active:scale-90 hover:bg-red-50"
@@ -163,7 +171,6 @@ export default function Likes() {
                         </svg>
                       </button>
 
-                      {/* Tombol Share */}
                       <button 
                         onClick={(e) => handleShare(e, event)}
                         className="bg-white p-2 rounded-full text-gray-400 hover:text-[#FF6B35] shadow-xl border border-gray-50 transition-transform active:scale-90"

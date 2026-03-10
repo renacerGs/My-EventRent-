@@ -29,8 +29,9 @@ export class AppService implements OnModuleInit {
 
   async getEvents() {
     try {
+      // PERBAIKAN: Tambahkan 'DD' agar angka tanggal ikut terkirim ke frontend
       const query = `
-        SELECT e.id, e.title, TO_CHAR(e.date_time, 'Dy, Mon YYYY - HH12.MI AM') as date, 
+        SELECT e.id, e.title, TO_CHAR(e.date_time, 'Dy, DD Mon YYYY - HH12.MI AM') as date, 
                e.location, e.image_url as img, c.name as category, e.price,
                e.description, e.phone, e.stock, e.views, u.name as author 
         FROM events e
@@ -48,8 +49,9 @@ export class AppService implements OnModuleInit {
 
   async getMyEvents(userId: number) {
     try {
+      // PERBAIKAN: Tambahkan 'DD' agar angka tanggal ikut terkirim ke frontend
       const query = `
-        SELECT e.id, e.title, TO_CHAR(e.date_time, 'Dy, Mon YYYY - HH12.MI AM') as date, 
+        SELECT e.id, e.title, TO_CHAR(e.date_time, 'Dy, DD Mon YYYY - HH12.MI AM') as date, 
                e.location, e.image_url as img, c.name as category, e.price,
                e.description, e.phone, e.stock, e.views, u.name as author
         FROM events e
@@ -139,8 +141,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // ... (kode atas tetap sama)
-
   // --- LIKES FEATURE ---
 
   async toggleLike(userId: number, event_id: number) {
@@ -163,11 +163,11 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // Nama fungsi ini harus getMyLikes agar tidak merah di controller
   async getMyLikes(userId: number) {
     try {
+      // PERBAIKAN: Tambahkan 'DD' di format tanggal MyLikes
       const query = `
-        SELECT e.id, e.title, TO_CHAR(e.date_time, 'Dy, Mon YYYY - HH12.MI AM') as date, 
+        SELECT e.id, e.title, TO_CHAR(e.date_time, 'Dy, DD Mon YYYY - HH12.MI AM') as date, 
                e.location, e.image_url as img, c.name as category, e.price, e.views
         FROM events e
         JOIN user_likes ul ON e.id = ul.event_id
@@ -206,9 +206,10 @@ export class AppService implements OnModuleInit {
 
   async getMyTickets(userId: number) {
     try {
+      // PERBAIKAN: Tambahkan 'DD' di format tanggal MyTickets
       const query = `
         SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price,
-               e.id as event_id, e.title, e.image_url as img, TO_CHAR(e.date_time, 'Dy, Mon YYYY - HH12.MI AM') as date, e.location
+               e.id as event_id, e.title, e.image_url as img, TO_CHAR(e.date_time, 'Dy, DD Mon YYYY - HH12.MI AM') as date, e.location
         FROM tickets t
         JOIN events e ON t.event_id = e.id
         WHERE t.user_id = $1
@@ -251,7 +252,6 @@ export class AppService implements OnModuleInit {
       const checkRes = await this.pool.query('SELECT * FROM users WHERE email = $1', [user.email]);
       if (checkRes.rows.length > 0) return checkRes.rows[0];
       
-      // Jika Google tidak ngasih foto, kasih avatar karakter random berdasarkan nama
       const defaultPic = user.picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name)}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4`;
       
       const insertRes = await this.pool.query(
@@ -270,7 +270,6 @@ export class AppService implements OnModuleInit {
     
     const hashedPassword = await bcrypt.hash(data.password, 10);
     
-    // PERUBAHAN DI SINI: Pakai DiceBear API buat ngasih avatar karakter random berdasarkan nama user
     const defaultPic = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(data.name)}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4`;
     
     const insertRes = await this.pool.query(
