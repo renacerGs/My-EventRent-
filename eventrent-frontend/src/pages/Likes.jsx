@@ -24,8 +24,11 @@ const formatPrettyDate = (dateString) => {
 export default function Likes() {
   const [likedEvents, setLikedEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
   
+  // --- STATE UNTUK KONTROL POP-UP KONFIRMASI ---
+  const [eventToUnlike, setEventToUnlike] = useState(null); 
+  
+  const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user'));
 
   useEffect(() => {
@@ -53,21 +56,34 @@ export default function Likes() {
     fetchLikedEvents();
   }, [user?.id]); 
 
-  const handleUnlike = async (e, eventId) => {
+  // --- 1. Fungsi buat nampilin pop-up doang ---
+  const triggerUnlikeConfirmation = (e, eventId) => {
     e.preventDefault(); 
+    setEventToUnlike(eventId); // Munculin modal
+  };
+
+  // --- 2. Fungsi eksekusi hapus beneran (Jalan pas tombol 'Hapus' di klik) ---
+  const confirmUnlike = async () => {
+    if (!eventToUnlike) return;
     
-    const updatedLikes = likedEvents.filter(event => event.id !== eventId);
+    // Hapus dari state lokal biar layarnya langsung kerasa cepet
+    const updatedLikes = likedEvents.filter(event => event.id !== eventToUnlike);
     setLikedEvents(updatedLikes);
     localStorage.setItem('likedEvents', JSON.stringify(updatedLikes)); 
     
+    // Tutup modal
+    setEventToUnlike(null);
+    
+    // Tembak API buat hapus di database
     try {
       await axios.post('http://localhost:3000/api/likes/toggle', {
         userId: user.id,
-        eventId: eventId
+        eventId: eventToUnlike
       });
     } catch (error) {
       console.error("Gagal unlike event:", error);
-      alert("Terjadi kesalahan saat menghapus like.");
+      // Biar nggak pake alert, lu bisa ganti pakai toast notification kalau mau
+      console.warn("Terjadi kesalahan saat menghapus like di server.");
     }
   };
 
@@ -140,7 +156,6 @@ export default function Likes() {
                   <h3 className="text-2xl font-bold text-gray-900 mb-2 uppercase tracking-tight group-hover:text-[#FF6B35] transition-colors line-clamp-2">
                     {event.title}
                   </h3>
-                  {/* --- IMPLEMENTASI FORMAT TANGGAL DI SINI --- */}
                   <p className="text-[#FF6B35] text-sm font-bold uppercase mb-1 tracking-widest">
                     {formatPrettyDate(event.date)}
                   </p>
@@ -162,7 +177,7 @@ export default function Likes() {
                     
                     <div className="absolute bottom-3 right-3 flex gap-2">
                       <button 
-                        onClick={(e) => handleUnlike(e, event.id)}
+                        onClick={(e) => triggerUnlikeConfirmation(e, event.id)} // <-- Diubah di sini
                         className="bg-white p-2 rounded-full text-red-500 shadow-xl border border-gray-50 transition-transform active:scale-90 hover:bg-red-50"
                         title="Remove from Likes"
                       >
@@ -187,6 +202,44 @@ export default function Likes() {
           </div>
         )}
       </div>
+
+      {/* --- CUSTOM MODAL KONFIRMASI --- */}
+      {eventToUnlike && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div 
+            className="bg-white rounded-[32px] p-8 max-w-sm w-full shadow-2xl transform transition-all animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()} // Biar kalau diklik di dalam modal nggak ketutup
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-6">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2 uppercase">Hapus dari Likes?</h3>
+              <p className="text-gray-500 text-sm mb-8 font-medium">
+                Kamu yakin mau menghapus event ini dari daftar favoritmu?
+              </p>
+              
+              <div className="flex w-full gap-3">
+                <button 
+                  onClick={() => setEventToUnlike(null)} // Tutup modal tanpa hapus
+                  className="flex-1 py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-bold uppercase text-xs tracking-wider hover:bg-gray-200 transition-colors"
+                >
+                  Batal
+                </button>
+                <button 
+                  onClick={confirmUnlike} // Eksekusi hapus beneran
+                  className="flex-1 py-3 px-4 bg-red-500 text-white rounded-xl font-bold uppercase text-xs tracking-wider hover:bg-red-600 shadow-lg shadow-red-200 transition-colors"
+                >
+                  Ya, Hapus
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

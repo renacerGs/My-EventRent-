@@ -1,55 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; 
 import { Link } from 'react-router-dom';
 
-// --- FUNGSI FORMAT TANGGAL CANTIK ---
 const formatPrettyDate = (dateString) => {
   if (!dateString) return '';
   try {
     let rawDate = dateString;
     let timePart = '';
-
     if (dateString.includes(' - ')) {
       const parts = dateString.split(' - ');
       rawDate = parts[0].trim();
       timePart = ` - ${parts[1]}`;
     }
-
     const dateObj = new Date(rawDate);
     if (isNaN(dateObj.getTime())) return dateString;
-
     const options = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
     const formattedDate = new Intl.DateTimeFormat('en-US', options).format(dateObj);
-
     return `${formattedDate}${timePart}`;
   } catch (error) {
     return dateString;
   }
 };
 
-// --- FUNGSI CEK WAKTU YANG SUPER KETAT ---
 const isEventPassed = (dateStr) => {
   if (!dateStr) return false;
   try {
-    // Contoh dateStr asli dari backend lu: "Tue, 01 Sep 2026 - 07.00 PM AM" (ada 'AM' nyangkut)
-    // 1. Hapus nama hari (contoh: "Tue, ")
     let cleanStr = dateStr;
-    if (cleanStr.includes(',')) {
-      cleanStr = cleanStr.split(',')[1].trim(); 
-    }
-    
-    // 2. Ganti spasi strip spasi (" - ") jadi spasi biasa
+    if (cleanStr.includes(',')) cleanStr = cleanStr.split(',')[1].trim(); 
     cleanStr = cleanStr.replace(' - ', ' ');
-
-    // 3. Bersihin sisa 'AM' atau 'WIB' yang dobel
     cleanStr = cleanStr.replace('WIB', '').replace(' AM', '').replace(' PM AM', ' PM').replace(' AM AM', ' AM').trim();
-
-    // 4. Ubah titik jadi titik dua di bagian jam (07.00 -> 07:00)
     cleanStr = cleanStr.replace(/(\d{2})\.(\d{2})/, '$1:$2');
-
     const eventDate = new Date(cleanStr);
-    
-    if (isNaN(eventDate.getTime())) return false; // Kalo tetep gak bisa dibaca, anggap blm basi
-
+    if (isNaN(eventDate.getTime())) return false; 
     const now = new Date(); 
     return eventDate < now; 
   } catch (error) {
@@ -57,13 +38,41 @@ const isEventPassed = (dateStr) => {
   }
 };
 
-export default function EventList({ events, searchQuery }) {
+export default function EventList({ events, searchQuery, onClearSearch }) {
   const [activeCategory, setActiveCategory] = useState('All');
   const categories = ['All', 'Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports'];
 
-  // FILTER: Cuma tampilin yang cocok kategori/search DAN BELUM BASI
+  // --- 🔥 SENSOR AUTO-SELECT CATEGORY YANG LEBIH PINTER 🔥 ---
+  useEffect(() => {
+    if (searchQuery) {
+      const queryLower = searchQuery.toLowerCase();
+      
+      // 1. Cek apakah ketikan user mengandung nama salah satu kategori (misal: "Konser Music" -> dapet "Music")
+      const matchedCat = categories.find(c => 
+        c !== 'All' && (c.toLowerCase() === queryLower || queryLower.includes(c.toLowerCase()))
+      );
+      
+      if (matchedCat) {
+        setActiveCategory(matchedCat);
+      } else {
+        // 2. Kalau bukan ngetik kategori, cari event yang judulnya mirip sama ketikan user
+        const matchedEvent = events.find(e => e.title.toLowerCase().includes(queryLower));
+        if (matchedEvent && matchedEvent.category) {
+          setActiveCategory(matchedEvent.category);
+        }
+      }
+    } else {
+      setActiveCategory('All'); // Reset ke All kalau search kosong
+    }
+  }, [searchQuery, events]); 
+
+  const handleCategoryClick = (cat) => {
+    setActiveCategory(cat);
+    if (onClearSearch) onClearSearch(); 
+  };
+
   const filteredEvents = events.filter(event => 
-    event.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+    event.title.toLowerCase().includes((searchQuery || "").toLowerCase()) &&
     (activeCategory === 'All' || event.category === activeCategory) &&
     !isEventPassed(event.date) 
   );
@@ -75,7 +84,9 @@ export default function EventList({ events, searchQuery }) {
         <h2 className="text-xl font-bold text-gray-900 mb-5">Browse by category</h2>
         <div className="flex flex-wrap gap-2">
           {categories.map(cat => (
-            <button key={cat} onClick={() => setActiveCategory(cat)}
+            <button 
+              key={cat} 
+              onClick={() => handleCategoryClick(cat)} 
               className={`px-5 py-2 rounded-2xl text-xs font-bold transition-all ${activeCategory === cat ? 'bg-[#FF6B35] text-white shadow-md' : 'bg-white text-gray-500 border border-gray-100 hover:bg-gray-50'}`}>
               {cat}
             </button>
@@ -94,7 +105,8 @@ export default function EventList({ events, searchQuery }) {
               <div className="relative h-44 overflow-hidden bg-gray-100">
                 <img src={event.img} alt={event.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                 <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-xl text-xs font-black text-gray-900 shadow-md">
-                   {Number(event.price) === 0 ? 'FREE' : `Rp ${parseInt(event.price).toLocaleString()}`}
+                   {/* --- BONUS: Format Rupiah udah otomatis pake id-ID --- */}
+                   {Number(event.price) === 0 ? 'FREE' : `Rp ${parseInt(event.price).toLocaleString('id-ID')}`}
                 </div>
               </div>
 

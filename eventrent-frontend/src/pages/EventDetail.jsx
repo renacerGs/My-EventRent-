@@ -2,25 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// --- FUNGSI FORMAT TANGGAL CANTIK (Fri, 16 Apr 2026) ---
+// --- FUNGSI FORMAT TANGGAL CANTIK ---
 const formatPrettyDate = (dateString) => {
   if (!dateString) return '';
   try {
     let rawDate = dateString;
     let timePart = '';
-
     if (dateString.includes(' - ')) {
       const parts = dateString.split(' - ');
       rawDate = parts[0].trim();
       timePart = ` - ${parts[1]}`;
     }
-
     const dateObj = new Date(rawDate);
     if (isNaN(dateObj.getTime())) return dateString;
-
     const options = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
     const formattedDate = new Intl.DateTimeFormat('en-US', options).format(dateObj);
-
     return `${formattedDate}${timePart}`;
   } catch (error) {
     return dateString;
@@ -30,7 +26,6 @@ const formatPrettyDate = (dateString) => {
 // --- KOMPONEN POPUP STATUS ---
 function StatusModal({ status, onClose, onGoToTickets }) {
   if (!status) return null;
-
   const isSuccess = status === 'success';
 
   return (
@@ -138,11 +133,11 @@ function PaymentModal({ isOpen, onClose, onConfirm, event, quantity, totalPrice,
               <div className="space-y-4">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-400 font-bold uppercase text-[9px] tracking-widest">Subtotal</span>
-                  <span className="font-bold text-gray-900">Rp {parseInt(event.price).toLocaleString()}</span>
+                  <span className="font-bold text-gray-900">Rp {parseInt(event.price).toLocaleString('id-ID')}</span>
                 </div>
                 <div className="pt-6 border-t border-dashed border-gray-300 flex justify-between items-center">
                   <span className="font-bold text-gray-900 uppercase text-xs">Total Bayar</span>
-                  <span className="text-2xl font-bold text-[#FF6B35]">Rp {totalPrice.toLocaleString()}</span>
+                  <span className="text-2xl font-bold text-[#FF6B35]">Rp {totalPrice.toLocaleString('id-ID')}</span>
                 </div>
               </div>
             </div>
@@ -180,8 +175,10 @@ export default function EventDetail({ events }) {
   const [isBuying, setIsBuying] = useState(false);
   const [ticketQty, setTicketQty] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
   const [paymentStatus, setPaymentStatus] = useState(null);
+  
+  // --- STATE BARU BUAT CUSTOM ALERT ---
+  const [alertMessage, setAlertMessage] = useState(null);
 
   const user = JSON.parse(localStorage.getItem('user'));
 
@@ -199,7 +196,10 @@ export default function EventDetail({ events }) {
   }, [id, events]);
 
   const handleLikeClick = async () => {
-    if (!event || !user) return alert("Login dulu bro!");
+    if (!event || !user) {
+      setAlertMessage("Login dulu bro buat nyimpen event ke Likes!");
+      return;
+    }
     try {
       const res = await fetch('http://localhost:3000/api/likes/toggle', {
         method: 'POST',
@@ -214,7 +214,17 @@ export default function EventDetail({ events }) {
   };
 
   const handleBuyTicket = () => {
-    if (!user) return alert("Login dulu untuk pesan tiket!");
+    if (!user) {
+      setAlertMessage("Login dulu bro untuk pesan tiket!");
+      return;
+    }
+    
+    // Validasi ekstra: Jangan bolehin checkout kalau kuota kurang dari yang dipesan
+    if (ticketQty > event.stock) {
+      setAlertMessage("Waduh, tiket yang tersisa kurang dari jumlah yang kamu pesan bro!");
+      return;
+    }
+    
     setIsModalOpen(true);
   };
 
@@ -231,8 +241,15 @@ export default function EventDetail({ events }) {
         setIsModalOpen(false); 
 
         if (res.ok) {
+          // --- MAGIC-NYA DI SINI BRO! ---
+          // Kurangin angka stock secara visual detik itu juga biar nggak perlu nunggu refresh!
+          setEvent(prevEvent => ({
+            ...prevEvent,
+            stock: prevEvent.stock - ticketQty
+          }));
+          
           setPaymentStatus('success');
-          setTicketQty(1);
+          setTicketQty(1); // Balikin angka pesenan ke 1
         } else {
           setPaymentStatus('failed');
         }
@@ -250,7 +267,7 @@ export default function EventDetail({ events }) {
   const isSoldOut = event.stock < 1;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 font-sans">
+    <div className="min-h-screen bg-gray-50 pb-20 font-sans relative">
       
       <StatusModal 
         status={paymentStatus} 
@@ -288,7 +305,6 @@ export default function EventDetail({ events }) {
                 <svg className="w-6 h-6 text-[#FF6B35] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                {/* --- FORMAT TANGGAL CANTIK DIPANGGIL DI SINI --- */}
                 <p>{formatPrettyDate(event.date)}</p>
               </div>
 
@@ -326,7 +342,7 @@ export default function EventDetail({ events }) {
               <div className="mb-5 flex justify-between items-end border-b border-gray-200/60 pb-4">
                  <div>
                    <span className="block text-gray-400 text-[10px] font-bold uppercase mb-1">Price per Ticket</span>
-                   <span className="text-2xl font-bold text-gray-900 tracking-tight uppercase">{Number(event.price) === 0 ? 'Free' : `Rp ${parseInt(event.price).toLocaleString()}`}</span>
+                   <span className="text-2xl font-bold text-gray-900 tracking-tight uppercase">{Number(event.price) === 0 ? 'Free' : `Rp ${parseInt(event.price).toLocaleString('id-ID')}`}</span>
                  </div>
                  <div className="text-right">
                    <span className="block text-gray-400 text-[10px] font-bold uppercase mb-1">Available</span>
@@ -358,6 +374,37 @@ export default function EventDetail({ events }) {
 
         </div>
       </div>
+
+      {/* --- CUSTOM MODAL ALERT --- */}
+      <AnimatePresence>
+        {alertMessage && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.8, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: 20 }}
+              className="bg-white w-full max-w-sm rounded-[32px] shadow-2xl overflow-hidden p-8 flex flex-col items-center text-center"
+            >
+              <div className="w-20 h-20 bg-orange-50 text-[#FF6B35] rounded-full flex items-center justify-center mb-6 border-[6px] border-orange-100">
+                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2 uppercase tracking-tight">Perhatian</h3>
+              <p className="text-gray-500 text-sm font-medium mb-8 leading-relaxed">
+                {alertMessage}
+              </p>
+              <button 
+                onClick={() => setAlertMessage(null)} 
+                className="w-full py-4 bg-[#FF6B35] text-white rounded-2xl font-bold uppercase text-xs tracking-widest shadow-xl hover:scale-[1.02] transition-all active:scale-95"
+              >
+                OK, Paham
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

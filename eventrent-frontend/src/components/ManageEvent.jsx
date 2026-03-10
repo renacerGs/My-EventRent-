@@ -1,39 +1,31 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
-// --- FUNGSI FORMAT TANGGAL (Fri, 16 Apr 2026) ---
+// --- FUNGSI FORMAT TANGGAL ---
 const formatPrettyDate = (dateString) => {
   if (!dateString) return '';
   try {
     const rawDate = dateString.split(' - ')[0].trim();
     const timePart = dateString.includes(' - ') ? ` - ${dateString.split(' - ')[1]}` : '';
-
     const dateObj = new Date(rawDate);
     if (isNaN(dateObj.getTime())) return dateString;
-
     const options = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
     const formattedDate = new Intl.DateTimeFormat('en-US', options).format(dateObj);
-
     return `${formattedDate}${timePart}`;
   } catch (error) {
     return dateString;
   }
 };
 
-// --- FUNGSI CEK WAKTU (AMAN) ---
 const isEventPassed = (dateStr) => {
   if (!dateStr) return false;
   try {
     let cleanDate = dateStr;
-    if (dateStr.includes(' - ')) {
-      cleanDate = dateStr.split(' - ')[0].trim();
-    }
+    if (dateStr.includes(' - ')) cleanDate = dateStr.split(' - ')[0].trim();
     const eventDate = new Date(cleanDate);
     if (isNaN(eventDate.getTime())) return false;
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
     return eventDate < today;
   } catch (error) {
     return false;
@@ -43,6 +35,10 @@ const isEventPassed = (dateStr) => {
 export default function ManageEvent() {
   const [myEvents, setMyEvents] = useState([]);
   const [activeMenuId, setActiveMenuId] = useState(null); 
+  
+  // --- STATE BUAT POP-UP DELETE ---
+  const [eventToDelete, setEventToDelete] = useState(null);
+
   const navigate = useNavigate();
   const menuRef = useRef(null);
   const user = JSON.parse(localStorage.getItem('user'));
@@ -69,19 +65,15 @@ export default function ManageEvent() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Sort Event (Aktif di atas, Ended di bawah)
   const sortedEvents = [...myEvents].sort((a, b) => {
     const isAPast = isEventPassed(a.date);
     const isBPast = isEventPassed(b.date);
-    
     if (isAPast && !isBPast) return 1;  
     if (!isAPast && isBPast) return -1; 
     return 0; 
   });
 
-  const handleCardClick = (id) => {
-    navigate(`/manage/event/${id}`);
-  };
+  const handleCardClick = (id) => navigate(`/manage/event/${id}`);
 
   const handleView = (e, id) => {
     e.stopPropagation(); 
@@ -95,23 +87,33 @@ export default function ManageEvent() {
     setActiveMenuId(null);
   };
 
-  const handleDelete = async (e, id) => {
+  // --- TRIGGER POP-UP ---
+  const triggerDelete = (e, id) => {
     e.stopPropagation();
-    if (window.confirm("Are you sure you want to delete this event?")) {
-      try {
-        const res = await fetch(`http://localhost:3000/api/events/${id}?userId=${user.id}`, { method: 'DELETE' });
-        if (res.ok) {
-          setMyEvents(prev => prev.filter(event => event.id !== id));
-          setActiveMenuId(null);
-        } else {
-          alert("Gagal menghapus event");
-        }
-      } catch (err) { console.error(err); }
+    setEventToDelete(id); // Munculin modal konfirmasi
+    setActiveMenuId(null);
+  };
+
+  // --- EKSEKUSI DELETE ---
+  const confirmDelete = async () => {
+    if (!eventToDelete) return;
+    try {
+      const res = await fetch(`http://localhost:3000/api/events/${eventToDelete}?userId=${user.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setMyEvents(prev => prev.filter(event => event.id !== eventToDelete));
+        setEventToDelete(null); // Tutup modal
+      } else {
+        console.error("Gagal menghapus event");
+        setEventToDelete(null);
+      }
+    } catch (err) { 
+      console.error(err); 
+      setEventToDelete(null);
     }
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen font-sans pb-20">
+    <div className="bg-gray-50 min-h-screen font-sans pb-20 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
         
         <div className="flex justify-between items-end mb-8">
@@ -122,7 +124,6 @@ export default function ManageEvent() {
         </div>
 
         <div className="bg-white rounded-[24px] shadow-sm border border-gray-200 min-h-[500px]">
-          
           <div className="grid grid-cols-12 gap-4 px-8 py-4 bg-gray-50/50 rounded-t-[24px] border-b border-gray-100 text-xs font-bold text-gray-400 uppercase tracking-wider">
             <div className="col-span-5">Event Details</div>
             <div className="col-span-2 text-center">Status</div>
@@ -141,10 +142,8 @@ export default function ManageEvent() {
                   <div 
                     key={event.id} 
                     onClick={() => handleCardClick(event.id)} 
-                    // PENAMBAHAN Z-INDEX SUPAYA MENU GAK KETUTUP BARIS BAWAHNYA
                     className={`grid grid-cols-12 gap-4 px-8 py-5 items-center hover:bg-gray-50 transition-colors group cursor-pointer relative ${isMenuActive ? 'z-50' : 'z-0'} ${isPast ? 'opacity-80' : ''}`}
                   >
-                    
                     <div className="col-span-5 flex items-center gap-5">
                       <div className={`w-20 h-14 rounded-lg overflow-hidden flex-shrink-0 border border-gray-100 ${isPast ? 'grayscale-[60%]' : 'bg-gray-100'}`}>
                          <img src={event.img} alt={event.title} className="w-full h-full object-cover" />
@@ -152,7 +151,6 @@ export default function ManageEvent() {
                       <div>
                         <h3 className="font-bold text-gray-900 text-base mb-1 group-hover:text-[#FF6B35] transition-colors line-clamp-1">{event.title}</h3>
                         <div className="flex items-center gap-3 text-xs text-gray-500 font-medium">
-                          {/* --- IMPLEMENTASI FORMAT TANGGAL DI SINI --- */}
                           <span className="flex items-center gap-1">{formatPrettyDate(event.date)}</span>
                         </div>
                       </div>
@@ -193,7 +191,8 @@ export default function ManageEvent() {
                             <button onClick={(e) => handleView(e, event.id)} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#FF6B35] flex items-center gap-2">View Event Page</button>
                             <button onClick={(e) => handleEdit(e, event)} className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-[#FF6B35] flex items-center gap-2">Edit Event</button>
                             <div className="border-t border-gray-100 mt-1">
-                              <button onClick={(e) => handleDelete(e, event.id)} className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 font-semibold flex items-center gap-2">Delete</button>
+                              {/* --- TOMBOL DELETE SEKARANG MANGGIL triggerDelete --- */}
+                              <button onClick={(e) => triggerDelete(e, event.id)} className="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 font-semibold flex items-center gap-2">Delete</button>
                             </div>
                           </div>
                         </div>
@@ -212,6 +211,43 @@ export default function ManageEvent() {
           </div>
         </div>
       </div>
+
+      {/* --- CUSTOM MODAL KONFIRMASI DELETE --- */}
+      {eventToDelete && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div 
+            className="bg-white rounded-[32px] p-8 max-w-sm w-full shadow-2xl transform transition-all animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()} 
+          >
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-6">
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2 uppercase">Hapus Event?</h3>
+              <p className="text-gray-500 text-sm mb-8 font-medium">
+                Kamu yakin mau menghapus event ini? Data yang dihapus tidak bisa dikembalikan.
+              </p>
+              
+              <div className="flex w-full gap-3">
+                <button 
+                  onClick={() => setEventToDelete(null)}
+                  className="flex-1 py-3 px-4 bg-gray-100 text-gray-600 rounded-xl font-bold uppercase text-xs tracking-wider hover:bg-gray-200 transition-colors"
+                >
+                  Batal
+                </button>
+                <button 
+                  onClick={confirmDelete}
+                  className="flex-1 py-3 px-4 bg-red-500 text-white rounded-xl font-bold uppercase text-xs tracking-wider hover:bg-red-600 shadow-lg shadow-red-200 transition-colors"
+                >
+                  Ya, Hapus
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

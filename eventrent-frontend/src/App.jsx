@@ -22,15 +22,12 @@ export default function App() {
   const [events, setEvents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // --- PERBAIKAN DI SINI ---
-  // Langsung cek localStorage saat state pertama kali dibuat (Synchronous)
   const [user, setUser] = useState(() => {
     const storedUser = localStorage.getItem('user');
     return storedUser ? JSON.parse(storedUser) : null;
   });
 
   useEffect(() => {
-    // Ambil data events
     fetch('http://localhost:3000/api/events')
       .then(res => res.json())
       .then(data => {
@@ -42,33 +39,23 @@ export default function App() {
       });
   }, []);
 
-  // KOMPONEN PROTEKSI
   const ProtectedRoute = ({ children }) => {
     if (!user) {
-      // Jika benar-benar belum login, buka modal dan lempar ke home
-      // timeout digunakan agar tidak memblokir render
       setTimeout(() => setIsLoginOpen(true), 0);
       return <Navigate to="/" replace />;
     }
     return children;
   };
 
-  const HomePage = () => (
-    <>
-      <Hero />
-      <div className="relative z-10 bg-white -mt-10 rounded-t-[40px] pt-4 min-h-[500px]">
-        <EventList events={events} searchQuery={searchQuery} />
-      </div>
-    </>
-  );
-
   return (
     <GoogleOAuthProvider clientId="561806317736-eq0ktc36954e6vftgp7q2bgi46bnhvqg.apps.googleusercontent.com">
       <div className="bg-white min-h-screen font-sans flex flex-col">
         
+        {/* --- PERBAIKAN: Kirim searchQuery ke Navbar --- */}
         <Navbar 
           user={user} 
           events={events} 
+          searchQuery={searchQuery}
           onSearchSelect={(title) => setSearchQuery(title)}
           onOpenLogin={() => setIsLoginOpen(true)}
           onLogout={() => {
@@ -79,46 +66,29 @@ export default function App() {
 
         <main className="flex-grow">
           <Routes>
-            <Route path="/" element={<HomePage />} />
+            {/* --- PERBAIKAN: Langsung render elemen, JANGAN PAKE fungsi HomePage() --- */}
+            <Route path="/" element={
+              <>
+                <Hero />
+                <div className="relative z-10 bg-white -mt-10 rounded-t-[40px] pt-4 min-h-[500px]">
+                  <EventList 
+                    events={events} 
+                    searchQuery={searchQuery} 
+                    onClearSearch={() => setSearchQuery('')} 
+                  />
+                </div>
+              </>
+            } />
+            
             <Route path="/likes" element={<Likes />} />
             <Route path="/event/:id" element={<EventDetail events={events} />} />
             
-            {/* HALAMAN YANG DIKUNCI (Harus Login) */}
-            <Route path="/create" element={
-              <ProtectedRoute>
-                <CreateEvent />
-              </ProtectedRoute>
-            } />
-            
-            <Route path="/manage" element={
-              <ProtectedRoute>
-                <ManageEvent />
-              </ProtectedRoute>
-            } />
-
-            <Route path="/edit/:id" element={
-              <ProtectedRoute>
-                <EditEvent />
-              </ProtectedRoute>
-            } />
-
-            <Route path="/profile" element={
-              <ProtectedRoute>
-                <Profile />
-              </ProtectedRoute>
-            } />
-
-            <Route path="/my-tickets" element={
-              <ProtectedRoute>
-                <MyTickets />
-              </ProtectedRoute>
-            } />
-
-            <Route path="/manage/event/:id" element={
-              <ProtectedRoute>
-                <EventDashboard />
-              </ProtectedRoute>
-            } />
+            <Route path="/create" element={<ProtectedRoute><CreateEvent /></ProtectedRoute>} />
+            <Route path="/manage" element={<ProtectedRoute><ManageEvent /></ProtectedRoute>} />
+            <Route path="/edit/:id" element={<ProtectedRoute><EditEvent /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/my-tickets" element={<ProtectedRoute><MyTickets /></ProtectedRoute>} />
+            <Route path="/manage/event/:id" element={<ProtectedRoute><EventDashboard /></ProtectedRoute>} />
             
             <Route path="*" element={
               <div className="text-center py-20 font-bold text-gray-400">
@@ -134,18 +104,14 @@ export default function App() {
           onLoginSuccess={(userData) => {
             console.log("User berhasil login:", userData);
             setUser(userData); 
-            
-            // --- SABUK PENGAMAN QUOTA EXCEEDED ---
             try {
               localStorage.setItem('user', JSON.stringify(userData)); 
             } catch (error) {
               console.warn("Memori browser penuh! Menyimpan sesi login tanpa gambar lokal.");
-              // Simpan tanpa gambar di browser biar nggak error
               const safeUserData = { ...userData, picture: null };
               localStorage.setItem('user', JSON.stringify(safeUserData));
             }
-            
-            setIsLoginOpen(false); // Pastikan modal ketutup!
+            setIsLoginOpen(false); 
           }}
         />
 
