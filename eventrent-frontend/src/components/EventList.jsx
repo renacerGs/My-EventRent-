@@ -4,18 +4,10 @@ import { Link } from 'react-router-dom';
 const formatPrettyDate = (dateString) => {
   if (!dateString) return '';
   try {
-    let rawDate = dateString;
-    let timePart = '';
-    if (dateString.includes(' - ')) {
-      const parts = dateString.split(' - ');
-      rawDate = parts[0].trim();
-      timePart = ` - ${parts[1]}`;
-    }
-    const dateObj = new Date(rawDate);
+    const dateObj = new Date(dateString);
     if (isNaN(dateObj.getTime())) return dateString;
     const options = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
-    const formattedDate = new Intl.DateTimeFormat('en-US', options).format(dateObj);
-    return `${formattedDate}${timePart}`;
+    return new Intl.DateTimeFormat('en-US', options).format(dateObj);
   } catch (error) {
     return dateString;
   }
@@ -24,14 +16,13 @@ const formatPrettyDate = (dateString) => {
 const isEventPassed = (dateStr) => {
   if (!dateStr) return false;
   try {
-    let cleanStr = dateStr;
-    if (cleanStr.includes(',')) cleanStr = cleanStr.split(',')[1].trim(); 
-    cleanStr = cleanStr.replace(' - ', ' ');
-    cleanStr = cleanStr.replace('WIB', '').replace(' AM', '').replace(' PM AM', ' PM').replace(' AM AM', ' AM').trim();
-    cleanStr = cleanStr.replace(/(\d{2})\.(\d{2})/, '$1:$2');
-    const eventDate = new Date(cleanStr);
+    const eventDate = new Date(dateStr);
     if (isNaN(eventDate.getTime())) return false; 
+    
+    // Set waktu ke akhir hari ini (23:59:59) biar event hari ini tetap muncul
     const now = new Date(); 
+    now.setHours(0, 0, 0, 0); 
+    
     return eventDate < now; 
   } catch (error) {
     return false;
@@ -42,12 +33,10 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
   const [activeCategory, setActiveCategory] = useState('All');
   const categories = ['All', 'Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports'];
 
-  // --- 🔥 SENSOR AUTO-SELECT CATEGORY YANG LEBIH PINTER 🔥 ---
   useEffect(() => {
     if (searchQuery) {
       const queryLower = searchQuery.toLowerCase();
       
-      // 1. Cek apakah ketikan user mengandung nama salah satu kategori (misal: "Konser Music" -> dapet "Music")
       const matchedCat = categories.find(c => 
         c !== 'All' && (c.toLowerCase() === queryLower || queryLower.includes(c.toLowerCase()))
       );
@@ -55,14 +44,13 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
       if (matchedCat) {
         setActiveCategory(matchedCat);
       } else {
-        // 2. Kalau bukan ngetik kategori, cari event yang judulnya mirip sama ketikan user
         const matchedEvent = events.find(e => e.title.toLowerCase().includes(queryLower));
         if (matchedEvent && matchedEvent.category) {
           setActiveCategory(matchedEvent.category);
         }
       }
     } else {
-      setActiveCategory('All'); // Reset ke All kalau search kosong
+      setActiveCategory('All'); 
     }
   }, [searchQuery, events]); 
 
@@ -105,7 +93,6 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
               <div className="relative h-44 overflow-hidden bg-gray-100">
                 <img src={event.img} alt={event.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                 <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-sm px-3 py-1.5 rounded-xl text-xs font-black text-gray-900 shadow-md">
-                   {/* --- BONUS: Format Rupiah udah otomatis pake id-ID --- */}
                    {Number(event.price) === 0 ? 'FREE' : `Rp ${parseInt(event.price).toLocaleString('id-ID')}`}
                 </div>
               </div>
@@ -130,8 +117,8 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
                   <span className="inline-block px-3 py-1 bg-orange-50 text-[#FF6B35] rounded-lg text-[10px] font-black uppercase tracking-widest">
                     {event.category || 'Event'}
                   </span>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                     {event.stock > 0 ? 'Available' : 'Sold Out'}
+                  <span className="text-[10px] font-bold text-[#FF6B35] uppercase tracking-widest">
+                     Beli Tiket
                   </span>
                 </div>
               </div>

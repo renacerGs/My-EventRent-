@@ -29,15 +29,16 @@ export class AppService implements OnModuleInit {
 
   async getEvents() {
     try {
-      // PERBAIKAN: Tambahkan 'DD' agar angka tanggal ikut terkirim ke frontend
+      // PERBAIKAN: Sesuaikan dengan kolom baru. Ambil harga termurah dari event_sessions
       const query = `
-        SELECT e.id, e.title, TO_CHAR(e.date_time, 'Dy, DD Mon YYYY - HH12.MI AM') as date, 
-               e.location, e.image_url as img, c.name as category, e.price,
-               e.description, e.phone, e.stock, e.views, u.name as author 
+        SELECT e.id, e.title, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date, 
+               e.place as location, e.image_url as img, c.name as category, 
+               COALESCE((SELECT MIN(price) FROM event_sessions WHERE event_id = e.id), 0) as price,
+               e.description, e.views, u.name as author 
         FROM events e
         JOIN categories c ON e.category_id = c.id
         LEFT JOIN users u ON e.created_by = u.id 
-        ORDER BY e.date_time DESC
+        ORDER BY e.created_at DESC
       `;
       const { rows } = await this.pool.query(query);
       return rows;
@@ -47,13 +48,60 @@ export class AppService implements OnModuleInit {
     }
   }
 
+  async getEventById(eventId: number) {
+    try {
+      // 1. Ambil data event utama
+      const eventQuery = `
+        SELECT e.id, e.title, e.description, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start, 
+               TO_CHAR(e.event_end, 'Dy, DD Mon YYYY') as date_end, e.place, e.name_place, e.city, e.province, e.map_url,
+               e.image_url as img, c.name as category, e.phone as contact, u.name as organizer_name
+        FROM events e
+        JOIN categories c ON e.category_id = c.id
+        LEFT JOIN users u ON e.created_by = u.id
+        WHERE e.id = $1
+      `;
+      const eventRes = await this.pool.query(eventQuery, [eventId]);
+      
+      if (eventRes.rows.length === 0) {
+        throw new BadRequestException('Event tidak ditemukan');
+      }
+
+      const eventData = eventRes.rows[0];
+
+      // 2. Ambil data sessions
+      const sessionQuery = `
+        SELECT id, name, description, TO_CHAR(session_date, 'Dy, DD Mon YYYY') as date, 
+               start_time, end_time, contact_person, event_type, price, stock
+        FROM event_sessions
+        WHERE event_id = $1
+        ORDER BY session_date ASC, start_time ASC
+      `;
+      const sessionRes = await this.pool.query(sessionQuery, [eventId]);
+      const sessions = sessionRes.rows;
+
+      // 3. BARU: Ambil questions untuk setiap session
+      for (let session of sessions) {
+        const qQuery = `SELECT id, question_text, answer_type, is_required FROM session_questions WHERE session_id = $1`;
+        const qRes = await this.pool.query(qQuery, [session.id]);
+        session.questions = qRes.rows;
+      }
+
+      eventData.sessions = sessions;
+      return eventData;
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      console.error("Error getEventById:", err);
+      throw new InternalServerErrorException('Gagal mengambil detail event');
+    }
+  }
+
   async getMyEvents(userId: number) {
     try {
-      // PERBAIKAN: Tambahkan 'DD' agar angka tanggal ikut terkirim ke frontend
       const query = `
-        SELECT e.id, e.title, TO_CHAR(e.date_time, 'Dy, DD Mon YYYY - HH12.MI AM') as date, 
-               e.location, e.image_url as img, c.name as category, e.price,
-               e.description, e.phone, e.stock, e.views, u.name as author
+        SELECT e.id, e.title, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date, 
+               e.place as location, e.image_url as img, c.name as category, 
+               COALESCE((SELECT MIN(price) FROM event_sessions WHERE event_id = e.id), 0) as price,
+               e.description, e.views, u.name as author
         FROM events e
         JOIN categories c ON e.category_id = c.id
         LEFT JOIN users u ON e.created_by = u.id
@@ -78,47 +126,92 @@ export class AppService implements OnModuleInit {
     }
   }
 
+  // --- PERBAIKAN UTAMA: TRANSACTION UNTUK NESTED INSERT ---
   async createEvent(data: any) {
+    const client = await this.pool.connect(); 
     try {
-      const fullDateTime = `${data.date} ${data.time}`; 
-      const query = `
-        INSERT INTO events (title, date_time, location, description, price, image_url, category_id, created_by, phone, stock)
-        VALUES ($1, $2, $3, $4, $5, $6, (SELECT id FROM categories WHERE name = $7 LIMIT 1), $8, $9, $10)
-        RETURNING *
+      await client.query('BEGIN'); 
+
+      // 1. Insert Event Utama (Menyesuaikan map_url dan phone)
+      const eventQuery = `
+        INSERT INTO events (
+          title, description, event_start, event_end, category_id, 
+          created_by, phone, place, name_place, city, province, map_url, image_url
+        )
+        VALUES (
+          $1, $2, $3, $4, (SELECT id FROM categories WHERE name = $5 LIMIT 1), 
+          $6, $7, $8, $9, $10, $11, $12, $13
+        )
+        RETURNING id
       `;
-      const values = [
-        data.title, fullDateTime, data.location, data.description, 
-        data.price || 0, 
-        data.img || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=1000&q=80', 
-        data.category, data.userId, data.phone || null,
-        data.stock || 0 
+      const eventValues = [
+        data.title, data.description, data.eventStart || null, data.eventEnd || null, 
+        data.category, data.userId, data.phone, data.location?.place, 
+        data.location?.namePlace, data.location?.city, data.location?.province, 
+        data.location?.mapUrl || null, 
+        data.img || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=1000&q=80'
       ];
-      const res = await this.pool.query(query, values);
-      return res.rows[0];
+      
+      const eventRes = await client.query(eventQuery, eventValues);
+      const eventId = eventRes.rows[0].id;
+
+      // 2. Insert Sessions
+      if (data.sessions && data.sessions.length > 0) {
+        for (const session of data.sessions) {
+          const sessionQuery = `
+            INSERT INTO event_sessions 
+            (event_id, name, description, session_date, start_time, end_time, contact_person, event_type, price, stock)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING id
+          `;
+          const sessionValues = [
+            eventId, session.name, session.description || session.ticketDesc, 
+            session.date || null, session.startTime || '00:00', session.endTime || '00:00', 
+            session.contactPerson, session.typeEvent, session.price || 0, session.stock || 0
+          ];
+          const sessionRes = await client.query(sessionQuery, sessionValues);
+          const sessionId = sessionRes.rows[0].id;
+
+          // 3. Insert Questions (Form Builder)
+          if (session.questions && session.questions.length > 0) {
+            for (const q of session.questions) {
+              const questionQuery = `
+                INSERT INTO session_questions (session_id, question_text, answer_type, is_required)
+                VALUES ($1, $2, $3, $4)
+              `;
+              await client.query(questionQuery, [sessionId, q.text, q.type, q.isRequired]);
+            }
+          }
+        }
+      }
+
+      await client.query('COMMIT'); 
+      return { message: 'Event berhasil dibuat!', eventId };
     } catch (err) {
-      console.error("Error Create Event:", err);
-      throw new InternalServerErrorException('Gagal membuat event');
+      await client.query('ROLLBACK'); 
+      console.error("Transaction Error Create Event:", err);
+      throw new InternalServerErrorException('Gagal membuat event beserta detailnya');
+    } finally {
+      client.release(); 
     }
   }
 
+  // TODO: Ini perlu dirapikan ke depannya karena update multiple session lumayan kompleks
   async updateEvent(eventId: number, userId: number, data: any) {
     try {
-      const fullDateTime = `${data.date} ${data.time}`; 
       const query = `
         UPDATE events 
-        SET title = $1, date_time = $2, location = $3, description = $4, price = $5, 
-            image_url = COALESCE($6, image_url), 
-            category_id = (SELECT id FROM categories WHERE name = $7 LIMIT 1),
-            phone = $8,
-            stock = $9
-        WHERE id = $10 AND created_by = $11
+        SET title = $1, description = $2, event_start = $3, event_end = $4,
+            organizer = $5, place = $6, name_place = $7, city = $8, province = $9,
+            image_url = COALESCE($10, image_url), 
+            category_id = (SELECT id FROM categories WHERE name = $11 LIMIT 1)
+        WHERE id = $12 AND created_by = $13
         RETURNING *
       `;
       const values = [
-        data.title, fullDateTime, data.location, data.description, data.price, 
-        data.img, data.category, data.phone, 
-        data.stock, 
-        eventId, userId
+        data.title, data.description, data.eventStart, data.eventEnd,
+        data.organizer, data.location?.place, data.location?.namePlace, data.location?.city, data.location?.province,
+        data.img, data.category, eventId, userId
       ];
       const res = await this.pool.query(query, values);
       if (res.rowCount === 0) throw new InternalServerErrorException('Event not found or unauthorized');
@@ -145,11 +238,7 @@ export class AppService implements OnModuleInit {
 
   async toggleLike(userId: number, event_id: number) {
     try {
-      const check = await this.pool.query(
-        'SELECT id FROM user_likes WHERE user_id = $1 AND event_id = $2',
-        [userId, event_id]
-      );
-
+      const check = await this.pool.query('SELECT id FROM user_likes WHERE user_id = $1 AND event_id = $2', [userId, event_id]);
       if (check.rows.length > 0) {
         await this.pool.query('DELETE FROM user_likes WHERE user_id = $1 AND event_id = $2', [userId, event_id]);
         return { liked: false };
@@ -165,10 +254,9 @@ export class AppService implements OnModuleInit {
 
   async getMyLikes(userId: number) {
     try {
-      // PERBAIKAN: Tambahkan 'DD' di format tanggal MyLikes
       const query = `
-        SELECT e.id, e.title, TO_CHAR(e.date_time, 'Dy, DD Mon YYYY - HH12.MI AM') as date, 
-               e.location, e.image_url as img, c.name as category, e.price, e.views
+        SELECT e.id, e.title, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date, 
+               e.place as location, e.image_url as img, c.name as category, e.views
         FROM events e
         JOIN user_likes ul ON e.id = ul.event_id
         JOIN categories c ON e.category_id = c.id
@@ -183,17 +271,22 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // --- TICKETS & ATTENDEES ---
-
+  // --- TICKETS & ATTENDEES (NOTE: Harus disesuaikan lagi ke depannya) ---
+  // Karena sekarang tiket nempel di session_id, logic ini sementara gue bypass ke event_sessions pertama
+  
   async buyTicket(userId: number, eventId: number, quantity: number) {
     try {
-      const eventRes = await this.pool.query('SELECT * FROM events WHERE id = $1', [eventId]);
-      const event = eventRes.rows[0];
-      if (!event) throw new BadRequestException('Event tidak ditemukan');
-      if (event.stock < quantity) throw new BadRequestException(`Stok tidak cukup!`);
+      // MENGAMBIL SESSION PERTAMA DARI EVENT TERSEBUT SEMENTARA
+      const sessionRes = await this.pool.query('SELECT * FROM event_sessions WHERE event_id = $1 LIMIT 1', [eventId]);
+      const session = sessionRes.rows[0];
       
-      await this.pool.query('UPDATE events SET stock = stock - $1 WHERE id = $2', [quantity, eventId]);
-      const totalPrice = event.price * quantity;
+      if (!session) throw new BadRequestException('Session event tidak ditemukan');
+      if (session.stock < quantity) throw new BadRequestException(`Stok tiket tidak cukup!`);
+      
+      await this.pool.query('UPDATE event_sessions SET stock = stock - $1 WHERE id = $2', [quantity, session.id]);
+      const totalPrice = session.price * quantity;
+      
+      // Catatan: idealnya tabel tiket diubah punya kolom session_id, bukan event_id. 
       const insertQuery = `INSERT INTO tickets (event_id, user_id, quantity, total_price) VALUES ($1, $2, $3, $4) RETURNING *`;
       const ticketRes = await this.pool.query(insertQuery, [eventId, userId, quantity, totalPrice]);
       return ticketRes.rows[0];
@@ -206,10 +299,9 @@ export class AppService implements OnModuleInit {
 
   async getMyTickets(userId: number) {
     try {
-      // PERBAIKAN: Tambahkan 'DD' di format tanggal MyTickets
       const query = `
         SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price,
-               e.id as event_id, e.title, e.image_url as img, TO_CHAR(e.date_time, 'Dy, DD Mon YYYY - HH12.MI AM') as date, e.location
+               e.id as event_id, e.title, e.image_url as img, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date, e.place as location
         FROM tickets t
         JOIN events e ON t.event_id = e.id
         WHERE t.user_id = $1
@@ -269,7 +361,6 @@ export class AppService implements OnModuleInit {
     if (checkRes.rows.length > 0) throw new BadRequestException('Email sudah terdaftar!');
     
     const hashedPassword = await bcrypt.hash(data.password, 10);
-    
     const defaultPic = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(data.name)}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4`;
     
     const insertRes = await this.pool.query(
