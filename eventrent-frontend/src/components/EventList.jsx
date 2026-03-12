@@ -1,26 +1,23 @@
-import React, { useState, useEffect } from 'react'; 
+import React, { useState, useEffect, useRef } from 'react'; 
 import { Link } from 'react-router-dom';
 
-// Fungsi merakit teks tanggal
 const displayDate = (event) => {
   if (event.date_start && event.date_end && event.date_start !== event.date_end) {
     return `${event.date_start} - ${event.date_end}`;
   }
   if (event.date_start) return event.date_start;
-  if (event.date_old) return event.date_old; // Fallback ke data event lama
+  if (event.date_old) return event.date_old; 
   return '-';
 };
 
-// Fungsi merakit teks lokasi
 const displayLocation = (event) => {
   if (event.city && event.name_place) return `${event.name_place}, ${event.city}`;
   if (event.city) return event.city;
   if (event.place) return event.place;
-  if (event.old_location) return event.old_location; // Fallback ke data event lama
+  if (event.old_location) return event.old_location; 
   return 'Multiple / TBD';
 };
 
-// Cek event sudah lewat atau belum (Cek dari tanggal selesai, atau tanggal mulai)
 const isEventPassed = (event) => {
   const dateToCheck = event.date_end || event.date_start || event.date_old;
   if (!dateToCheck) return false;
@@ -40,37 +37,75 @@ const isEventPassed = (event) => {
 export default function EventList({ events, searchQuery, onClearSearch }) {
   const [activeCategory, setActiveCategory] = useState('All');
   const categories = ['All', 'Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports'];
+  
+  // --- PERBAIKAN: BENDERA PENANDA (Flag) ---
+  const isCategoryClicked = useRef(false);
 
+  // LOGIC 1: DETEKSI KATEGORI OTOMATIS
   useEffect(() => {
-    if (searchQuery) {
-      const queryLower = searchQuery.toLowerCase();
+    // Kalau Search Bar kosong gara-gara kita klik tombol Kategori, SKIP LOGIC INI!
+    if (isCategoryClicked.current) {
+      isCategoryClicked.current = false; // Turunin benderanya lagi
+      return; 
+    }
+
+    // Kalau user nge-HAPUS teks manual pakai backspace sampai kosong -> Balik ke All
+    if (!searchQuery || searchQuery.trim() === '') {
+      setActiveCategory('All');
+      return; 
+    }
+
+    // Jika ada teks, baru jalankan deteksi pinter
+    const queryLower = searchQuery.trim().toLowerCase();
+    const matchedEvent = events.find(e => e.title.toLowerCase().includes(queryLower));
+    
+    if (matchedEvent && matchedEvent.category) {
+      if (categories.includes(matchedEvent.category)) {
+        setActiveCategory(matchedEvent.category);
+      } else {
+        setActiveCategory('All');
+      }
+    } else {
       const matchedCat = categories.find(c => 
-        c !== 'All' && (c.toLowerCase() === queryLower || queryLower.includes(c.toLowerCase()))
+        c !== 'All' && (c.toLowerCase() === queryLower || c.toLowerCase().includes(queryLower))
       );
-      
       if (matchedCat) {
         setActiveCategory(matchedCat);
       } else {
-        const matchedEvent = events.find(e => e.title.toLowerCase().includes(queryLower));
-        if (matchedEvent && matchedEvent.category) {
-          setActiveCategory(matchedEvent.category);
-        }
+        setActiveCategory('All');
       }
-    } else {
-      setActiveCategory('All'); 
     }
   }, [searchQuery, events]); 
 
+  // LOGIC 2: KLIK KATEGORI SECARA MANUAL
   const handleCategoryClick = (cat) => {
-    setActiveCategory(cat);
-    if (onClearSearch) onClearSearch(); 
+    // Kalau kotak search ada isinya, kita naikkan bendera sebelum dihapus
+    if (searchQuery && searchQuery.trim() !== '') {
+      isCategoryClicked.current = true; 
+    }
+    
+    // Ubah ke kategori yang diklik
+    setActiveCategory(cat); 
+    
+    // Bersihkan search bar
+    if (onClearSearch) {
+      onClearSearch(''); 
+    }
   };
 
-  const filteredEvents = events.filter(event => 
-    event.title.toLowerCase().includes((searchQuery || "").toLowerCase()) &&
-    (activeCategory === 'All' || event.category === activeCategory) &&
-    !isEventPassed(event) 
-  );
+  // LOGIC 3: FILTER CARD EVENT
+  const filteredEvents = events.filter(event => {
+    if (isEventPassed(event)) return false;
+
+    if (searchQuery && searchQuery.trim() !== '') {
+      const queryLower = searchQuery.trim().toLowerCase();
+      return event.title.toLowerCase().includes(queryLower) || 
+             (event.category && event.category.toLowerCase().includes(queryLower));
+    } 
+    
+    if (activeCategory === 'All') return true;
+    return event.category === activeCategory;
+  });
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-10 font-sans">
@@ -125,7 +160,6 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
                     {event.category || 'Event'}
                   </span>
                   
-                  {/* Status tiket dinamis ngecek total_stock dari backend */}
                   <span className={`text-[10px] font-bold uppercase tracking-widest ${Number(event.stock) > 0 ? 'text-[#FF6B35]' : 'text-gray-400'}`}>
                      {Number(event.stock) > 0 ? 'Beli Tiket' : 'Sold Out'}
                   </span>
@@ -135,7 +169,7 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
           ))
         ) : (
           <div className="col-span-full text-center py-20 text-gray-400 font-bold bg-white rounded-3xl border border-gray-100">
-            No active events found.
+            Tidak ada event yang ditemukan.
           </div>
         )}
       </div>

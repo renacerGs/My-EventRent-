@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -12,6 +13,18 @@ export default function Profile() {
 
   const [passData, setPassData] = useState({ oldPass: '', newPass: '', confirmPass: '' });
   const [isLoadingPass, setIsLoadingPass] = useState(false);
+
+  // --- STATE UNTUK POP-UP MODERN ---
+  const [popup, setPopup] = useState({ isOpen: false, message: '', type: 'info', action: null });
+
+  const showPopup = (message, type = 'info', action = null) => {
+    setPopup({ isOpen: true, message, type, action });
+  };
+
+  const closePopup = () => {
+    if (popup.action) popup.action(); // Eksekusi fungsi tambahan kalau ada (misal reload)
+    setPopup({ isOpen: false, message: '', type: 'info', action: null });
+  };
 
   useEffect(() => {
     if (!user) {
@@ -88,14 +101,14 @@ export default function Profile() {
         setUser(updatedUser); 
         setImageBase64(null); 
         
-        alert("Profile updated successfully!");
-        window.location.reload(); 
+        // Munculin Pop-up Success, dan reload page cuma PAS tombol Tutup diklik
+        showPopup("Profil berhasil diperbarui!", "success", () => window.location.reload());
       } else {
-        alert("Failed to update profile");
+        showPopup("Gagal memperbarui profil", "error");
       }
     } catch (err) {
       console.error(err);
-      alert("Something went wrong");
+      showPopup("Terjadi kesalahan sistem", "error");
     } finally {
       setIsLoadingProfile(false);
     }
@@ -104,11 +117,11 @@ export default function Profile() {
   const handleChangePassword = async (e) => {
     e.preventDefault();
     if (passData.newPass !== passData.confirmPass) {
-      alert("New Password and Confirmation do not match!");
+      showPopup("Password baru dan konfirmasi tidak cocok!", "error");
       return;
     }
     if (passData.newPass.length < 6) {
-      alert("Password must be at least 6 characters");
+      showPopup("Password minimal terdiri dari 6 karakter!", "error");
       return;
     }
 
@@ -121,13 +134,14 @@ export default function Profile() {
       });
       const data = await res.json();
       if (res.ok) {
-        alert("Password changed successfully!");
+        showPopup("Password berhasil diubah!", "success");
         setPassData({ oldPass: '', newPass: '', confirmPass: '' });
       } else {
-        alert(data.message || "Failed to change password");
+        showPopup(data.message || "Gagal mengubah password", "error");
       }
     } catch (err) {
       console.error(err);
+      showPopup("Terjadi kesalahan sistem", "error");
     } finally {
       setIsLoadingPass(false);
     }
@@ -142,7 +156,45 @@ export default function Profile() {
   const currentImage = imagePreview || user.picture;
 
   return (
-    <div className="bg-[#F8F9FA] min-h-screen pt-10 pb-20 font-sans">
+    <div className="bg-[#F8F9FA] min-h-screen pt-10 pb-20 font-sans relative">
+      
+      {/* --- UI POP UP MODERN ANIMATED --- */}
+      <AnimatePresence>
+        {popup.isOpen && (
+          <div className="fixed inset-0 z-[120] flex flex-col items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.8, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: -20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className={`w-full max-w-sm rounded-[32px] p-8 text-center shadow-2xl relative overflow-hidden ${popup.type === 'error' ? 'bg-[#E24A29]' : popup.type === 'success' ? 'bg-[#27AE60]' : 'bg-gray-800'}`}
+            >
+              <div className={`w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner ${popup.type === 'error' ? 'text-[#E24A29]' : popup.type === 'success' ? 'text-[#27AE60]' : 'text-gray-800'}`}>
+                {popup.type === 'error' ? (
+                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                ) : popup.type === 'success' ? (
+                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                ) : (
+                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                )}
+              </div>
+              
+              <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">
+                {popup.type === 'error' ? 'Ups, Gagal!' : popup.type === 'success' ? 'Berhasil!' : 'Info'}
+              </h2>
+              <p className="text-white/90 font-medium mb-8 text-sm">{popup.message}</p>
+              
+              <button 
+                onClick={closePopup} 
+                className={`w-full bg-white py-4 rounded-xl font-bold uppercase tracking-widest shadow-lg transition-all active:scale-95 text-xs ${popup.type === 'error' ? 'text-[#E24A29] hover:bg-red-50' : popup.type === 'success' ? 'text-[#27AE60] hover:bg-green-50' : 'text-gray-900 hover:bg-gray-50'}`}
+              >
+                Tutup
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <div className="max-w-5xl mx-auto px-4 md:px-8">
         
         <div className="flex items-center gap-4 mb-8">
