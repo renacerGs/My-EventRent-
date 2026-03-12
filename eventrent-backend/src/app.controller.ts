@@ -56,8 +56,8 @@ export class AppController {
 
   // --- TICKETS ---
   @Post('tickets/buy')
-  async buyTicket(@Body() data: { userId: number; eventId: number; quantity: number }) {
-    return await this.appService.buyTicket(data.userId, data.eventId, data.quantity || 1);
+  async buyTicket(@Body() data: { userId: number; eventId: number; cart: any[]; formAnswers: any }) {
+    return await this.appService.buyTicket(data.userId, data.eventId, data.cart, data.formAnswers || {});
   }
 
   @Get('tickets/my')

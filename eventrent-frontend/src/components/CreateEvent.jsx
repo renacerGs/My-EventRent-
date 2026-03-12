@@ -122,16 +122,30 @@ export default function CreateEvent() {
   };
 
   const inputStyle = 'w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all';
-  const labelStyle = 'text-xs font-semibold text-gray-700 mb-1.5 block';
+  const labelStyle = 'text-xs font-semibold text-gray-700 mb-1.5 block uppercase tracking-wider';
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-20">
+    <div className="bg-gray-50 min-h-screen pb-20 font-sans">
       <main className="max-w-4xl mx-auto px-6 py-12">
+        
+        {/* BANNER PERINGATAN (BARU) */}
+        <div className="bg-[#FFF5F0] border-l-[6px] border-[#FF6B35] p-6 mb-8 rounded-r-2xl shadow-sm flex items-start gap-4">
+           <div className="bg-[#FF6B35] bg-opacity-10 p-3 rounded-full shrink-0">
+              <svg className="w-6 h-6 text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+           </div>
+           <div>
+             <h3 className="text-lg font-black text-[#FF6B35] mb-2 uppercase tracking-tight">Perhatian Sebelum Membuat Event!</h3>
+             <p className="text-sm text-gray-700 leading-relaxed font-medium">
+               Pastikan semua data terkait <strong className="text-gray-900 font-black">Sesi/Tiket, Harga, Kuota, dan Custom Form</strong> sudah benar dan final. Setelah event dibuat dan ada tiket yang terjual, data-data tersebut <span className="text-red-500 font-bold">TIDAK DAPAT DIHAPUS ATAU DIUBAH</span> untuk menjaga validitas transaksi peserta. Harap teliti sebelum menyimpan!
+             </p>
+           </div>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-8">
           
           {/* SECTION 1: CREATE AN EVENT */}
           <div className="bg-white rounded-[24px] shadow-sm p-8 border border-gray-200">
-            <h2 className="text-xl font-bold mb-6">Create an Event</h2>
+            <h2 className="text-2xl font-black mb-6 uppercase tracking-tight">Event Details</h2>
             
             <div className="space-y-5">
               {/* IMAGE UPLOAD */}
@@ -143,7 +157,7 @@ export default function CreateEvent() {
                       <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <span className="text-3xl mb-2 text-gray-400">📷</span>
+                        <span className="text-3xl mb-2 text-gray-400">➕</span>
                         <p className="text-xs text-gray-500 font-medium">Click to upload poster</p>
                       </div>
                     )}
@@ -186,7 +200,7 @@ export default function CreateEvent() {
 
           {/* SECTION 2: LOCATION (MANUAL INPUT) */}
           <div className="bg-white rounded-[24px] shadow-sm p-8 border border-gray-200">
-            <h2 className="text-xl font-bold mb-6">Event Location</h2>
+            <h2 className="text-2xl font-black mb-6 uppercase tracking-tight">Event Location</h2>
             
             <div className="space-y-5">
               <div>
@@ -219,18 +233,18 @@ export default function CreateEvent() {
           {/* SECTION 3: SESSIONS */}
           {formData.sessions.map((session, sIndex) => (
             <div key={session.id} className="bg-white rounded-[24px] shadow-sm p-8 border border-gray-200">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold">Session {sIndex + 1}</h2>
+              <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
+                <h2 className="text-xl font-black uppercase text-[#FF6B35]">Session {sIndex + 1}</h2>
                 {formData.sessions.length > 1 && (
-                  <button type="button" onClick={() => removeSession(sIndex)} className="bg-[#E24A29] hover:bg-red-700 text-white text-sm font-semibold px-5 py-2 rounded-xl transition-all shadow-sm">
+                  <button type="button" onClick={() => removeSession(sIndex)} className="bg-red-50 hover:bg-red-100 text-red-500 text-xs uppercase tracking-widest font-bold px-4 py-2 rounded-xl transition-all">
                     Remove Session
                   </button>
                 )}
               </div>
               <div className="space-y-4">
                 <div>
-                  <label className={labelStyle}>Name Session</label>
-                  <input type="text" value={session.name} onChange={(e) => handleSessionChange(sIndex, 'name', e.target.value)} className={inputStyle} required />
+                  <label className={labelStyle}>Name Session / Jenis Tiket</label>
+                  <input type="text" value={session.name} placeholder="Ex: VIP M&G" onChange={(e) => handleSessionChange(sIndex, 'name', e.target.value)} className={inputStyle} required />
                 </div>
                 <div>
                   <label className={labelStyle}>Deskripsi</label>
@@ -251,7 +265,7 @@ export default function CreateEvent() {
                   </div>
                 </div>
                 <div>
-                  <label className={labelStyle}>Contact Person</label>
+                  <label className={labelStyle}>Contact Person Session</label>
                   <input type="text" value={session.contactPerson} onChange={(e) => handleSessionChange(sIndex, 'contactPerson', e.target.value)} className={inputStyle} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -264,64 +278,93 @@ export default function CreateEvent() {
                   </div>
                   <div>
                     <label className={labelStyle}>Price</label>
-                    <input type="number" value={session.price} onChange={(e) => handleSessionChange(sIndex, 'price', e.target.value)} disabled={session.typeEvent === 'Free'} className={`${inputStyle} ${session.typeEvent === 'Free' ? 'bg-gray-100' : ''}`} placeholder={session.typeEvent === 'Free' ? '0' : 'Rp...'} required={session.typeEvent === 'Paid'} />
+                    <div className="relative">
+                       {session.typeEvent === 'Paid' && <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">Rp</span>}
+                       <input 
+                         type="text" 
+                         value={session.price} 
+                         onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '' || /^\d+$/.test(val)) {
+                                handleSessionChange(sIndex, 'price', val);
+                            }
+                         }} 
+                         disabled={session.typeEvent === 'Free'} 
+                         className={`${inputStyle} ${session.typeEvent === 'Paid' ? 'pl-10' : 'bg-gray-100'}`} 
+                         placeholder={session.typeEvent === 'Free' ? '0' : 'Harga...'} 
+                         required={session.typeEvent === 'Paid'} 
+                       />
+                    </div>
                   </div>
                 </div>
                 <div>
-                  <label className={labelStyle}>Stock</label>
-                  <input type="number" value={session.stock} onChange={(e) => handleSessionChange(sIndex, 'stock', e.target.value)} className={inputStyle} required />
+                  <label className={labelStyle}>Stock / Kuota Tiket</label>
+                  <input 
+                    type="text" 
+                    value={session.stock} 
+                    onChange={(e) => {
+                       const val = e.target.value;
+                       if (val === '' || /^\d+$/.test(val)) {
+                           handleSessionChange(sIndex, 'stock', val);
+                       }
+                    }} 
+                    className={inputStyle} 
+                    required 
+                  />
                 </div>
                 <div>
-                  <label className={labelStyle}>Deskripsi Ticket</label>
+                  <label className={labelStyle}>Syarat & Ketentuan Ticket</label>
                   <textarea value={session.ticketDesc} onChange={(e) => handleSessionChange(sIndex, 'ticketDesc', e.target.value)} rows="3" className={inputStyle} />
                 </div>
               </div>
             </div>
           ))}
-          <button type="button" onClick={addSession} className="w-full py-4 bg-green-500/10 text-green-600 border border-green-500 font-bold rounded-xl hover:bg-green-500/20 transition">Add Session</button>
+          <button type="button" onClick={addSession} className="w-full py-4 bg-orange-50 text-[#FF6B35] border-2 border-dashed border-orange-200 font-black tracking-widest uppercase rounded-2xl hover:bg-orange-100 transition">
+            + Add Another Session / Category
+          </button>
 
           {/* SECTION 4: FORM BUILDER */}
           <div className="space-y-8">
             {formData.sessions.map((session, sIndex) => (
               <div key={`formbuilder-${session.id}`} className="bg-white rounded-[24px] shadow-sm p-8 border border-gray-200">
-                <h2 className="text-xl font-bold mb-6 text-[#FF6B35]">Judul Session: {session.name || `Session ${sIndex + 1}`}</h2>
-                <div className="space-y-4 mb-6 opacity-60">
-                  <div><label className={labelStyle}>Name</label><input type="text" disabled className={inputStyle} /></div>
-                  <div><label className={labelStyle}>Email</label><input type="text" disabled className={inputStyle} /></div>
+                <div className="mb-6 border-b border-gray-100 pb-4">
+                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Form Registrasi Peserta Untuk:</p>
+                   <h2 className="text-xl font-bold text-gray-900">{session.name || `Session ${sIndex + 1}`}</h2>
                 </div>
+                
+                <div className="space-y-4 mb-6 opacity-50 select-none">
+                  <div><label className={labelStyle}>Nama Lengkap (Bawaan)</label><input type="text" disabled className={inputStyle} value="Akan diisi oleh peserta" readOnly/></div>
+                  <div><label className={labelStyle}>Email (Bawaan)</label><input type="text" disabled className={inputStyle} value="Akan diisi oleh peserta" readOnly/></div>
+                </div>
+
                 {session.questions.map((q, qIndex) => (
-                  <div key={q.id} className="border border-orange-200 rounded-xl p-4 mb-4 shadow-sm relative border-l-4 border-l-orange-500">
+                  <div key={q.id} className="border border-orange-100 rounded-xl p-5 mb-4 shadow-sm relative border-l-4 border-l-[#FF6B35] bg-orange-50/20">
                     <div className="flex gap-4 mb-3">
-                      <input type="text" placeholder="Pertanyaan" value={q.text} onChange={(e) => handleQuestionChange(sIndex, qIndex, 'text', e.target.value)} className={`${inputStyle} flex-1`} required />
-                      <select value={q.type} onChange={(e) => handleQuestionChange(sIndex, qIndex, 'type', e.target.value)} className="border border-gray-300 rounded-xl px-4 py-3 w-32 outline-none">
-                        <option value="Text">Text</option>
-                        <option value="Dropdown">Dropdown</option>
-                      </select>
+                      <input type="text" placeholder="Ketik pertanyaan custom di sini (Ex: Ukuran Kaos)" value={q.text} onChange={(e) => handleQuestionChange(sIndex, qIndex, 'text', e.target.value)} className={`${inputStyle} flex-1 border-orange-200`} required />
                     </div>
-                    <input type="text" placeholder="Jawaban (Preview)" disabled className={`${inputStyle} bg-gray-50`} />
-                    <div className="flex justify-end items-center gap-4 mt-4 pt-3 border-t border-gray-100">
-                      <button type="button" onClick={() => removeQuestion(sIndex, qIndex)} className="text-gray-400 hover:text-red-500">🗑️</button>
-                      <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 cursor-pointer">
-                        Wajib isi
+                    <input type="text" placeholder="Kolom jawaban peserta" disabled className={`${inputStyle} bg-gray-50 border-gray-200 opacity-60`} />
+                    <div className="flex justify-end items-center gap-4 mt-4 pt-3 border-t border-orange-100">
+                      <button type="button" onClick={() => removeQuestion(sIndex, qIndex)} className="text-xs font-bold text-gray-400 hover:text-red-500 uppercase tracking-widest">Hapus</button>
+                      <label className="flex items-center gap-2 text-xs font-bold text-gray-700 cursor-pointer uppercase tracking-widest">
+                        Wajib Isi
                         <input type="checkbox" checked={q.isRequired} onChange={(e) => handleQuestionChange(sIndex, qIndex, 'isRequired', e.target.checked)} className="w-4 h-4 text-orange-500" />
                       </label>
-                      <button type="button" onClick={() => addQuestion(sIndex)} className="text-gray-600 hover:text-orange-500 text-xl font-bold">⊕</button>
                     </div>
                   </div>
                 ))}
+                <button type="button" onClick={() => addQuestion(sIndex)} className="text-sm font-bold text-[#FF6B35] hover:text-orange-700 flex items-center gap-2 mt-4">
+                  <span className="text-xl">⊕</span> Tambah Pertanyaan
+                </button>
               </div>
             ))}
           </div>
 
           {/* FOOTER BUTTONS */}
-          <div className="flex justify-between items-center pt-6">
-            <button type="button" className="px-8 py-3 rounded-full border border-gray-300 font-semibold text-gray-500 hover:bg-gray-50">Save as Draft</button>
-            <div className="flex gap-4">
-              <button type="button" onClick={() => navigate('/')} className="px-8 py-3 rounded-full border border-gray-300 font-semibold text-gray-500 hover:bg-gray-50">Cancel</button>
-              <button type="submit" disabled={isLoading} className="px-8 py-3 rounded-full bg-[#FF6B35] text-white font-bold shadow-lg shadow-orange-200 hover:opacity-90 disabled:opacity-50">
-                {isLoading ? 'Processing...' : 'Create Event'}
-              </button>
-            </div>
+          <div className="flex justify-between items-center pt-6 border-t border-gray-200 mt-10">
+            <button type="button" onClick={() => navigate('/')} className="px-8 py-4 rounded-xl font-bold text-gray-400 hover:text-gray-900 uppercase tracking-widest text-xs transition">Cancel</button>
+            <button type="submit" disabled={isLoading} className="px-10 py-4 rounded-xl bg-gray-900 text-white font-bold uppercase tracking-widest text-xs shadow-xl hover:bg-black transition-all active:scale-95 disabled:bg-gray-400 disabled:cursor-not-allowed">
+              {isLoading ? 'Processing...' : 'Publish Event'}
+            </button>
           </div>
         </form>
       </main>

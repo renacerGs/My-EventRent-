@@ -1,28 +1,36 @@
 import React, { useState, useEffect } from 'react'; 
 import { Link } from 'react-router-dom';
 
-const formatPrettyDate = (dateString) => {
-  if (!dateString) return '';
-  try {
-    const dateObj = new Date(dateString);
-    if (isNaN(dateObj.getTime())) return dateString;
-    const options = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
-    return new Intl.DateTimeFormat('en-US', options).format(dateObj);
-  } catch (error) {
-    return dateString;
+// Fungsi merakit teks tanggal
+const displayDate = (event) => {
+  if (event.date_start && event.date_end && event.date_start !== event.date_end) {
+    return `${event.date_start} - ${event.date_end}`;
   }
+  if (event.date_start) return event.date_start;
+  if (event.date_old) return event.date_old; // Fallback ke data event lama
+  return '-';
 };
 
-const isEventPassed = (dateStr) => {
-  if (!dateStr) return false;
+// Fungsi merakit teks lokasi
+const displayLocation = (event) => {
+  if (event.city && event.name_place) return `${event.name_place}, ${event.city}`;
+  if (event.city) return event.city;
+  if (event.place) return event.place;
+  if (event.old_location) return event.old_location; // Fallback ke data event lama
+  return 'Multiple / TBD';
+};
+
+// Cek event sudah lewat atau belum (Cek dari tanggal selesai, atau tanggal mulai)
+const isEventPassed = (event) => {
+  const dateToCheck = event.date_end || event.date_start || event.date_old;
+  if (!dateToCheck) return false;
+  
   try {
-    const eventDate = new Date(dateStr);
+    const eventDate = new Date(dateToCheck);
     if (isNaN(eventDate.getTime())) return false; 
     
-    // Set waktu ke akhir hari ini (23:59:59) biar event hari ini tetap muncul
     const now = new Date(); 
     now.setHours(0, 0, 0, 0); 
-    
     return eventDate < now; 
   } catch (error) {
     return false;
@@ -36,7 +44,6 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
   useEffect(() => {
     if (searchQuery) {
       const queryLower = searchQuery.toLowerCase();
-      
       const matchedCat = categories.find(c => 
         c !== 'All' && (c.toLowerCase() === queryLower || queryLower.includes(c.toLowerCase()))
       );
@@ -62,7 +69,7 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
   const filteredEvents = events.filter(event => 
     event.title.toLowerCase().includes((searchQuery || "").toLowerCase()) &&
     (activeCategory === 'All' || event.category === activeCategory) &&
-    !isEventPassed(event.date) 
+    !isEventPassed(event) 
   );
 
   return (
@@ -105,11 +112,11 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
                 <div className="space-y-2 mb-5 flex-1">
                   <div className="flex items-center text-[12px] text-gray-500 font-medium">
                     <svg className="w-4 h-4 mr-2 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                    <span className="truncate">{formatPrettyDate(event.date)}</span>
+                    <span className="truncate">{displayDate(event)}</span>
                   </div>
                   <div className="flex items-center text-[12px] text-gray-500 font-medium">
                     <svg className="w-4 h-4 mr-2 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                    <span className="truncate">{event.location}</span>
+                    <span className="truncate">{displayLocation(event)}</span>
                   </div>
                 </div>
 
@@ -117,8 +124,10 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
                   <span className="inline-block px-3 py-1 bg-orange-50 text-[#FF6B35] rounded-lg text-[10px] font-black uppercase tracking-widest">
                     {event.category || 'Event'}
                   </span>
-                  <span className="text-[10px] font-bold text-[#FF6B35] uppercase tracking-widest">
-                     Beli Tiket
+                  
+                  {/* Status tiket dinamis ngecek total_stock dari backend */}
+                  <span className={`text-[10px] font-bold uppercase tracking-widest ${Number(event.stock) > 0 ? 'text-[#FF6B35]' : 'text-gray-400'}`}>
+                     {Number(event.stock) > 0 ? 'Beli Tiket' : 'Sold Out'}
                   </span>
                 </div>
               </div>

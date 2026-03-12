@@ -22,25 +22,21 @@ export default function Profile() {
     setImagePreview(user.picture);
   }, [navigate, user]);
 
-  // --- FITUR BARU: AUTO COMPRESS IMAGE ---
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Buat preview instan (URL lokal sementara)
       setImagePreview(URL.createObjectURL(file));
       
       const reader = new FileReader();
       reader.onload = (event) => {
         const img = new Image();
         img.onload = () => {
-          // Buat Canvas untuk nge-resize gambar
           const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 300; // Maksimal lebar 300px
-          const MAX_HEIGHT = 300; // Maksimal tinggi 300px
+          const MAX_WIDTH = 300; 
+          const MAX_HEIGHT = 300; 
           let width = img.width;
           let height = img.height;
 
-          // Hitung rasio
           if (width > height) {
             if (width > MAX_WIDTH) {
               height *= MAX_WIDTH / width;
@@ -58,9 +54,8 @@ export default function Profile() {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Kompres ke format JPEG dengan kualitas 70%
           const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-          setImageBase64(compressedBase64); // Simpan hasil kompresan
+          setImageBase64(compressedBase64); 
         };
         img.src = event.target.result;
       };
@@ -83,17 +78,15 @@ export default function Profile() {
         const newPicture = data.picture || imagePreview; 
         const updatedUser = { ...user, name: data.name, picture: newPicture };
         
-        // Simpan ke localStorage dengan aman
         try {
           localStorage.setItem('user', JSON.stringify(updatedUser));
         } catch (error) {
-          console.warn("Memori browser penuh! Menyimpan data tanpa gambar.");
           const safeUser = { ...updatedUser, picture: null };
           localStorage.setItem('user', JSON.stringify(safeUser));
         }
 
         setUser(updatedUser); 
-        setImageBase64(null); // Kosongkan state setelah berhasil
+        setImageBase64(null); 
         
         alert("Profile updated successfully!");
         window.location.reload(); 
@@ -143,98 +136,116 @@ export default function Profile() {
   if (!user) return null;
   const isGoogleUser = !!user.googleId; 
 
-  const inputStyle = "w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[#FF6B35] focus:ring-1 focus:ring-orange-200 transition bg-white";
-  const labelStyle = "block text-xs font-bold text-gray-700 mb-2 uppercase tracking-wide";
+  const inputStyle = "w-full bg-gray-50 border border-gray-200 rounded-xl px-5 py-4 text-sm font-bold text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#FF6B35] focus:ring-1 focus:ring-[#FF6B35] transition-all";
+  const labelStyle = "block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest ml-1";
 
   const currentImage = imagePreview || user.picture;
 
   return (
-    <div className="bg-gray-50 min-h-screen pt-10 pb-20 font-sans">
-      <div className="max-w-4xl mx-auto px-6">
-        <h1 className="text-3xl font-black text-gray-900 mb-8">My Profile</h1>
+    <div className="bg-[#F8F9FA] min-h-screen pt-10 pb-20 font-sans">
+      <div className="max-w-5xl mx-auto px-4 md:px-8">
+        
+        <div className="flex items-center gap-4 mb-8">
+          <button onClick={() => navigate(-1)} className="w-12 h-12 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-500 hover:text-[#FF6B35] hover:border-[#FF6B35] shadow-sm transition-all active:scale-95">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+          </button>
+          <h1 className="text-3xl md:text-4xl font-black text-gray-900 uppercase tracking-tight m-0">My Account</h1>
+        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          <div className="bg-white p-8 rounded-[24px] shadow-sm border border-gray-100 h-fit">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Personal Information</h2>
-            
-            <form onSubmit={handleUpdateProfile}>
-              <div className="flex flex-col items-center mb-8">
-                
-                <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-gray-100 shadow-md mb-4 relative group bg-gray-100 flex items-center justify-center">
-                   {currentImage && currentImage.length > 10 ? (
-                     <img src={currentImage} alt="Profile" className="w-full h-full object-cover" />
-                   ) : (
-                     <svg className="w-16 h-16 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                       <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                     </svg>
-                   )}
-                   <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer">
-                      <span className="text-white text-xs font-bold">Change</span>
-                   </div>
-                   <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" />
-                </div>
-                
-                <p className="text-xs text-gray-400">Allowed *.jpeg, *.jpg, *.png</p>
-              </div>
-
-              <div className="space-y-5">
-                <div>
-                  <label className={labelStyle}>Full Name</label>
-                  <input type="text" value={name} onChange={e => setName(e.target.value)} className={inputStyle} />
-                </div>
-                
-                <div>
-                  <label className={labelStyle}>Email Address</label>
-                  <input type="email" value={user.email} disabled className={`${inputStyle} bg-gray-100 text-gray-500 cursor-not-allowed`} />
-                  <p className="text-[10px] text-gray-400 mt-1">*Email cannot be changed</p>
+          {/* BAGIAN KIRI: PROFIL UTAMA */}
+          <div className="lg:col-span-7">
+            <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100">
+              <h2 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-wide border-b border-gray-100 pb-4">Personal Info</h2>
+              
+              <form onSubmit={handleUpdateProfile}>
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8 bg-gray-50 p-6 rounded-2xl border border-gray-100">
+                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-md relative group bg-gray-200 flex-shrink-0">
+                     {currentImage && currentImage.length > 10 ? (
+                       <img src={currentImage} alt="Profile" className="w-full h-full object-cover" />
+                     ) : (
+                       <svg className="w-12 h-12 text-gray-400 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg>
+                     )}
+                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer">
+                        <span className="text-white text-[10px] font-bold uppercase tracking-widest">Edit</span>
+                     </div>
+                     <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" />
+                  </div>
+                  
+                  <div className="text-center sm:text-left">
+                    <h3 className="text-lg font-black text-gray-900">{user.name}</h3>
+                    <p className="text-sm font-semibold text-gray-500 mb-2">{user.email}</p>
+                    <label className="cursor-pointer inline-block bg-white text-gray-700 px-4 py-1.5 border border-gray-200 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-gray-100 transition-colors shadow-sm">
+                      Ganti Foto
+                      <input type="file" className="hidden" onChange={handleImageChange} accept="image/*" />
+                    </label>
+                  </div>
                 </div>
 
-                <button 
-                  type="submit" 
-                  disabled={isLoadingProfile}
-                  className="w-full bg-[#FF6B35] text-white py-3 rounded-xl font-bold text-sm shadow-lg hover:bg-[#e05a2b] transition disabled:opacity-50"
-                >
-                  {isLoadingProfile ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
-          </div>
+                <div className="space-y-6">
+                  <div>
+                    <label className={labelStyle}>Full Name</label>
+                    <input type="text" value={name} onChange={e => setName(e.target.value)} className={inputStyle} required />
+                  </div>
+                  
+                  <div>
+                    <label className={labelStyle}>Email Address</label>
+                    <input type="email" value={user.email} disabled className="w-full bg-gray-100 border border-gray-200 rounded-xl px-5 py-4 text-sm font-bold text-gray-400 cursor-not-allowed" />
+                    <p className="text-[10px] text-red-400 font-bold mt-2 ml-1 uppercase tracking-widest">*Email tidak dapat diubah</p>
+                  </div>
 
-          <div className="bg-white p-8 rounded-[24px] shadow-sm border border-gray-100 h-fit">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Security</h2>
-            
-            {isGoogleUser ? (
-              <div className="text-center py-10">
-                <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-500">
-                  <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-                </div>
-                <h3 className="text-gray-900 font-bold mb-2">Google Account</h3>
-                <p className="text-gray-500 text-sm px-4">
-                  You are logged in via Google. You don't need to manage a password here.
-                </p>
-              </div>
-            ) : (
-              <form onSubmit={handleChangePassword} className="space-y-5">
-                <div>
-                  <label className={labelStyle}>Current Password</label>
-                  <input type="password" value={passData.oldPass} onChange={e => setPassData({...passData, oldPass: e.target.value})} className={inputStyle} placeholder="Enter current password" required />
-                </div>
-                <div>
-                  <label className={labelStyle}>New Password</label>
-                  <input type="password" value={passData.newPass} onChange={e => setPassData({...passData, newPass: e.target.value})} className={inputStyle} placeholder="Enter new password" required />
-                </div>
-                <div>
-                  <label className={labelStyle}>Confirm New Password</label>
-                  <input type="password" value={passData.confirmPass} onChange={e => setPassData({...passData, confirmPass: e.target.value})} className={inputStyle} placeholder="Re-enter new password" required />
-                </div>
-                <div className="pt-2">
-                   <button type="submit" disabled={isLoadingPass} className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold text-sm shadow-lg hover:bg-gray-800 transition disabled:opacity-50">
-                    {isLoadingPass ? 'Updating...' : 'Update Password'}
-                  </button>
+                  <div className="pt-4">
+                    <button 
+                      type="submit" 
+                      disabled={isLoadingProfile}
+                      className="w-full sm:w-auto bg-[#FF6B35] text-white px-10 py-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-orange-100 hover:bg-[#E85526] transition-all active:scale-95 disabled:opacity-50"
+                    >
+                      {isLoadingProfile ? 'Menyimpan...' : 'Simpan Profil'}
+                    </button>
+                  </div>
                 </div>
               </form>
-            )}
+            </div>
+          </div>
+
+          {/* BAGIAN KANAN: SECURITY */}
+          <div className="lg:col-span-5">
+            <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 h-full">
+              <h2 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-wide border-b border-gray-100 pb-4">Keamanan</h2>
+              
+              {isGoogleUser ? (
+                <div className="text-center py-12 px-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                  <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-5 text-blue-500">
+                    <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24"><path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/></svg>
+                  </div>
+                  <h3 className="text-lg text-gray-900 font-black mb-2 uppercase tracking-wide">Login via Google</h3>
+                  <p className="text-gray-500 text-xs font-semibold leading-relaxed">
+                    Akun kamu terhubung secara aman dengan Google. Tidak perlu mengingat atau mengganti password di sini.
+                  </p>
+                </div>
+              ) : (
+                <form onSubmit={handleChangePassword} className="space-y-6">
+                  <div>
+                    <label className={labelStyle}>Password Lama</label>
+                    <input type="password" value={passData.oldPass} onChange={e => setPassData({...passData, oldPass: e.target.value})} className={inputStyle} placeholder="••••••••" required />
+                  </div>
+                  <div>
+                    <label className={labelStyle}>Password Baru</label>
+                    <input type="password" value={passData.newPass} onChange={e => setPassData({...passData, newPass: e.target.value})} className={inputStyle} placeholder="••••••••" required />
+                  </div>
+                  <div>
+                    <label className={labelStyle}>Konfirmasi Password Baru</label>
+                    <input type="password" value={passData.confirmPass} onChange={e => setPassData({...passData, confirmPass: e.target.value})} className={inputStyle} placeholder="••••••••" required />
+                  </div>
+                  <div className="pt-2">
+                     <button type="submit" disabled={isLoadingPass} className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl hover:bg-black transition-all active:scale-95 disabled:opacity-50">
+                      {isLoadingPass ? 'Memproses...' : 'Ubah Password'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           </div>
 
         </div>

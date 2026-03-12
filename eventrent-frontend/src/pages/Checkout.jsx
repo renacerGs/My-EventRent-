@@ -1,20 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 
 export default function Checkout() {
   const { id } = useParams();
   const navigate = useNavigate();
+  
+  // Nangkep parameter ?session=xxx dari URL
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const preferredSessionId = queryParams.get('session'); 
+
   const user = JSON.parse(localStorage.getItem('user'));
 
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   
-  // STATE KERANJANG (BAGIAN KIRI)
-  // Format: [{ id: unik, sessionId: ID, qty: 1 }]
   const [cart, setCart] = useState([]);
-
-  // STATE JAWABAN FORM (BAGIAN KANAN)
   const [formAnswers, setFormAnswers] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!user) navigate('/');
@@ -26,11 +29,22 @@ export default function Checkout() {
         const data = await res.json();
         setEvent(data);
         
-        // Default cart: Masukin session pertama sebanyak 1 tiket (kalau ada stoknya)
         if (data.sessions && data.sessions.length > 0) {
-          const firstAvailable = data.sessions.find(s => s.stock > 0);
-          if (firstAvailable) {
-            setCart([{ id: crypto.randomUUID(), sessionId: firstAvailable.id, qty: 1 }]);
+          let initialSession;
+          
+          // 1. Coba cari sesi yang sesuai dengan URL parameter dan masih ada stoknya
+          if (preferredSessionId) {
+            initialSession = data.sessions.find(s => String(s.id) === String(preferredSessionId) && s.stock > 0);
+          }
+          
+          // 2. Kalau gak ketemu (karena URL kosong atau stok sesi itu habis), cari sesi pertama yang ready
+          if (!initialSession) {
+            initialSession = data.sessions.find(s => s.stock > 0);
+          }
+
+          // 3. Masukin ke keranjang
+          if (initialSession) {
+            setCart([{ id: crypto.randomUUID(), sessionId: initialSession.id, qty: 1 }]);
           }
         }
       } catch (err) {
@@ -42,12 +56,14 @@ export default function Checkout() {
       }
     };
     fetchEvent();
-  }, [id, navigate]);
+  }, [id, navigate, preferredSessionId]);
 
-  // --- LOGIC BAGIAN KIRI (KERANJANG) ---
   const handleAddCartItem = () => {
-    const availableSession = event.sessions.find(s => s.stock > 0);
-    if (!availableSession) return alert("Semua tiket habis bro!");
+    const availableSession = event.sessions.find(s => 
+      s.stock > 0 && !cart.some(item => String(item.sessionId) === String(s.id))
+    );
+
+    if (!availableSession) return alert("Semua tipe tiket sudah kamu pilih bro!");
     
     setCart([...cart, { id: crypto.randomUUID(), sessionId: availableSession.id, qty: 1 }]);
   };
@@ -68,22 +84,69 @@ export default function Checkout() {
     }, 0);
   };
 
-  // --- LOGIC SUBMIT (SEMENTARA) ---
-  const handleProceedPayment = () => {
-    console.log("Keranjang Belanja:", cart);
-    console.log("Jawaban Form Peserta:", formAnswers);
-    alert("Cek Console Log bro! Data keranjang dan jawaban udah siap dikirim ke API.");
-    // TODO: Nanti disambungin ke API Checkout beneran
+  const canAddNewSession = event?.sessions?.some(s => 
+    s.stock > 0 && !cart.some(item => String(item.sessionId) === String(s.id))
+  );
+
+  const handleProceedPayment = async () => {
+    if (cart.length === 0) return alert("Keranjang kosong bro!");
+
+    const invalidItem = cart.find(item => item.qty < 1);
+    if (invalidItem) return alert("Jumlah tiket minimal 1 per pilihan ya bro!");
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        userId: user.id,
+        eventId: event.id,
+        cart: cart,         
+        formAnswers: formAnswers 
+      };
+
+      const res = await fetch('http://localhost:3000/api/tickets/buy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert("Mantap bro! Tiket berhasil dibeli dan masuk ke database! 🎉");
+        navigate(`/event/${id}`); 
+      } else {
+        alert("Gagal bayar: " + (data.message || 'Terjadi kesalahan di server'));
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Terjadi kesalahan jaringan atau server mati.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-400">Loading Checkout...</div>;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-32 font-sans pt-10">
-      <div className="max-w-7xl mx-auto px-4">
+      <div className="max-w-7xl mx-auto px-4 md:px-8">
         
-        <h1 className="text-3xl font-extrabold text-gray-900 mb-2 uppercase">Checkout Tiket</h1>
-        <p className="text-sm text-gray-500 font-medium mb-8">Event: {event.title}</p>
+        {/* --- HEADER DENGAN TOMBOL BACK --- */}
+        <div className="flex items-center gap-4 mb-8">
+          <button 
+            onClick={() => navigate(-1)} 
+            className="w-12 h-12 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-500 hover:text-[#FF6B35] hover:border-[#FF6B35] shadow-sm transition-all active:scale-95"
+            title="Kembali ke Event"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div>
+            <h1 className="text-3xl font-extrabold text-gray-900 uppercase tracking-tight leading-none mb-1">Checkout Tiket</h1>
+            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">{event.title}</p>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
@@ -98,7 +161,7 @@ export default function Checkout() {
               return (
                 <div key={item.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
                   <div className="flex justify-between items-center mb-3">
-                    <span className="text-xs font-bold text-[#FF6B35] uppercase tracking-widest">Tiket {index + 1}</span>
+                    <span className="text-xs font-bold text-[#FF6B35] uppercase tracking-widest">Pilihan {index + 1}</span>
                     {cart.length > 1 && (
                       <button onClick={() => handleRemoveCartItem(item.id)} className="text-gray-400 hover:text-red-500 font-bold text-sm">✕ Hapus</button>
                     )}
@@ -110,11 +173,17 @@ export default function Checkout() {
                     onChange={(e) => updateCartItem(item.id, 'sessionId', e.target.value)}
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 mb-4 focus:ring-1 focus:ring-[#FF6B35] outline-none"
                   >
-                    {event.sessions.map(s => (
-                      <option key={s.id} value={s.id} disabled={s.stock < 1}>
-                        {s.name} - {Number(s.price) === 0 ? 'FREE' : `Rp ${parseInt(s.price).toLocaleString('id-ID')}`} {s.stock < 1 ? '(Habis)' : ''}
-                      </option>
-                    ))}
+                    {event.sessions.map(s => {
+                      const isAlreadySelectedByOtherCartItem = cart.some(c => String(c.sessionId) === String(s.id) && c.id !== item.id);
+                      const isOutOfStock = s.stock < 1;
+
+                      return (
+                        <option key={s.id} value={s.id} disabled={isOutOfStock || isAlreadySelectedByOtherCartItem}>
+                          {s.name} - {Number(s.price) === 0 ? 'FREE' : `Rp ${parseInt(s.price).toLocaleString('id-ID')}`} 
+                          {isOutOfStock ? ' (Habis)' : isAlreadySelectedByOtherCartItem ? ' (Sudah Dipilih)' : ''}
+                        </option>
+                      );
+                    })}
                   </select>
 
                   {/* Atur Jumlah & Info Stok */}
@@ -140,12 +209,14 @@ export default function Checkout() {
               );
             })}
 
-            <button 
-              onClick={handleAddCartItem} 
-              className="w-full py-4 border-2 border-dashed border-green-500 text-green-600 font-bold rounded-2xl hover:bg-green-50 transition-colors uppercase text-xs tracking-widest"
-            >
-              + Tambah Pilihan Tiket
-            </button>
+            {canAddNewSession && (
+              <button 
+                onClick={handleAddCartItem} 
+                className="w-full py-4 border-2 border-dashed border-green-500 text-green-600 font-bold rounded-2xl hover:bg-green-50 transition-colors uppercase text-xs tracking-widest"
+              >
+                + Tambah Pilihan Tiket
+              </button>
+            )}
           </div>
 
           {/* ======================================================= */}
@@ -154,12 +225,10 @@ export default function Checkout() {
           <div className="lg:col-span-8 bg-white rounded-[32px] p-8 md:p-10 shadow-sm border border-gray-200">
             <h2 className="text-2xl font-bold text-gray-900 mb-8 border-b border-gray-100 pb-4">Data Peserta</h2>
 
-            {/* LOOPING: Untuk setiap item di keranjang... */}
             {cart.map((item, cartIndex) => {
               const session = event.sessions.find(s => String(s.id) === String(item.sessionId));
               if (!session) return null;
 
-              // LOOPING: ...Render form sebanyak jumlah qty (tiket) yang dibeli
               return Array.from({ length: item.qty }).map((_, qtyIndex) => {
                 const formKeyPrefix = `cart-${item.id}-ticket-${qtyIndex}`;
 
@@ -170,17 +239,27 @@ export default function Checkout() {
                     </div>
 
                     <div className="space-y-4 pl-2 md:pl-4 border-l-2 border-gray-100">
-                      {/* Default Form (Name & Email) */}
                       <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-2">Nama Lengkap</label>
-                        <input type="text" className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35]" placeholder="Masukkan nama peserta" />
+                        <label className="block text-xs font-bold text-gray-700 mb-2">Nama Lengkap <span className="text-red-500">*</span></label>
+                        <input 
+                          type="text" 
+                          required
+                          onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-nama`]: e.target.value}))}
+                          className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35]" 
+                          placeholder="Masukkan nama sesuai KTP" 
+                        />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-gray-700 mb-2">Email</label>
-                        <input type="email" className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35]" placeholder="Masukkan email peserta" />
+                        <label className="block text-xs font-bold text-gray-700 mb-2">Email <span className="text-red-500">*</span></label>
+                        <input 
+                          type="email" 
+                          required
+                          onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-email`]: e.target.value}))}
+                          className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35]" 
+                          placeholder="Masukkan email aktif" 
+                        />
                       </div>
 
-                      {/* Custom Questions dari Backend */}
                       {session.questions && session.questions.map((q) => (
                         <div key={q.id}>
                           <label className="block text-xs font-bold text-gray-700 mb-2">
@@ -216,7 +295,6 @@ export default function Checkout() {
 
       </div>
 
-      {/* STICKY BOTTOM BAR UNTUK PEMBAYARAN */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] p-5 z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-between px-4">
           <div>
@@ -225,9 +303,10 @@ export default function Checkout() {
           </div>
           <button 
             onClick={handleProceedPayment}
-            className="px-8 py-4 bg-gray-900 text-white font-bold rounded-xl uppercase tracking-widest text-sm shadow-xl hover:bg-black transition-all active:scale-95"
+            disabled={isSubmitting || cart.length === 0}
+            className="px-8 py-4 bg-gray-900 text-white font-bold rounded-xl uppercase tracking-widest text-sm shadow-xl hover:bg-black transition-all active:scale-95 disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
-            Lanjut Bayar
+            {isSubmitting ? 'Memproses...' : 'Lanjut Bayar'}
           </button>
         </div>
       </div>

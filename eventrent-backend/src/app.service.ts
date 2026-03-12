@@ -29,11 +29,15 @@ export class AppService implements OnModuleInit {
 
   async getEvents() {
     try {
-      // PERBAIKAN: Sesuaikan dengan kolom baru. Ambil harga termurah dari event_sessions
       const query = `
-        SELECT e.id, e.title, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date, 
-               e.place as location, e.image_url as img, c.name as category, 
+        SELECT e.id, e.title, 
+               TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start,
+               TO_CHAR(e.event_end, 'Dy, DD Mon YYYY') as date_end,
+               TO_CHAR(e.date_time, 'Dy, DD Mon YYYY') as date_old,
+               e.name_place, e.city, e.place, e.location as old_location,
+               e.image_url as img, c.name as category, 
                COALESCE((SELECT MIN(price) FROM event_sessions WHERE event_id = e.id), 0) as price,
+               COALESCE((SELECT SUM(stock) FROM event_sessions WHERE event_id = e.id), 0) as stock,
                e.description, e.views, u.name as author 
         FROM events e
         JOIN categories c ON e.category_id = c.id
@@ -50,7 +54,6 @@ export class AppService implements OnModuleInit {
 
   async getEventById(eventId: number) {
     try {
-      // 1. Ambil data event utama
       const eventQuery = `
         SELECT e.id, e.title, e.description, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start, 
                TO_CHAR(e.event_end, 'Dy, DD Mon YYYY') as date_end, e.place, e.name_place, e.city, e.province, e.map_url,
@@ -68,7 +71,6 @@ export class AppService implements OnModuleInit {
 
       const eventData = eventRes.rows[0];
 
-      // 2. Ambil data sessions
       const sessionQuery = `
         SELECT id, name, description, TO_CHAR(session_date, 'Dy, DD Mon YYYY') as date, 
                start_time, end_time, contact_person, event_type, price, stock
@@ -79,7 +81,6 @@ export class AppService implements OnModuleInit {
       const sessionRes = await this.pool.query(sessionQuery, [eventId]);
       const sessions = sessionRes.rows;
 
-      // 3. BARU: Ambil questions untuk setiap session
       for (let session of sessions) {
         const qQuery = `SELECT id, question_text, answer_type, is_required FROM session_questions WHERE session_id = $1`;
         const qRes = await this.pool.query(qQuery, [session.id]);
@@ -98,9 +99,14 @@ export class AppService implements OnModuleInit {
   async getMyEvents(userId: number) {
     try {
       const query = `
-        SELECT e.id, e.title, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date, 
-               e.place as location, e.image_url as img, c.name as category, 
+        SELECT e.id, e.title, 
+               TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start,
+               TO_CHAR(e.event_end, 'Dy, DD Mon YYYY') as date_end,
+               TO_CHAR(e.date_time, 'Dy, DD Mon YYYY') as date_old,
+               e.name_place, e.city, e.place, e.location as old_location,
+               e.image_url as img, c.name as category, 
                COALESCE((SELECT MIN(price) FROM event_sessions WHERE event_id = e.id), 0) as price,
+               COALESCE((SELECT SUM(stock) FROM event_sessions WHERE event_id = e.id), 0) as stock,
                e.description, e.views, u.name as author
         FROM events e
         JOIN categories c ON e.category_id = c.id
@@ -126,13 +132,11 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // --- PERBAIKAN UTAMA: TRANSACTION UNTUK NESTED INSERT ---
   async createEvent(data: any) {
     const client = await this.pool.connect(); 
     try {
       await client.query('BEGIN'); 
 
-      // 1. Insert Event Utama (Menyesuaikan map_url dan phone)
       const eventQuery = `
         INSERT INTO events (
           title, description, event_start, event_end, category_id, 
@@ -155,7 +159,6 @@ export class AppService implements OnModuleInit {
       const eventRes = await client.query(eventQuery, eventValues);
       const eventId = eventRes.rows[0].id;
 
-      // 2. Insert Sessions
       if (data.sessions && data.sessions.length > 0) {
         for (const session of data.sessions) {
           const sessionQuery = `
@@ -172,7 +175,6 @@ export class AppService implements OnModuleInit {
           const sessionRes = await client.query(sessionQuery, sessionValues);
           const sessionId = sessionRes.rows[0].id;
 
-          // 3. Insert Questions (Form Builder)
           if (session.questions && session.questions.length > 0) {
             for (const q of session.questions) {
               const questionQuery = `
@@ -196,7 +198,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // TODO: Ini perlu dirapikan ke depannya karena update multiple session lumayan kompleks
   async updateEvent(eventId: number, userId: number, data: any) {
     try {
       const query = `
@@ -234,8 +235,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // --- LIKES FEATURE ---
-
   async toggleLike(userId: number, event_id: number) {
     try {
       const check = await this.pool.query('SELECT id FROM user_likes WHERE user_id = $1 AND event_id = $2', [userId, event_id]);
@@ -271,39 +270,88 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // --- TICKETS & ATTENDEES (NOTE: Harus disesuaikan lagi ke depannya) ---
-  // Karena sekarang tiket nempel di session_id, logic ini sementara gue bypass ke event_sessions pertama
-  
-  async buyTicket(userId: number, eventId: number, quantity: number) {
+  // --- LOGIC PEMBELIAN BARU: SIMPAN JAWABAN CUSTOM KE JSON ---
+  async buyTicket(userId: number, eventId: number, cart: any[], formAnswers: any) {
+    const client = await this.pool.connect();
     try {
-      // MENGAMBIL SESSION PERTAMA DARI EVENT TERSEBUT SEMENTARA
-      const sessionRes = await this.pool.query('SELECT * FROM event_sessions WHERE event_id = $1 LIMIT 1', [eventId]);
-      const session = sessionRes.rows[0];
-      
-      if (!session) throw new BadRequestException('Session event tidak ditemukan');
-      if (session.stock < quantity) throw new BadRequestException(`Stok tiket tidak cukup!`);
-      
-      await this.pool.query('UPDATE event_sessions SET stock = stock - $1 WHERE id = $2', [quantity, session.id]);
-      const totalPrice = session.price * quantity;
-      
-      // Catatan: idealnya tabel tiket diubah punya kolom session_id, bukan event_id. 
-      const insertQuery = `INSERT INTO tickets (event_id, user_id, quantity, total_price) VALUES ($1, $2, $3, $4) RETURNING *`;
-      const ticketRes = await this.pool.query(insertQuery, [eventId, userId, quantity, totalPrice]);
-      return ticketRes.rows[0];
+      await client.query('BEGIN'); 
+
+      const boughtTickets: number[] = [];
+
+      for (const item of cart) {
+        const sessionId = item.sessionId;
+        const qty = item.qty;
+
+        const sessionRes = await client.query('SELECT price, stock FROM event_sessions WHERE id = $1 FOR UPDATE', [sessionId]);
+        if (sessionRes.rows.length === 0) throw new BadRequestException('Session tidak ditemukan');
+        
+        const session = sessionRes.rows[0];
+        if (session.stock < qty) throw new BadRequestException(`Stok tiket tidak cukup untuk session ini!`);
+
+        await client.query('UPDATE event_sessions SET stock = stock - $1 WHERE id = $2', [qty, sessionId]);
+
+        const totalPrice = session.price * qty;
+        const ticketRes = await client.query(
+          `INSERT INTO tickets (event_id, session_id, user_id, quantity, total_price) 
+           VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+          [eventId, sessionId, userId, qty, totalPrice]
+        );
+        const ticketId = ticketRes.rows[0].id;
+        boughtTickets.push(ticketId);
+
+        // Ambil data pertanyaan dari database untuk sesi ini
+        const qRes = await client.query('SELECT id, question_text FROM session_questions WHERE session_id = $1', [sessionId]);
+        const dbQuestions = qRes.rows;
+
+        // PERBAIKAN: Gunakan any[] supaya tidak Error "never"
+        const attendeesData: any[] = [];
+        
+        for (let i = 0; i < qty; i++) {
+          const prefix = `cart-${item.id}-ticket-${i}`;
+          
+          const name = formAnswers[`${prefix}-nama`] || `Peserta ${i + 1}`;
+          const email = formAnswers[`${prefix}-email`] || ``;
+          
+          // Susun jawaban customnya
+          // PERBAIKAN: Gunakan any[] supaya tidak Error "never"
+          const customAnswers: any[] = [];
+          for (const q of dbQuestions) {
+             const ans = formAnswers[`${prefix}-q${q.id}`];
+             if (ans) {
+                customAnswers.push({ question: q.question_text, answer: ans });
+             }
+          }
+
+          attendeesData.push({ name, email, customAnswers });
+        }
+
+        await client.query(`UPDATE tickets SET attendee_data = $1 WHERE id = $2`, [JSON.stringify(attendeesData), ticketId]);
+      }
+
+      await client.query('COMMIT');
+      return { message: 'Pembelian tiket berhasil', ticketIds: boughtTickets };
+
     } catch (err) {
+      await client.query('ROLLBACK');
+      console.error("Error Buy Ticket Transaction:", err);
       if (err instanceof BadRequestException) throw err;
-      console.error(err);
-      throw new InternalServerErrorException('Gagal membeli tiket');
+      throw new InternalServerErrorException('Gagal memproses pembelian tiket');
+    } finally {
+      client.release();
     }
   }
 
   async getMyTickets(userId: number) {
     try {
       const query = `
-        SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price,
-               e.id as event_id, e.title, e.image_url as img, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date, e.place as location
+        SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price, t.attendee_data,
+               e.id as event_id, e.title, e.image_url as img, 
+               TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date, e.place as location,
+               s.name as session_name, TO_CHAR(s.session_date, 'Dy, DD Mon YYYY') as session_date, 
+               s.start_time, s.end_time
         FROM tickets t
         JOIN events e ON t.event_id = e.id
+        JOIN event_sessions s ON t.session_id = s.id
         WHERE t.user_id = $1
         ORDER BY t.purchase_date DESC
       `;
@@ -322,10 +370,12 @@ export class AppService implements OnModuleInit {
       if (eventCheck.rows[0].created_by != userId) throw new UnauthorizedException('Bukan pemilik event!');
 
       const query = `
-        SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price,
-               u.name as buyer_name, u.email as buyer_email, u.picture as buyer_pic
+        SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price, t.attendee_data,
+               u.name as buyer_name, u.email as buyer_email, u.picture as buyer_pic,
+               s.name as session_name
         FROM tickets t
         JOIN users u ON t.user_id = u.id
+        JOIN event_sessions s ON t.session_id = s.id
         WHERE t.event_id = $1
         ORDER BY t.purchase_date DESC
       `;

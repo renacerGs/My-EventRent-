@@ -1,6 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
+// Fungsi untuk convert format "Mon, 12 Jan 2026" kembali jadi "YYYY-MM-DD" buat form HTML
+const formatDateForInput = (dateStr) => {
+  if (!dateStr || dateStr.includes('TBA') || dateStr.includes('-')) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  } catch (err) {
+    return '';
+  }
+};
+
 export default function EditEvent() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -10,17 +25,19 @@ export default function EditEvent() {
     title: '',
     phone: '', 
     category: '',
-    location: '',
-    date: '',
-    time: '',
-    price: '',
     description: '',
+    place: '',
+    namePlace: '',
+    city: '',
+    province: '',
+    mapUrl: '',
+    eventStart: '',
+    eventEnd: ''
   });
+  
   const [imagePreview, setImagePreview] = useState(null);
   const [imageBase64, setImageBase64] = useState(null); 
   const [isLoading, setIsLoading] = useState(true);
-  
-  // --- STATE BUAT POP-UP SUKSES ---
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const categories = ['Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports'];
@@ -28,28 +45,34 @@ export default function EditEvent() {
   useEffect(() => {
     if (!user) { navigate('/'); return; }
 
-    fetch(`http://localhost:3000/api/events`) 
-      .then(res => res.json())
-      .then(data => {
-        const found = data.find(e => String(e.id) === String(id));
-        
-        if (found) {
-          setFormData({
-            title: found.title,
-            phone: found.phone || '',
-            category: found.category,
-            location: found.location,
-            date: '', 
-            time: '', 
-            price: found.price,
-            stock: found.stock || 0, 
-            description: found.description,
-          });
-          setImagePreview(found.img);
-        }
+    fetch(`http://localhost:3000/api/events/${id}`) 
+      .then(res => {
+        if (!res.ok) throw new Error("Gagal load event");
+        return res.json();
+      })
+      .then(found => {
+        setFormData({
+          title: found.title || '',
+          phone: found.contact || '',
+          category: found.category || 'Music',
+          description: found.description || '',
+          place: found.place || '',
+          namePlace: found.name_place || '',
+          city: found.city || '',
+          province: found.province || '',
+          mapUrl: found.map_url || '',
+          eventStart: formatDateForInput(found.date_start), 
+          eventEnd: formatDateForInput(found.date_end)
+        });
+        setImagePreview(found.img);
         setIsLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        alert("Gagal memuat data edit");
+        navigate('/manage');
       });
-  }, [id]);
+  }, [id, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -69,7 +92,22 @@ export default function EditEvent() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const payload = { ...formData, img: imageBase64 };
+      const payload = { 
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        phone: formData.phone,
+        eventStart: formData.eventStart, 
+        eventEnd: formData.eventEnd,     
+        location: {
+          place: formData.place,
+          namePlace: formData.namePlace,
+          city: formData.city,
+          province: formData.province,
+          mapUrl: formData.mapUrl
+        },
+        img: imageBase64 
+      };
 
       const res = await fetch(`http://localhost:3000/api/events/${id}?userId=${user.id}`, {
         method: 'PUT',
@@ -78,157 +116,164 @@ export default function EditEvent() {
       });
 
       if (res.ok) {
-        // --- JANGAN LANGSUNG NAVIGATE, MUNCULIN MODAL DULU (KILAT 0.5s) ---
         setShowSuccessModal(true);
         setTimeout(() => {
           navigate('/manage');
-        }, 500); 
+        }, 1000); 
       } else {
-        console.error("Gagal update event");
+        alert("Gagal update event. Pastikan kamu pembuat event ini.");
       }
     } catch (err) {
       console.error(err);
     }
   };
 
-  if (isLoading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-400">Loading Edit Form...</div>;
 
-  const labelStyle = "block text-sm font-bold text-gray-800 mb-2 ml-3";
-  const inputStyle = "w-full bg-white border border-gray-200 rounded-full px-5 py-3 text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:border-[#FF6B35] focus:ring-2 focus:ring-orange-100 transition-all";
-  const sectionStyle = "bg-white p-6 md:p-8 rounded-[24px] shadow-sm border border-gray-100 mb-6";
+  const labelStyle = "block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 ml-1";
+  const inputStyle = "w-full bg-white border border-gray-200 rounded-xl px-5 py-4 text-sm font-bold text-gray-900 placeholder-gray-300 focus:outline-none focus:border-[#FF6B35] focus:ring-1 focus:ring-[#FF6B35] transition-all";
+  const sectionStyle = "bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 mb-8";
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-32 pt-10 font-sans relative">
+    <div className="bg-[#F8F9FA] min-h-screen pb-32 pt-10 font-sans relative">
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
         
-        <div className="flex items-center justify-between mb-8">
-           <h1 className="text-2xl font-black text-gray-900">Edit Event</h1>
-           <button onClick={() => navigate('/manage')} className="text-gray-500 hover:text-gray-900 font-bold text-sm">Cancel</button>
+        <div className="flex items-center justify-between mb-6">
+           <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tight">Edit Event</h1>
+           <button onClick={() => navigate('/manage')} className="text-gray-400 hover:text-red-500 font-bold text-xs uppercase tracking-widest transition-colors">Batal</button>
+        </div>
+
+        {/* --- BANNER PERINGATAN (BARU) --- */}
+        <div className="bg-[#FFF5F0] border-l-[6px] border-[#FF6B35] p-5 mb-8 rounded-r-2xl shadow-sm flex items-start gap-4">
+           <div className="bg-[#FF6B35] bg-opacity-10 p-2 rounded-full shrink-0">
+              <svg className="w-5 h-5 text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+           </div>
+           <div>
+             <h3 className="text-sm font-black text-[#FF6B35] mb-1 uppercase tracking-wider">Perhatian Buat Organizer</h3>
+             <p className="text-xs text-gray-600 leading-relaxed font-medium">
+               Untuk menjaga validitas dan keamanan data transaksi peserta yang sudah membeli tiket, <strong className="text-gray-900 font-bold">Sesi Tiket, Harga, Kuota, dan Custom Form TIDAK DAPAT DIUBAH</strong> setelah event dibuat. Anda hanya dapat memperbarui informasi dasar di bawah ini. Harap teliti sebelum menyimpan perubahan.
+             </p>
+           </div>
         </div>
 
         <form onSubmit={handleSubmit}>
           
+          {/* SECTION 1: OVERVIEW */}
           <div className={sectionStyle}>
-            <h2 className="text-lg font-black text-gray-900 mb-6 pb-4 border-b border-gray-100 text-left">Event Overview</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4">Event Overview</h2>
             
-            <div className="mb-6 text-left">
-              <label className={labelStyle}>Event Title <span className="text-red-500">*</span></label>
+            <div className="mb-6">
+              <label className={labelStyle}>Event Title</label>
               <input type="text" name="title" value={formData.title} onChange={handleChange} required className={inputStyle} />
             </div>
 
-            <div className="mb-6 text-left">
-              <label className={labelStyle}>WhatsApp / Contact Person <span className="text-red-500">*</span></label>
-              <input type="text" name="phone" value={formData.phone} onChange={handleChange} required className={inputStyle} placeholder="Ex: 08123456789" />
-            </div>
-
-            <div className="text-left">
-              <label className={labelStyle}>Summary / Description <span className="text-red-500">*</span></label>
-              <textarea name="description" value={formData.description} onChange={handleChange} rows="4" required className="w-full border border-gray-200 rounded-[20px] px-5 py-4 text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:border-[#FF6B35] transition resize-none min-h-[120px]" />
-            </div>
-          </div>
-
-          <div className={sectionStyle}>
-            <h2 className="text-lg font-black text-gray-900 mb-6 pb-4 border-b border-gray-100 text-left">Date and Location</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 text-left">
-              <div><label className={labelStyle}>Date</label><input type="date" name="date" value={formData.date} onChange={handleChange} required className={`${inputStyle} cursor-pointer`} /></div>
-              <div><label className={labelStyle}>Time</label><input type="time" name="time" value={formData.time} onChange={handleChange} required className={`${inputStyle} cursor-pointer`} /></div>
-            </div>
-            <div className="mb-6 text-left">
-              <label className={labelStyle}>Location</label>
-              <input type="text" name="location" value={formData.location} onChange={handleChange} required className={inputStyle} />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left items-end">
-               <div>
-                  <label className={labelStyle}>Category</label>
-                  <select name="category" value={formData.category} onChange={handleChange} required className={`${inputStyle} appearance-none bg-white`}>
-                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-               </div>
-               {/* --- PERBAIKAN DI SINI: TYPE GANTI TEXT + SENSOR ANGKA + PREFIX Rp --- */}
-               <div>
-                    <label className={labelStyle}>Price (Rp)</label>
-                    <div className="relative">
-                        <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">Rp</span>
-                        <input 
-                            type="text" // Ganti ke text
-                            name="price" 
-                            value={formData.price} 
-                            onChange={(e) => {
-                                const val = e.target.value;
-                                if (val === '' || /^\d+$/.test(val)) {
-                                    handleChange(e);
-                                }
-                            }}
-                            className={`${inputStyle} pl-12`} 
-                        />
-                    </div>
-                </div>
-               
-               <div>
-                    <label className={labelStyle}>Stock</label>
-                    <input 
-                        type="text" // Ganti ke text
-                        name="stock" 
-                        value={formData.stock} 
-                        onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === '' || /^\d+$/.test(val)) {
-                                handleChange(e);
-                            }
-                        }}
-                        required 
-                        className={inputStyle} 
-                    />
-                </div>
-            </div>
-          </div>
-
-          <div className={sectionStyle}>
-            <h2 className="text-lg font-black text-gray-900 mb-6 pb-4 border-b border-gray-100 text-left">Event Image</h2>
-            <div className="flex flex-col md:flex-row items-start gap-6">
-              <div className="w-full md:w-64 h-40 bg-gray-100 rounded-[16px] overflow-hidden border border-gray-200 relative group flex-shrink-0">
-                 {imagePreview && <img src={imagePreview} className="w-full h-full object-cover" alt="Preview" />}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className={labelStyle}>Category</label>
+                <select name="category" value={formData.category} onChange={handleChange} required className={inputStyle}>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
               </div>
-              <div className="flex-1 text-left pt-4">
-                <label className="cursor-pointer inline-flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-6 py-2.5 rounded-full text-xs font-bold hover:bg-gray-50 transition shadow-sm">
-                  <svg className="w-4 h-4 text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                  Change Image
+              <div>
+                <label className={labelStyle}>Contact Person (WA)</label>
+                <input type="text" name="phone" value={formData.phone} onChange={handleChange} required className={inputStyle} />
+              </div>
+            </div>
+
+            <div>
+              <label className={labelStyle}>Description</label>
+              <textarea name="description" value={formData.description} onChange={handleChange} rows="6" required className="w-full bg-white border border-gray-200 rounded-2xl px-5 py-4 text-sm font-medium text-gray-700 placeholder-gray-300 focus:outline-none focus:border-[#FF6B35] focus:ring-1 focus:ring-[#FF6B35] transition-all resize-none" />
+            </div>
+          </div>
+
+          {/* SECTION 2: DATE & LOCATION */}
+          <div className={sectionStyle}>
+            <h2 className="text-xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4">Date & Location</h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className={labelStyle}>Tanggal Mulai</label>
+                <input type="date" name="eventStart" value={formData.eventStart} onChange={handleChange} required className={inputStyle} />
+              </div>
+              <div>
+                <label className={labelStyle}>Tanggal Selesai</label>
+                <input type="date" name="eventEnd" value={formData.eventEnd} onChange={handleChange} className={inputStyle} />
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <label className={labelStyle}>Nama Tempat / Gedung</label>
+              <input type="text" name="namePlace" value={formData.namePlace} onChange={handleChange} placeholder="Contoh: Palur Plaza" className={inputStyle} />
+            </div>
+
+            <div className="mb-6">
+              <label className={labelStyle}>Alamat Lengkap</label>
+              <input type="text" name="place" value={formData.place} onChange={handleChange} required className={inputStyle} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label className={labelStyle}>Kota</label>
+                <input type="text" name="city" value={formData.city} onChange={handleChange} required className={inputStyle} />
+              </div>
+              <div>
+                <label className={labelStyle}>Provinsi</label>
+                <input type="text" name="province" value={formData.province} onChange={handleChange} required className={inputStyle} />
+              </div>
+            </div>
+
+            <div>
+              <label className={labelStyle}>Google Maps URL (Opsional)</label>
+              <input type="url" name="mapUrl" value={formData.mapUrl} onChange={handleChange} placeholder="https://goo.gl/maps/..." className={inputStyle} />
+            </div>
+          </div>
+
+          {/* SECTION 3: IMAGE */}
+          <div className={sectionStyle}>
+            <h2 className="text-xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4">Event Banner</h2>
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
+              <div className="w-full md:w-80 aspect-video bg-gray-100 rounded-2xl overflow-hidden border-2 border-dashed border-gray-200 relative group flex-shrink-0">
+                 {imagePreview ? (
+                   <img src={imagePreview} className="w-full h-full object-cover" alt="Preview" />
+                 ) : (
+                   <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-xs uppercase tracking-widest">No Image</div>
+                 )}
+              </div>
+              <div className="flex-1 text-center md:text-left w-full">
+                <label className="cursor-pointer inline-flex items-center justify-center gap-2 bg-gray-900 text-white px-8 py-4 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-black transition-all shadow-md w-full md:w-auto">
+                  <svg className="w-4 h-4 text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                  Ganti Gambar
                   <input type="file" className="hidden" onChange={handleImageChange} accept="image/*" />
                 </label>
-                <p className="text-[10px] text-gray-400 mt-3 ml-3">Max file size: 2MB. Accepted formats: JPG, PNG, WEBP.</p>
+                <p className="text-[10px] text-gray-400 mt-4 font-bold uppercase tracking-wider">Maksimal 2MB. Format: JPG, PNG, WEBP.</p>
               </div>
             </div>
           </div>
 
           <div className="flex justify-end pt-4">
-            <button type="submit" className="bg-gradient-to-r from-orange-400 to-[#FF6B35] text-white px-12 py-3 rounded-full font-bold text-sm shadow-lg shadow-orange-100 hover:shadow-orange-200 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300">Save Changes</button>
+            <button type="submit" className="w-full md:w-auto bg-[#FF6B35] text-white px-12 py-4 rounded-xl font-bold text-sm uppercase tracking-widest shadow-xl shadow-orange-100 hover:bg-[#E85526] hover:-translate-y-1 transition-all duration-300">
+              Simpan Perubahan
+            </button>
           </div>
         </form>
       </div>
 
-      {/* --- CUSTOM MODAL SUCCESS EDIT (TANPA TOMBOL & REDIRECT KILAT) --- */}
+      {/* MODAL SUCCESS KILAT */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-[32px] p-8 max-w-sm w-full shadow-2xl transform transition-all animate-in zoom-in-95 duration-200 text-center relative overflow-hidden">
-            
-            {/* Animasi loading bar kecil di atas biar keliatan mau redirect */}
-            <div className="absolute top-0 left-0 h-1 bg-[#FF6B35] animate-loadBar"></div>
-
+          <div className="bg-white rounded-[32px] p-8 max-w-sm w-full shadow-2xl transform transition-all text-center relative overflow-hidden">
             <div className="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6 border-[6px] border-green-100">
               <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            
-            <h3 className="text-2xl font-bold text-gray-900 mb-2 uppercase tracking-tight">Sukses!</h3>
-            <p className="text-gray-500 text-sm font-medium">
-              Event kamu berhasil diupdate. Mengalihkan...
+            <h3 className="text-2xl font-black text-gray-900 mb-2 uppercase tracking-tight">Sukses!</h3>
+            <p className="text-gray-500 text-sm font-medium mb-2">
+              Detail event berhasil diperbarui.
             </p>
-            
           </div>
         </div>
       )}
-
     </div>
   );
 }
