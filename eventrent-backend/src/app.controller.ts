@@ -69,6 +69,12 @@ export class AppController {
   async getAttendees(@Param('id') id: number, @Query('userId') userId: number) {
     return await this.appService.getEventAttendees(id, userId);
   }
+
+  // --- PERBAIKAN: HAPUS KATA 'api/' DI SINI ---
+  @Post('tickets/scan')
+  async scanTicket(@Body() body: { ticketId: number, eventId: number, userId: number }) {
+    return this.appService.scanTicket(body.ticketId, body.eventId, body.userId);
+  }
   
   // --- AUTH & USERS ---
   @Post('auth/google')
@@ -95,4 +101,4 @@ export class AppController {
   async changePassword(@Param('id') id: number, @Body() data: any) {
     return await this.appService.changePassword(id, data);
   }
-} 
+}

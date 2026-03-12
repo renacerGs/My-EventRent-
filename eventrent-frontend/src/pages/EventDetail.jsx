@@ -157,10 +157,10 @@ export default function EventDetail() {
               
               {/* Tombol Umum (Tanpa Session ID) */}
               <button 
-                onClick={() => handleGoToCheckout()} 
+                onClick={() => handleGoToCheckout('all')} 
                 className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-xl hover:bg-black transition-all active:scale-95"
               >
-                Beli Sekarang
+                Beli Semua Sesi
               </button>
             </div>
           </div>

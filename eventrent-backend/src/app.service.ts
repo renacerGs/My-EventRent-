@@ -20,6 +20,15 @@ export class AppService implements OnModuleInit {
     try {
       await this.pool.query('SELECT 1');
       console.log('Berhasil terhubung ke database PostgreSQL EventRent!');
+      
+      // --- AUTO MIGRATE: Persiapan Database buat Fitur Scanner ---
+      await this.pool.query(`
+        ALTER TABLE tickets 
+        ADD COLUMN IF NOT EXISTS is_scanned BOOLEAN DEFAULT FALSE,
+        ADD COLUMN IF NOT EXISTS scanned_at TIMESTAMP
+      `);
+      console.log('Database Update: Fitur Scanner Ready! 📸');
+
     } catch (error) {
       console.error('Gagal terhubung ke database:', error);
     }
@@ -270,7 +279,7 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // --- LOGIC PEMBELIAN BARU: SIMPAN JAWABAN CUSTOM KE JSON ---
+  // --- TICKETS, ATTENDEES, & SCANNER ---
   async buyTicket(userId: number, eventId: number, cart: any[], formAnswers: any) {
     const client = await this.pool.connect();
     try {
@@ -299,21 +308,16 @@ export class AppService implements OnModuleInit {
         const ticketId = ticketRes.rows[0].id;
         boughtTickets.push(ticketId);
 
-        // Ambil data pertanyaan dari database untuk sesi ini
         const qRes = await client.query('SELECT id, question_text FROM session_questions WHERE session_id = $1', [sessionId]);
         const dbQuestions = qRes.rows;
 
-        // PERBAIKAN: Gunakan any[] supaya tidak Error "never"
         const attendeesData: any[] = [];
         
         for (let i = 0; i < qty; i++) {
           const prefix = `cart-${item.id}-ticket-${i}`;
-          
           const name = formAnswers[`${prefix}-nama`] || `Peserta ${i + 1}`;
           const email = formAnswers[`${prefix}-email`] || ``;
           
-          // Susun jawaban customnya
-          // PERBAIKAN: Gunakan any[] supaya tidak Error "never"
           const customAnswers: any[] = [];
           for (const q of dbQuestions) {
              const ans = formAnswers[`${prefix}-q${q.id}`];
@@ -343,8 +347,9 @@ export class AppService implements OnModuleInit {
 
   async getMyTickets(userId: number) {
     try {
+      // Kita tambahin is_scanned buat ditampilin di halaman user nanti (opsional)
       const query = `
-        SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price, t.attendee_data,
+        SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price, t.attendee_data, t.is_scanned,
                e.id as event_id, e.title, e.image_url as img, 
                TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date, e.place as location,
                s.name as session_name, TO_CHAR(s.session_date, 'Dy, DD Mon YYYY') as session_date, 
@@ -370,7 +375,7 @@ export class AppService implements OnModuleInit {
       if (eventCheck.rows[0].created_by != userId) throw new UnauthorizedException('Bukan pemilik event!');
 
       const query = `
-        SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price, t.attendee_data,
+        SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price, t.attendee_data, t.is_scanned,
                u.name as buyer_name, u.email as buyer_email, u.picture as buyer_pic,
                s.name as session_name
         FROM tickets t
@@ -384,6 +389,56 @@ export class AppService implements OnModuleInit {
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
       throw new InternalServerErrorException('Gagal mengambil data peserta');
+    }
+  }
+
+  // --- FUNGSI VALIDASI SCANNER QR CODE ---
+  async scanTicket(ticketId: number, eventId: number, userId: number) {
+    try {
+      // 1. Validasi Panitia (Apakah user yang buka scanner ini beneran pembuat event-nya?)
+      const eventCheck = await this.pool.query('SELECT created_by FROM events WHERE id = $1', [eventId]);
+      if (eventCheck.rows.length === 0) throw new BadRequestException('Event tidak ditemukan');
+      if (eventCheck.rows[0].created_by != userId) throw new UnauthorizedException('Akses ditolak! Kamu bukan panitia event ini.');
+
+      // 2. Cek eksistensi Tiket (Apakah tiket ini beneran buat event ini?)
+      const ticketRes = await this.pool.query(`
+        SELECT t.id, t.is_scanned, t.scanned_at, t.quantity, t.attendee_data,
+               u.name as buyer_name, s.name as session_name
+        FROM tickets t
+        JOIN users u ON t.user_id = u.id
+        JOIN event_sessions s ON t.session_id = s.id
+        WHERE t.id = $1 AND t.event_id = $2
+      `, [ticketId, eventId]);
+
+      if (ticketRes.rows.length === 0) {
+        return { valid: false, message: 'TIKET PALSU ATAU SALAH EVENT!' };
+      }
+
+      const ticket = ticketRes.rows[0];
+
+      // 3. Cek apakah tiket sudah pernah di-scan sebelumnya (Mencegah tiket ganda)
+      if (ticket.is_scanned) {
+        const scanWaktu = new Date(ticket.scanned_at).toLocaleString('id-ID');
+        return { 
+          valid: false, 
+          message: `TIKET SUDAH DIGUNAKAN pada ${scanWaktu}!`,
+          data: ticket
+        };
+      }
+
+      // 4. Kalau tiket valid dan belum di-scan, kita tandai (Update DB)
+      await this.pool.query('UPDATE tickets SET is_scanned = TRUE, scanned_at = NOW() WHERE id = $1', [ticketId]);
+
+      return { 
+        valid: true, 
+        message: 'SCAN SUKSES! Tiket Valid.',
+        data: ticket 
+      };
+
+    } catch (err) {
+      if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
+      console.error(err);
+      throw new InternalServerErrorException('Gagal memproses validasi tiket');
     }
   }
 

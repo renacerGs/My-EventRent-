@@ -15,8 +15,8 @@ import EditEvent from "./components/EditEvent";
 import Profile from "./components/Profile"; 
 import MyTickets from "./components/MyTickets"; 
 import EventDashboard from "./components/EventDashboard";
-// --- BARU DI IMPORT ---
 import Checkout from "./pages/Checkout"; 
+import Scanner from './pages/Scanner';
 
 export default function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -80,10 +80,10 @@ export default function App() {
           
           <Route path="/likes" element={<Likes />} />
           <Route path="/event/:id" element={<EventDetail events={events} />} />
+          <Route path="/scanner/:eventId" element={<Scanner />} />
           
-          {/* --- ROUTE BARU UNTUK CHECKOUT --- */}
+        
           <Route path="/checkout/:id" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
-          
           <Route path="/create" element={<ProtectedRoute><CreateEvent /></ProtectedRoute>} />
           <Route path="/manage" element={<ProtectedRoute><ManageEvent /></ProtectedRoute>} />
           <Route path="/edit/:id" element={<ProtectedRoute><EditEvent /></ProtectedRoute>} />

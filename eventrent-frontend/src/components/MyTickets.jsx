@@ -60,6 +60,7 @@ export default function MyTickets() {
 
   const user = JSON.parse(localStorage.getItem('user')) || null;
 
+  // --- REFRESH DATA OTOMATIS SAAT HALAMAN DIBUKA KEMBALI ---
   useEffect(() => {
     const fetchMyTickets = async () => {
       if (!user || !user.id) {
@@ -70,30 +71,27 @@ export default function MyTickets() {
         const response = await axios.get(`http://localhost:3000/api/tickets/my?userId=${user.id}`);
         const rawTickets = response.data;
 
-        // --- LOGIC GROUPING BARU: BERDASARKAN EVENT & WAKTU CHECKOUT ---
         const grouped = {};
         rawTickets.forEach(ticket => {
-          // Jadikan gabungan event_id dan purchase_date sebagai Kunci Unik (1 Transaksi/Order)
           const orderKey = `${ticket.event_id}_${ticket.purchase_date}`;
           
           if (!grouped[orderKey]) {
             grouped[orderKey] = {
-              order_id: orderKey, // ID unik buat UI
+              order_id: orderKey, 
               event_id: ticket.event_id,
               title: ticket.title,
               img: ticket.img,
               location: ticket.location,
               event_date: ticket.event_date || ticket.session_date, 
-              purchase_date: ticket.purchase_date, // Simpan waktu beli
+              purchase_date: ticket.purchase_date, 
               total_quantity: 0,
-              transactions: [] // Isi tiket dari transaksi ini
+              transactions: [] 
             };
           }
           grouped[orderKey].total_quantity += parseInt(ticket.quantity);
           grouped[orderKey].transactions.push(ticket);
         });
 
-        // Ubah dari object balik jadi array biar gampang di-map
         setGroupedOrders(Object.values(grouped));
       } catch (error) {
         console.error("Gagal mengambil data tiket:", error);
@@ -101,7 +99,13 @@ export default function MyTickets() {
         setLoading(false);
       }
     };
+    
     fetchMyTickets();
+    
+    // Polling setiap 10 detik biar kalau tiket discan di gate, layarnya otomatis update
+    const interval = setInterval(fetchMyTickets, 10000);
+    return () => clearInterval(interval);
+    
   }, [user?.id]);
 
   if (loading) return <div className="text-center py-20 font-bold text-gray-500 animate-pulse">Loading My Tickets...</div>;
@@ -120,25 +124,21 @@ export default function MyTickets() {
     
     setSelectedQR({ 
       ...trx, 
-      uniqueQRData: `EVENTRENT-TICKET-${trx.ticket_id}-P-${index + 1}`, 
+      // PERBAIKAN: QR Code HANYA BERISI TICKET ID MURNI (ANGKA)
+      uniqueQRData: `${trx.ticket_id}`, 
       attendeeName: attendeeName,
       attendeeNum: index + 1 
     });
     setShowQR(true);
   };
 
-  // --- KOMPONEN CARD ORDER/TRANSAKSI ---
   const OrderCardGroup = ({ orderGroup, isPast }) => {
     const isExpanded = expandedOrderId === orderGroup.order_id;
     
     return (
       <div className={`bg-white rounded-[32px] shadow-sm border border-gray-200 overflow-hidden transition-all hover:shadow-md mb-6 ${isPast ? 'opacity-70 grayscale-[30%]' : ''}`}>
         
-        {/* HEADER ORDER (KLIK UNTUK EXPAND) */}
-        <div 
-          onClick={() => toggleExpand(orderGroup.order_id)} 
-          className="flex flex-col md:flex-row cursor-pointer group relative"
-        >
+        <div onClick={() => toggleExpand(orderGroup.order_id)} className="flex flex-col md:flex-row cursor-pointer group relative">
           <div className="md:w-64 aspect-video md:aspect-auto md:h-full relative overflow-hidden bg-gray-100">
             <img src={orderGroup.img} alt={orderGroup.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
           </div>
@@ -146,7 +146,6 @@ export default function MyTickets() {
           <div className="flex-1 p-6 md:p-8 relative flex flex-col justify-center">
             <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4 mb-4">
               <div>
-                {/* WAKTU PEMBELIAN / ORDER INFO */}
                 <div className="flex items-center gap-2 mb-3">
                   <span className="bg-gray-100 text-gray-500 text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">
                     Order Dikonfirmasi
@@ -183,7 +182,6 @@ export default function MyTickets() {
           </div>
         </div>
 
-        {/* DETAIL EXPAND (DAFTAR SESSION & TIKET PESERTA) */}
         <AnimatePresence>
           {isExpanded && (
             <motion.div 
@@ -212,20 +210,29 @@ export default function MyTickets() {
                           ? trx.attendee_data[idx].name 
                           : `Peserta ${idx + 1}`;
                         
+                        // Cek apakah tiket sudah discan
+                        const isScanned = trx.is_scanned; 
+                        
                         return (
-                          <div key={idx} className="bg-white border border-gray-200 rounded-2xl p-4 flex items-center justify-between shadow-sm hover:border-[#FF6B35] transition-colors">
+                          <div key={idx} className={`bg-white border rounded-2xl p-4 flex items-center justify-between shadow-sm transition-colors ${isScanned ? 'border-gray-200 opacity-60' : 'border-gray-200 hover:border-[#FF6B35]'}`}>
                             <div className="overflow-hidden pr-3">
-                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest block mb-1">E-Ticket {idx + 1}</span>
-                              <p className="font-bold text-gray-900 text-sm truncate uppercase">
+                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest block mb-1">
+                                {isScanned ? 'TIKET TERPAKAI' : `E-Ticket ${idx + 1}`}
+                              </span>
+                              <p className={`font-bold text-sm truncate uppercase ${isScanned ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
                                 {attendeeName}
                               </p>
                             </div>
+                            
                             <button 
                               onClick={() => openQR(trx, idx)}
-                              disabled={isPast}
-                              className={`shrink-0 px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm ${isPast ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none' : 'bg-[#1a1a1a] text-white hover:bg-[#FF6B35]'}`}
+                              disabled={isPast || isScanned}
+                              className={`shrink-0 px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-sm 
+                                ${isPast ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none' 
+                                : isScanned ? 'bg-green-50 text-green-600 border border-green-200 cursor-not-allowed' 
+                                : 'bg-[#1a1a1a] text-white hover:bg-[#FF6B35]'}`}
                             >
-                              {isPast ? 'Expired' : 'Show QR'}
+                              {isPast ? 'Expired' : isScanned ? 'Dipakai' : 'Show QR'}
                             </button>
                           </div>
                         );
@@ -265,6 +272,7 @@ export default function MyTickets() {
 
               <div className="p-8 flex flex-col items-center -mt-10 relative z-10">
                 <div className="bg-white p-5 rounded-[24px] shadow-lg border border-gray-100 mb-6">
+                  {/* GENERATOR QR CODE MENGGUNAKAN API GOOGLE/QRSERVER */}
                   <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${selectedQR.uniqueQRData}`} alt="QR" className="w-48 h-48 mix-blend-multiply" />
                 </div>
                 
