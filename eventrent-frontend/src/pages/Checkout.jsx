@@ -90,18 +90,19 @@ export default function Checkout() {
 
   const canAddNewSession = event?.sessions?.some(s => s.stock > 0 && !cart.some(item => String(item.sessionId) === String(s.id)));
 
-  // --- PERBAIKAN: Fungsi ini sekarang dipanggil lewat onSubmit Form ---
   const handleOpenPaymentModal = (e) => {
-    e.preventDefault(); // Cegah halaman reload pas klik Lanjut Bayar
+    e.preventDefault(); 
 
     if (cart.length === 0) return alert("Keranjang kosong bro!");
     const invalidItem = cart.find(item => item.qty < 1);
     if (invalidItem) return alert("Jumlah tiket minimal 1 per pilihan ya bro!");
     
+    // --- PERBAIKAN LOGIKA POP UP TIKET GRATIS ---
+    setShowPaymentModal(true); // Selalu buka Pop Up
     if (calculateTotal() === 0) {
-      executeRealPayment();
+      setPaymentMethod('free'); // Set mode 'free' otomatis
     } else {
-      setShowPaymentModal(true);
+      setPaymentMethod(null); // Reset biar milih bayar pakai apa
     }
   };
 
@@ -143,13 +144,12 @@ export default function Checkout() {
   return (
     <div className="min-h-screen bg-gray-50 pb-32 font-sans pt-10">
       
-      {/* --- PERBAIKAN: Bungkus konten utama dengan tag FORM --- */}
       <form onSubmit={handleOpenPaymentModal}>
         
         <div className="max-w-7xl mx-auto px-4 md:px-8">
           <div className="flex items-center gap-4 mb-8">
             <button 
-              type="button" // PENTING: Biar gak dikira tombol submit form
+              type="button" 
               onClick={() => navigate(-1)} 
               className="w-12 h-12 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-500 hover:text-[#FF6B35] hover:border-[#FF6B35] shadow-sm transition-all active:scale-95" 
               title="Kembali ke Event"
@@ -254,7 +254,6 @@ export default function Checkout() {
               <p className="text-2xl font-black text-[#FF6B35]">Rp {calculateTotal().toLocaleString('id-ID')}</p>
             </div>
             
-            {/* PERBAIKAN: Tombol ini jadi type="submit" untuk men-trigger form validation */}
             <button 
               type="submit" 
               disabled={isSubmitting || cart.length === 0}
@@ -284,7 +283,8 @@ export default function Checkout() {
               </button>
             )}
 
-            {paymentStatus === 'idle' && !paymentMethod && (
+            {/* STATE 1: PILIH METODE BAYAR (Hanya kalau tiket berbayar) */}
+            {paymentStatus === 'idle' && !paymentMethod && calculateTotal() > 0 && (
               <div className="p-8">
                 <h3 className="text-xl font-black text-gray-900 mb-2">Pilih Pembayaran</h3>
                 <p className="text-sm text-gray-500 mb-8 font-medium">Total: <strong className="text-[#FF6B35]">Rp {calculateTotal().toLocaleString('id-ID')}</strong></p>
@@ -315,13 +315,25 @@ export default function Checkout() {
               </div>
             )}
 
+            {/* STATE 2: DETAIL PEMBAYARAN ATAU TIKET GRATIS */}
             {paymentStatus === 'idle' && paymentMethod && (
               <div className="p-8 text-center">
-                <button type="button" onClick={() => setPaymentMethod(null)} className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-gray-900 mb-6 flex items-center justify-center w-full">
-                  ← Ganti Metode
-                </button>
+                {/* Tombol kembali cuma muncul kalau milih QR/VA */}
+                {paymentMethod !== 'free' && (
+                  <button type="button" onClick={() => setPaymentMethod(null)} className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-gray-900 mb-6 flex items-center justify-center w-full">
+                    ← Ganti Metode
+                  </button>
+                )}
 
-                {paymentMethod === 'qris' ? (
+                {paymentMethod === 'free' ? (
+                  <>
+                    <h3 className="text-2xl font-black text-gray-900 mb-2">Tiket Gratis! 🎉</h3>
+                    <p className="text-sm text-gray-500 mb-8 font-medium">Asyik, kamu gak perlu bayar sepeserpun untuk event ini.</p>
+                    <div className="w-32 h-32 mx-auto bg-green-50 text-green-500 rounded-full flex items-center justify-center mb-8 border-[8px] border-green-100">
+                      <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>
+                    </div>
+                  </>
+                ) : paymentMethod === 'qris' ? (
                   <>
                     <h3 className="text-xl font-black text-gray-900 mb-2">Scan QRIS</h3>
                     <p className="text-xs text-gray-500 mb-6 font-medium">Buka aplikasi e-wallet / m-banking kamu</p>
@@ -340,20 +352,24 @@ export default function Checkout() {
                   </>
                 )}
 
-                <div className="bg-orange-50 text-[#FF6B35] p-4 rounded-xl font-black text-xl mb-8 border border-orange-100">
-                  Rp {calculateTotal().toLocaleString('id-ID')}
-                </div>
+                {/* Tampilan Total Harga (Sembunyi kalau gratis) */}
+                {paymentMethod !== 'free' && (
+                  <div className="bg-orange-50 text-[#FF6B35] p-4 rounded-xl font-black text-xl mb-8 border border-orange-100">
+                    Rp {calculateTotal().toLocaleString('id-ID')}
+                  </div>
+                )}
 
                 <button 
                   type="button"
                   onClick={executeRealPayment}
                   className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl hover:bg-black transition-all active:scale-95"
                 >
-                  Saya Sudah Bayar
+                  {paymentMethod === 'free' ? 'Dapatkan Tiket' : 'Saya Sudah Bayar'}
                 </button>
               </div>
             )}
 
+            {/* STATE 3: PROCESSING / SUCCESS */}
             {paymentStatus !== 'idle' && (
               <div className="p-12 text-center flex flex-col items-center justify-center min-h-[300px]">
                 {paymentStatus === 'processing' ? (
@@ -367,7 +383,9 @@ export default function Checkout() {
                     <div className="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mb-6 border-[6px] border-green-100 animate-bounce">
                       <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                     </div>
-                    <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Pembayaran Sukses!</h3>
+                    <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">
+                      {paymentMethod === 'free' ? 'Tiket Diklaim!' : 'Pembayaran Sukses!'}
+                    </h3>
                     <p className="text-sm text-gray-500 mt-2 font-medium">Tiket kamu sedang disiapkan...</p>
                   </>
                 )}
