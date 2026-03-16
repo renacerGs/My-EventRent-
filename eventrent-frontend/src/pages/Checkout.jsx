@@ -1,6 +1,57 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+
+// --- KOMPONEN CUSTOM DROPDOWN ALA GOOGLE FORMS ---
+function CustomDropdown({ options, value, onChange, placeholder }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full bg-white border ${isOpen ? 'border-[#FF6B35] ring-1 ring-[#FF6B35]' : 'border-gray-300'} rounded-xl px-4 py-3 text-sm outline-none cursor-pointer flex justify-between items-center transition-all hover:border-gray-400`}
+      >
+        <span className={value ? 'text-gray-900 font-medium' : 'text-gray-400'}>{value || placeholder}</span>
+        <svg className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"></path></svg>
+      </div>
+      
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="absolute z-20 w-full mt-2 bg-white border border-gray-100 shadow-[0_10px_40px_rgba(0,0,0,0.08)] rounded-xl py-2 max-h-60 overflow-y-auto"
+          >
+            {options.map((opt, idx) => (
+              <div 
+                key={idx}
+                onClick={() => { onChange(opt); setIsOpen(false); }}
+                className={`px-5 py-3 text-sm cursor-pointer transition-colors flex items-center gap-2 ${value === opt ? 'bg-orange-50 text-[#FF6B35] font-bold' : 'text-gray-700 hover:bg-gray-50'}`}
+              >
+                {value === opt && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>}
+                <span className={value === opt ? '' : 'pl-6'}>{opt}</span>
+              </div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 export default function Checkout() {
   const { id } = useParams();
@@ -23,7 +74,6 @@ export default function Checkout() {
   const [paymentMethod, setPaymentMethod] = useState(null); 
   const [paymentStatus, setPaymentStatus] = useState('idle'); 
 
-  // --- STATE UNTUK POP-UP MODERN PENGGANTI ALERT ---
   const [popup, setPopup] = useState({ isOpen: false, message: '', type: 'info' });
 
   const showPopup = (message, type = 'info') => {
@@ -35,11 +85,7 @@ export default function Checkout() {
   };
 
   useEffect(() => {
-    if (!user) {
-      navigate('/');
-      return;
-    }
-    
+    // --- Validasi redirect login DIBUANG agar Guest bisa masuk ---
     const fetchEvent = async () => {
       try {
         const res = await fetch(`http://localhost:3000/api/events/${id}`);
@@ -61,10 +107,16 @@ export default function Checkout() {
             }
           } else if (preferredSessionId) {
             const initialSession = data.sessions.find(s => String(s.id) === String(preferredSessionId) && s.stock > 0);
-            if (initialSession) setCart([{ id: crypto.randomUUID(), sessionId: initialSession.id, qty: 1 }]);
+            if (initialSession) {
+               const newCartId = crypto.randomUUID();
+               setCart([{ id: newCartId, sessionId: initialSession.id, qty: 1 }]);
+            }
           } else {
             const initialSession = data.sessions.find(s => s.stock > 0);
-            if (initialSession) setCart([{ id: crypto.randomUUID(), sessionId: initialSession.id, qty: 1 }]);
+            if (initialSession) {
+               const newCartId = crypto.randomUUID();
+               setCart([{ id: newCartId, sessionId: initialSession.id, qty: 1 }]);
+            }
           }
         }
       } catch (err) {
@@ -76,7 +128,7 @@ export default function Checkout() {
       }
     };
     fetchEvent();
-  }, [id, navigate, preferredSessionId, user]);
+  }, [id, navigate, preferredSessionId]);
 
   const handleAddCartItem = () => {
     const availableSession = event.sessions.find(s => s.stock > 0 && !cart.some(item => String(item.sessionId) === String(s.id)));
@@ -84,7 +136,8 @@ export default function Checkout() {
       showPopup("Semua kategori tiket sudah kamu pilih bro!", "error");
       return;
     }
-    setCart([...cart, { id: crypto.randomUUID(), sessionId: availableSession.id, qty: 1 }]);
+    const newCartId = crypto.randomUUID();
+    setCart([...cart, { id: newCartId, sessionId: availableSession.id, qty: 1 }]);
   };
 
   const handleRemoveCartItem = (cartId) => {
@@ -134,7 +187,14 @@ export default function Checkout() {
     setIsSubmitting(true);
     
     try {
-      const payload = { userId: user.id, eventId: event.id, cart: cart, formAnswers: formAnswers };
+      // --- PERBAIKAN: Jika user tidak login (Guest), kirim userId bernilai null ---
+      const payload = { 
+        userId: user ? user.id : null, 
+        eventId: event.id, 
+        cart: cart, 
+        formAnswers: formAnswers 
+      };
+      
       const res = await fetch('http://localhost:3000/api/tickets/buy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -167,7 +227,6 @@ export default function Checkout() {
   return (
     <div className="min-h-screen bg-gray-50 pb-32 font-sans pt-10 relative">
       
-      {/* --- UI POP UP MODERN ANIMATED --- */}
       <AnimatePresence>
         {popup.isOpen && (
           <div className="fixed inset-0 z-[110] flex flex-col items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
@@ -266,100 +325,109 @@ export default function Checkout() {
             </div>
 
             <div className="lg:col-span-8 bg-white rounded-[32px] p-8 md:p-10 shadow-sm border border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900 mb-8 border-b border-gray-100 pb-4">Data Pemegang Tiket</h2>
-              {cart.map((item) => {
-                const session = event.sessions.find(s => String(s.id) === String(item.sessionId));
-                if (!session) return null;
+              <h2 className="text-2xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4">Data Pemegang Tiket</h2>
+              
+              {/* --- KEMBALI KE UI FLAT (TIDAK BERJENJANG) --- */}
+              <div className="space-y-4">
+                {cart.map((item, cartIndex) => {
+                  const session = event.sessions.find(s => String(s.id) === String(item.sessionId));
+                  if (!session) return null;
 
-                return Array.from({ length: item.qty }).map((_, qtyIndex) => {
-                  const formKeyPrefix = `cart-${item.id}-ticket-${qtyIndex}`;
-                  return (
-                    <div key={formKeyPrefix} className="mb-10 last:mb-0">
-                      <div className="bg-orange-50 text-[#FF6B35] px-4 py-2 rounded-lg font-bold text-sm mb-5 inline-block border border-orange-100">
-                        Tiket {qtyIndex + 1} - <span className="uppercase">{session.name}</span>
-                      </div>
-                      <div className="space-y-4 pl-2 md:pl-4 border-l-2 border-gray-100">
-                        <div>
-                          <label className="block text-xs font-bold text-gray-700 mb-2">Nama Lengkap <span className="text-red-500">*</span></label>
-                          <input type="text" required value={formAnswers[`${formKeyPrefix}-nama`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-nama`]: e.target.value}))} className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35]" placeholder="Masukkan nama sesuai KTP" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-bold text-gray-700 mb-2">Email <span className="text-red-500">*</span></label>
-                          <input type="email" required value={formAnswers[`${formKeyPrefix}-email`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-email`]: e.target.value}))} className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35]" placeholder="Masukkan email aktif" />
+                  return Array.from({ length: item.qty }).map((_, qtyIndex) => {
+                    const formKeyPrefix = `cart-${item.id}-ticket-${qtyIndex}`;
+
+                    return (
+                      <div key={formKeyPrefix} className="mb-10 last:mb-0">
+                        <div className="bg-orange-50 text-[#FF6B35] px-4 py-2 rounded-lg font-bold text-sm mb-5 inline-block border border-orange-100">
+                          Tiket {qtyIndex + 1} - <span className="uppercase">{session.name}</span>
                         </div>
                         
-                        {/* --- RENDER CUSTOM QUESTIONS (TEXT, DROPDOWN, CHECKBOX) --- */}
-                        {session.questions && session.questions.map((q) => {
-                          const formKey = `${formKeyPrefix}-q${q.id}`;
-                          return (
-                            <div key={q.id}>
-                              <label className="block text-xs font-bold text-gray-700 mb-2">
-                                {q.question_text} {q.is_required && <span className="text-red-500">*</span>}
-                              </label>
+                        <div className="space-y-5 pl-2 md:pl-4 border-l-2 border-gray-100">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-widest">Nama Lengkap <span className="text-red-500">*</span></label>
+                            <input type="text" required value={formAnswers[`${formKeyPrefix}-nama`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-nama`]: e.target.value}))} className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35] focus:ring-1 focus:ring-[#FF6B35] transition-all" placeholder="Masukkan nama sesuai KTP" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-widest">Email <span className="text-red-500">*</span></label>
+                            <input type="email" required value={formAnswers[`${formKeyPrefix}-email`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-email`]: e.target.value}))} className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35] focus:ring-1 focus:ring-[#FF6B35] transition-all" placeholder="Masukkan email aktif" />
+                          </div>
+                          
+                          {/* --- RENDER CUSTOM QUESTIONS --- */}
+                          {session.questions && session.questions.map((q) => {
+                            const formKey = `${formKeyPrefix}-q${q.id}`;
+                            return (
+                              <div key={q.id} className="pt-4 border-t border-gray-100">
+                                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-widest">
+                                  {q.question_text} {q.is_required && <span className="text-red-500">*</span>}
+                                </label>
 
-                              {(!q.answer_type || q.answer_type === 'Text') && (
-                                <input 
-                                  type="text" 
-                                  required={q.is_required} 
-                                  value={formAnswers[formKey] || ''} 
-                                  onChange={(e) => setFormAnswers(prev => ({...prev, [formKey]: e.target.value}))} 
-                                  className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35]" 
-                                  placeholder="Ketik jawaban..." 
-                                />
-                              )}
+                                {(!q.answer_type || q.answer_type === 'Text') && (
+                                  <input 
+                                    type="text" 
+                                    required={q.is_required} 
+                                    value={formAnswers[formKey] || ''} 
+                                    onChange={(e) => setFormAnswers(prev => ({...prev, [formKey]: e.target.value}))} 
+                                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35] focus:ring-1 focus:ring-[#FF6B35] transition-all" 
+                                    placeholder="Ketik jawaban..." 
+                                  />
+                                )}
 
-                              {q.answer_type === 'Dropdown' && (
-                                <select 
-                                  required={q.is_required} 
-                                  value={formAnswers[formKey] || ''} 
-                                  onChange={(e) => setFormAnswers(prev => ({...prev, [formKey]: e.target.value}))} 
-                                  className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35] cursor-pointer"
-                                >
-                                  <option value="" disabled hidden>Pilih jawaban...</option>
-                                  {q.options && q.options.map((opt, idx) => (
-                                    <option key={idx} value={opt}>{opt}</option>
-                                  ))}
-                                </select>
-                              )}
+                                {/* --- CUSTOM DROPDOWN --- */}
+                                {q.answer_type === 'Dropdown' && (
+                                  <CustomDropdown 
+                                    options={q.options} 
+                                    value={formAnswers[formKey] || ''} 
+                                    onChange={(val) => setFormAnswers(prev => ({...prev, [formKey]: val}))} 
+                                    placeholder="Pilih jawaban..." 
+                                    required={q.is_required}
+                                  />
+                                )}
 
-                              {q.answer_type === 'Checkbox' && (
-                                <div className="space-y-2 mt-2">
-                                  {q.options && q.options.map((opt, idx) => {
-                                     const currentStr = formAnswers[formKey] || '';
-                                     const isChecked = currentStr.split(', ').includes(opt);
-                                     
-                                     return (
-                                       <label key={idx} className="flex items-center gap-3 text-sm text-gray-700 cursor-pointer">
-                                         <input 
-                                           type="checkbox" 
-                                           checked={isChecked}
-                                           onChange={(e) => {
-                                              const checked = e.target.checked;
-                                              setFormAnswers(prev => {
-                                                 const prevStr = prev[formKey] || '';
-                                                 let arr = prevStr ? prevStr.split(', ') : [];
-                                                 if (checked) arr.push(opt);
-                                                 else arr = arr.filter(x => x !== opt);
-                                                 return { ...prev, [formKey]: arr.join(', ') };
-                                              });
-                                           }} 
-                                           className="w-4 h-4 text-[#FF6B35] rounded border-gray-300 focus:ring-[#FF6B35] cursor-pointer" 
-                                         />
-                                         {opt}
-                                       </label>
-                                     )
-                                  })}
-                                </div>
-                              )}
-
-                            </div>
-                          );
-                        })}
+                                {/* --- CUSTOM CHECKBOX --- */}
+                                {q.answer_type === 'Checkbox' && (
+                                  <div className="space-y-3 mt-3 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                                    {q.options && q.options.map((opt, idx) => {
+                                       const currentStr = formAnswers[formKey] || '';
+                                       const isChecked = currentStr.split(', ').includes(opt);
+                                       
+                                       return (
+                                         <label key={idx} className="flex items-start gap-3 cursor-pointer group">
+                                           <div className="relative flex items-center justify-center w-5 h-5 shrink-0 mt-0.5">
+                                             <input 
+                                               type="checkbox" 
+                                               checked={isChecked}
+                                               onChange={(e) => {
+                                                  const checked = e.target.checked;
+                                                  setFormAnswers(prev => {
+                                                     const prevStr = prev[formKey] || '';
+                                                     let arr = prevStr ? prevStr.split(', ') : [];
+                                                     if (checked) arr.push(opt);
+                                                     else arr = arr.filter(x => x !== opt);
+                                                     return { ...prev, [formKey]: arr.join(', ') };
+                                                  });
+                                               }} 
+                                               className="peer w-full h-full absolute opacity-0 cursor-pointer" 
+                                             />
+                                             <div className="w-5 h-5 border-2 border-gray-400 rounded-[3px] flex items-center justify-center peer-checked:bg-[#FF6B35] peer-checked:border-[#FF6B35] transition-all group-hover:border-gray-600">
+                                                <svg className="w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                                             </div>
+                                           </div>
+                                           <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors">{opt}</span>
+                                         </label>
+                                       )
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  );
-                });
-              })}
+                    );
+                  });
+                })}
+              </div>
+
             </div>
           </div>
         </div>
@@ -394,7 +462,7 @@ export default function Checkout() {
               <button 
                 type="button"
                 onClick={() => { setShowPaymentModal(false); setPaymentMethod(null); }} 
-                className="absolute top-5 right-5 text-gray-400 hover:text-gray-900 bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center"
+                className="absolute top-5 right-5 text-gray-400 hover:text-gray-900 bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
               >
                 ✕
               </button>
@@ -434,7 +502,7 @@ export default function Checkout() {
             {paymentStatus === 'idle' && paymentMethod && (
               <div className="p-8 text-center">
                 {paymentMethod !== 'free' && (
-                  <button type="button" onClick={() => setPaymentMethod(null)} className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-gray-900 mb-6 flex items-center justify-center w-full">
+                  <button type="button" onClick={() => setPaymentMethod(null)} className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-gray-900 mb-6 flex items-center justify-center w-full transition-colors">
                     ← Ganti Metode
                   </button>
                 )}

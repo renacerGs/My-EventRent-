@@ -82,8 +82,9 @@ export default function App() {
           <Route path="/event/:id" element={<EventDetail events={events} />} />
           <Route path="/scanner/:eventId" element={<Scanner />} />
           
-        
-          <Route path="/checkout/:id" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />
+          {/* --- PERBAIKAN: Gembok (ProtectedRoute) dilepas biar Guest bisa Checkout! --- */}
+          <Route path="/checkout/:id" element={<Checkout />} />
+          
           <Route path="/create" element={<ProtectedRoute><CreateEvent /></ProtectedRoute>} />
           <Route path="/manage" element={<ProtectedRoute><ManageEvent /></ProtectedRoute>} />
           <Route path="/edit/:id" element={<ProtectedRoute><EditEvent /></ProtectedRoute>} />
