@@ -11,7 +11,7 @@ export class AppService implements OnModuleInit {
       user: 'postgres',
       host: 'localhost',
       database: 'eventrent_db',
-      password: 'crissyen26', 
+      password: '123', 
       port: 5432,
     });
   }
@@ -21,13 +21,16 @@ export class AppService implements OnModuleInit {
       await this.pool.query('SELECT 1');
       console.log('Berhasil terhubung ke database PostgreSQL EventRent!');
       
-      // --- AUTO MIGRATE: Persiapan Database buat Fitur Scanner ---
+      // --- AUTO MIGRATE: Persiapan Database buat Fitur Scanner & Form Options ---
       await this.pool.query(`
         ALTER TABLE tickets 
         ADD COLUMN IF NOT EXISTS is_scanned BOOLEAN DEFAULT FALSE,
-        ADD COLUMN IF NOT EXISTS scanned_at TIMESTAMP
+        ADD COLUMN IF NOT EXISTS scanned_at TIMESTAMP;
+        
+        ALTER TABLE session_questions 
+        ADD COLUMN IF NOT EXISTS options JSONB DEFAULT '[]'::jsonb;
       `);
-      console.log('Database Update: Fitur Scanner Ready! 📸');
+      console.log('Database Update: Fitur Scanner & Form Custom Options Ready! 🚀');
 
     } catch (error) {
       console.error('Gagal terhubung ke database:', error);
@@ -91,7 +94,8 @@ export class AppService implements OnModuleInit {
       const sessions = sessionRes.rows;
 
       for (let session of sessions) {
-        const qQuery = `SELECT id, question_text, answer_type, is_required FROM session_questions WHERE session_id = $1`;
+        // PERUBAHAN: Menambahkan 'options' di SELECT query
+        const qQuery = `SELECT id, question_text, answer_type, is_required, options FROM session_questions WHERE session_id = $1`;
         const qRes = await this.pool.query(qQuery, [session.id]);
         session.questions = qRes.rows;
       }
@@ -186,11 +190,18 @@ export class AppService implements OnModuleInit {
 
           if (session.questions && session.questions.length > 0) {
             for (const q of session.questions) {
+              // PERUBAHAN: Menyimpan 'options' ke database dalam bentuk JSON string
               const questionQuery = `
-                INSERT INTO session_questions (session_id, question_text, answer_type, is_required)
-                VALUES ($1, $2, $3, $4)
+                INSERT INTO session_questions (session_id, question_text, answer_type, is_required, options)
+                VALUES ($1, $2, $3, $4, $5)
               `;
-              await client.query(questionQuery, [sessionId, q.text, q.type, q.isRequired]);
+              await client.query(questionQuery, [
+                sessionId, 
+                q.text, 
+                q.type, 
+                q.isRequired, 
+                q.options ? JSON.stringify(q.options) : '[]'
+              ]);
             }
           }
         }
@@ -347,7 +358,6 @@ export class AppService implements OnModuleInit {
 
   async getMyTickets(userId: number) {
     try {
-      // Kita tambahin is_scanned buat ditampilin di halaman user nanti (opsional)
       const query = `
         SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price, t.attendee_data, t.is_scanned,
                e.id as event_id, e.title, e.image_url as img, 
@@ -395,12 +405,10 @@ export class AppService implements OnModuleInit {
   // --- FUNGSI VALIDASI SCANNER QR CODE ---
   async scanTicket(ticketId: number, eventId: number, userId: number) {
     try {
-      // 1. Validasi Panitia (Apakah user yang buka scanner ini beneran pembuat event-nya?)
       const eventCheck = await this.pool.query('SELECT created_by FROM events WHERE id = $1', [eventId]);
       if (eventCheck.rows.length === 0) throw new BadRequestException('Event tidak ditemukan');
       if (eventCheck.rows[0].created_by != userId) throw new UnauthorizedException('Akses ditolak! Kamu bukan panitia event ini.');
 
-      // 2. Cek eksistensi Tiket (Apakah tiket ini beneran buat event ini?)
       const ticketRes = await this.pool.query(`
         SELECT t.id, t.is_scanned, t.scanned_at, t.quantity, t.attendee_data,
                u.name as buyer_name, s.name as session_name
@@ -416,7 +424,6 @@ export class AppService implements OnModuleInit {
 
       const ticket = ticketRes.rows[0];
 
-      // 3. Cek apakah tiket sudah pernah di-scan sebelumnya (Mencegah tiket ganda)
       if (ticket.is_scanned) {
         const scanWaktu = new Date(ticket.scanned_at).toLocaleString('id-ID');
         return { 
@@ -426,7 +433,6 @@ export class AppService implements OnModuleInit {
         };
       }
 
-      // 4. Kalau tiket valid dan belum di-scan, kita tandai (Update DB)
       await this.pool.query('UPDATE tickets SET is_scanned = TRUE, scanned_at = NOW() WHERE id = $1', [ticketId]);
 
       return { 
