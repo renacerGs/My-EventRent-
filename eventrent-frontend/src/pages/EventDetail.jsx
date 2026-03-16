@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 
 // --- FUNGSI FORMAT TANGGAL CANTIK ---
 const formatPrettyDate = (dateString) => {
@@ -25,6 +26,17 @@ export default function EventDetail() {
   const [isLiked, setIsLiked] = useState(false);
   const user = JSON.parse(localStorage.getItem('user'));
 
+  // --- STATE POP-UP MODERN PENGGANTI ALERT ---
+  const [popup, setPopup] = useState({ isOpen: false, message: '', type: 'info' });
+
+  const showPopup = (message, type = 'info') => {
+    setPopup({ isOpen: true, message, type });
+  };
+
+  const closePopup = () => {
+    setPopup({ isOpen: false, message: '', type: 'info' });
+  };
+
   useEffect(() => {
     const fetchEventDetail = async () => {
       try {
@@ -39,8 +51,8 @@ export default function EventDetail() {
         setIsLiked(savedLikes.some(item => String(item.id) === String(id)));
       } catch (error) {
         console.error(error);
-        alert("Event tidak ditemukan");
-        navigate('/');
+        showPopup("Event tidak ditemukan!", "error");
+        setTimeout(() => navigate('/'), 2000);
       } finally {
         setLoading(false);
       }
@@ -51,8 +63,8 @@ export default function EventDetail() {
   }, [id, navigate]);
 
   const handleLikeClick = async () => {
-    // Kalau like tetep wajib login ya bro, biar nyimpennya jelas
-    if (!user) return alert("Login dulu bro buat nyimpen event ke Likes!");
+    // Alert diubah jadi pop-up keren
+    if (!user) return showPopup("Login dulu bro buat nyimpen event ke Wishlist!", "error");
     try {
       const res = await fetch('http://localhost:3000/api/likes/toggle', {
         method: 'POST',
@@ -66,7 +78,6 @@ export default function EventDetail() {
   };
 
   const handleGoToCheckout = (sessionId = null) => {
-    // --- PERBAIKAN: Validasi login dihapus biar Guest bisa langsung checkout! ---
     const url = sessionId 
       ? `/checkout/${event.id}?session=${sessionId}` 
       : `/checkout/${event.id}`;
@@ -78,8 +89,43 @@ export default function EventDetail() {
   if (!event) return null;
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] pb-20 font-sans">
+    <div className="min-h-screen bg-[#F8F9FA] pb-20 font-sans relative">
       
+      {/* --- UI POP UP MODERN ANIMATED --- */}
+      <AnimatePresence>
+        {popup.isOpen && (
+          <div className="fixed inset-0 z-[120] flex flex-col items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.8, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: -20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className={`w-full max-w-sm rounded-[32px] p-8 text-center shadow-2xl relative overflow-hidden ${popup.type === 'error' ? 'bg-[#E24A29]' : popup.type === 'success' ? 'bg-[#27AE60]' : 'bg-gray-800'}`}
+            >
+              <div className={`w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner ${popup.type === 'error' ? 'text-[#E24A29]' : popup.type === 'success' ? 'text-[#27AE60]' : 'text-gray-800'}`}>
+                {popup.type === 'error' ? (
+                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                ) : popup.type === 'success' ? (
+                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                ) : (
+                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                )}
+              </div>
+              <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight">
+                {popup.type === 'error' ? 'Ups!' : popup.type === 'success' ? 'Berhasil!' : 'Info'}
+              </h2>
+              <p className="text-white/90 font-medium mb-8">{popup.message}</p>
+              <button 
+                onClick={closePopup} 
+                className={`w-full bg-white py-4 rounded-xl font-bold uppercase tracking-widest shadow-lg transition-all active:scale-95 ${popup.type === 'error' ? 'text-[#E24A29] hover:bg-red-50' : popup.type === 'success' ? 'text-[#27AE60] hover:bg-green-50' : 'text-gray-900 hover:bg-gray-50'}`}
+              >
+                Tutup
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* HEADER BANNER */}
       <div className="relative w-full h-[400px] md:h-[500px] bg-gray-900">
         <img src={event.img} className="w-full h-full object-cover opacity-50" alt="Banner" />
@@ -149,6 +195,7 @@ export default function EventDetail() {
               <div className="absolute top-0 left-0 w-full h-1 bg-[#FF6B35]"></div>
               <h3 className="text-sm font-black text-[#FF6B35] mb-6 uppercase tracking-widest">Dapatkan Tiketmu</h3>
               
+              {/* Tombol Umum (Tanpa Session ID) */}
               <button 
                 onClick={() => handleGoToCheckout('all')} 
                 className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-xl hover:bg-black transition-all active:scale-95"
@@ -160,9 +207,9 @@ export default function EventDetail() {
 
         </div>
 
-        {/* CARD SESSION DENGAN HARGA */}
+        {/* CARD SESSION DENGAN HARGA (Kembali pakai nama SESSION) */}
         <div className="bg-white rounded-[40px] shadow-sm border border-gray-100 p-8 md:p-12 mb-10">
-          <h2 className="text-2xl font-black text-gray-900 mb-8 uppercase tracking-tight">Kategori Tiket</h2>
+          <h2 className="text-2xl font-black text-gray-900 mb-8 uppercase tracking-tight">Session</h2>
           
           <div className="grid grid-cols-1 gap-6 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
             {event.sessions && event.sessions.length > 0 ? (
