@@ -17,6 +17,7 @@ import MyTickets from "./components/MyTickets";
 import EventDashboard from "./components/EventDashboard";
 import Checkout from "./pages/Checkout"; 
 import Scanner from './pages/Scanner';
+import TrackTicket from './pages/TrackTicket'; 
 
 export default function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -81,10 +82,8 @@ export default function App() {
           <Route path="/likes" element={<Likes />} />
           <Route path="/event/:id" element={<EventDetail events={events} />} />
           <Route path="/scanner/:eventId" element={<Scanner />} />
-          
-          {/* --- PERBAIKAN: Gembok (ProtectedRoute) dilepas biar Guest bisa Checkout! --- */}
           <Route path="/checkout/:id" element={<Checkout />} />
-          
+          <Route path="/cek-tiket" element={<TrackTicket />} />
           <Route path="/create" element={<ProtectedRoute><CreateEvent /></ProtectedRoute>} />
           <Route path="/manage" element={<ProtectedRoute><ManageEvent /></ProtectedRoute>} />
           <Route path="/edit/:id" element={<ProtectedRoute><EditEvent /></ProtectedRoute>} />
@@ -104,12 +103,10 @@ export default function App() {
         isOpen={isLoginOpen} 
         onClose={() => setIsLoginOpen(false)} 
         onLoginSuccess={(userData) => {
-          console.log("User berhasil login:", userData);
           setUser(userData); 
           try {
             localStorage.setItem('user', JSON.stringify(userData)); 
           } catch (error) {
-            console.warn("Memori browser penuh! Menyimpan sesi login tanpa gambar lokal.");
             const safeUserData = { ...userData, picture: null };
             localStorage.setItem('user', JSON.stringify(safeUserData));
           }

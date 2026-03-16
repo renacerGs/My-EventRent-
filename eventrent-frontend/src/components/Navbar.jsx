@@ -3,17 +3,12 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 const AnimatedSearchNavbar = ({ events, searchQuery, onSearchSelect }) => {
   const [isOpen, setIsOpen] = useState(false);
-  
-  // --- FITUR BARU: LOCAL STATE UNTUK NGETIK ---
-  // Teks disimpan sementara di sini, belum dikirim ke halaman utama
   const [localSearch, setLocalSearch] = useState(searchQuery || ''); 
   
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Kalau tombol Kategori di EventList diklik (yang bikin searchQuery kosong),
-  // kotak teks di sini harus ikutan kosong!
   useEffect(() => {
     setLocalSearch(searchQuery || '');
   }, [searchQuery]);
@@ -28,25 +23,22 @@ const AnimatedSearchNavbar = ({ events, searchQuery, onSearchSelect }) => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Filter rekomendasi berdasarkan ketikan sementara (localSearch)
   const filteredResults = events ? events.filter((event) =>
     event.title.toLowerCase().includes((localSearch || "").toLowerCase())
   ) : [];
 
-  // --- KALAU REKOMENDASI DIKLIK ---
   const handleResultClick = (eventTitle) => {
-    setLocalSearch(eventTitle); // Tulis di kotak search
-    onSearchSelect(eventTitle); // EKSEKUSI PENCARIAN UTAMA!
+    setLocalSearch(eventTitle); 
+    onSearchSelect(eventTitle); 
     setIsOpen(false); 
     if (location.pathname !== '/') {
       navigate('/');
     }
   };
 
-  // --- KALAU TOMBOL ENTER DITEKAN ---
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
-      onSearchSelect(localSearch); // EKSEKUSI PENCARIAN UTAMA!
+      onSearchSelect(localSearch); 
       setIsOpen(false);
       if (location.pathname !== '/') {
         navigate('/');
@@ -63,11 +55,11 @@ const AnimatedSearchNavbar = ({ events, searchQuery, onSearchSelect }) => {
         <input
           type="text"
           placeholder="Search..."
-          value={localSearch} // Pakai ketikan sementara
+          value={localSearch}
           onFocus={() => setIsOpen(true)}
           onChange={(e) => {
-            setLocalSearch(e.target.value); // Cuma update ketikan aja
-            setIsOpen(true); // Buka rekomendasi
+            setLocalSearch(e.target.value);
+            setIsOpen(true);
           }} 
           onKeyDown={handleKeyDown}
           className={`w-full pl-10 md:pl-11 pr-4 py-2 md:py-2.5 border rounded-full outline-none text-[13px] md:text-sm transition-all duration-300 bg-gray-50/50
@@ -115,7 +107,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
   return (
     <nav className="bg-white/80 backdrop-blur-md flex items-center justify-between px-4 md:px-8 py-3 md:py-4 shadow-sm sticky top-0 z-[100] text-left font-sans transition-all duration-300 gap-3 md:gap-6">
       
-      {/* 1. LOGO SECTION */}
       <div className="flex items-center shrink-0">
         <Link to="/" className="flex items-center gap-3 select-none cursor-pointer hover:opacity-80 transition-opacity">
           <img src="/logo.jpeg" alt="EventRent Logo" className="w-9 h-9 md:w-10 md:h-10 rounded-lg shadow-sm object-cover" />
@@ -125,14 +116,18 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
         </Link>
       </div>
 
-      {/* 2. SEARCH BAR SECTION */}
       <div className="flex-1 max-w-sm md:max-w-md lg:max-w-lg mx-auto flex justify-center">
          <AnimatedSearchNavbar events={events} searchQuery={searchQuery} onSearchSelect={onSearchSelect} />
       </div>
 
-      {/* 3. RIGHT SECTION (CREATE, LIKES, PROFILE) */}
       <div className="flex items-center gap-2 md:gap-3 shrink-0">
         
+        {/* 👇👇👇 TOMBOL CEK TIKET (BARU) 👇👇👇 */}
+        <Link to="/cek-tiket" className="flex items-center justify-center gap-1.5 bg-white border border-gray-200 text-gray-500 w-9 h-9 md:w-auto md:px-5 md:py-2.5 rounded-full font-bold text-[10px] md:text-xs uppercase tracking-wider hover:text-[#FF6B35] hover:border-orange-200 hover:bg-orange-50 transition shadow-sm shrink-0">
+          <svg className="w-[16px] h-[16px] md:w-[18px] md:h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          <span className="hidden md:inline">Cek Tiket</span>
+        </Link>
+
         {/* TOMBOL CREATE */}
         <Link to="/create" className="flex items-center justify-center gap-1.5 bg-[#FF6B35] text-white w-9 h-9 md:w-auto md:px-5 md:py-2.5 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-orange-600 transition shadow-md shadow-orange-100 shrink-0">
           <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -147,7 +142,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
             </Link>
 
             <div className="relative shrink-0" ref={profileRef}>
-              {/* TOMBOL PROFIL */}
               <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className="flex items-center gap-3 p-0 md:p-1 md:pr-3 bg-transparent md:bg-white rounded-full border-transparent md:border border-gray-100 hover:bg-gray-50 transition-all shadow-none md:shadow-sm focus:outline-none shrink-0">
                 <div className="w-9 h-9 rounded-full overflow-hidden border border-gray-100 shadow-inner shrink-0">
                   <img src={user.picture || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} alt="Profile" className="w-full h-full object-cover" />
@@ -159,7 +153,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                 <svg className={`w-3.5 h-3.5 text-gray-400 hidden md:block transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
               </button>
 
-              {/* Dropdown Menu */}
               <div className={`absolute right-0 top-full mt-3 w-[220px] md:w-[260px] bg-white rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 transform origin-top-right transition-all duration-300 z-[60] overflow-hidden ${isDropdownOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                 <div className="p-2 flex flex-col gap-1">
                   <button onClick={() => { navigate('/'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35] rounded-xl transition-all group">

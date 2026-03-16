@@ -9,7 +9,7 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   // --- EVENTS ---
-  @ApiTags('Events') // Kelompokkan ke folder "Events" di UI Swagger
+  @ApiTags('Events') 
   @ApiOperation({ summary: 'Mendapatkan semua event' })
   @Get('events') 
   async getEvents() {
@@ -80,19 +80,22 @@ export class AppController {
   @ApiTags('Tickets')
   @ApiOperation({ summary: 'Membeli tiket (Checkout)' })
   @ApiBody({ 
-    description: 'Data pembelian tiket termasuk jawaban form',
+    description: 'Data pembelian tiket termasuk jawaban form (Bisa Guest/Tanpa userId)',
     schema: { 
       example: { 
-        userId: 1, 
+        userId: null, // <-- Dibuat null kalau Guest
+        guestEmail: 'tamu@gmail.com', // <-- Email tamu
         eventId: 32, 
         cart: [{ sessionId: 2, quantity: 2, price: 200000 }], 
         formAnswers: { "2": { "No HP": "08123" } } 
       } 
     } 
   })
+  
   @Post('tickets/buy')
-  async buyTicket(@Body() data: { userId: number; eventId: number; cart: any[]; formAnswers: any }) {
-    return await this.appService.buyTicket(data.userId, data.eventId, data.cart, data.formAnswers || {});
+  async buyTicket(@Body() data: { userId?: number; guestEmail?: string; eventId: number; cart: any[]; formAnswers: any }) {
+    // 👇👇👇 TAMBAHIN "|| null" DI DATA.USERID 👇👇👇
+    return await this.appService.buyTicket(data.userId || null, data.eventId, data.cart, data.formAnswers || {}, data.guestEmail);
   }
 
   @ApiTags('Tickets')
@@ -101,6 +104,16 @@ export class AppController {
   async getMyTickets(@Query('userId') userId: number) {
     return await this.appService.getMyTickets(userId);
   }
+
+  // 👇👇👇 INI API BARU UNTUK FITUR CEK TIKET (GUEST) 👇👇👇
+  @ApiTags('Tickets')
+  @ApiOperation({ summary: 'Melacak/Mencari tiket (Guest Checkout) menggunakan Order ID dan Email' })
+  @ApiBody({ schema: { example: { ticketId: 46, email: "tamu@gmail.com" } } })
+  @Post('tickets/track')
+  async trackTicket(@Body() data: { ticketId: number; email: string }) {
+    return await this.appService.trackTicket(data.ticketId, data.email);
+  }
+  // 👆👆👆 ------------------------------------------ 👆👆👆
 
   @ApiTags('Tickets')
   @ApiOperation({ summary: 'Mendapatkan daftar peserta (Dashboard Panitia)' })

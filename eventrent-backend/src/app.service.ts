@@ -1,10 +1,12 @@
-import { Injectable, OnModuleInit, InternalServerErrorException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { Injectable, OnModuleInit, InternalServerErrorException, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt'; 
+import * as nodemailer from 'nodemailer'; // <-- IMPORT NODEMAILER
 
 @Injectable()
 export class AppService implements OnModuleInit {
   private pool: Pool;
+  private transporter: nodemailer.Transporter; // <-- SETUP EMAIL
 
   constructor() {
     this.pool = new Pool({
@@ -14,6 +16,15 @@ export class AppService implements OnModuleInit {
       password: 'crissyen26', 
       port: 5432,
     });
+
+    // --- SETUP NODEMAILER (GMAIL) ---
+    this.transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: 'renacergosyen@gmail.com', // GANTI: Email Gmail lu
+        pass: 'aatd cyiv derw imhn'    // GANTI: App Password Gmail lu (Bukan password biasa)
+      }
+    });
   }
 
   async onModuleInit() {
@@ -21,16 +32,14 @@ export class AppService implements OnModuleInit {
       await this.pool.query('SELECT 1');
       console.log('Berhasil terhubung ke database PostgreSQL EventRent!');
       
-      // --- AUTO MIGRATE: Persiapan Database buat Fitur Scanner & Form Options ---
+      // --- AUTO MIGRATE: Nambahin kolom guest_email ---
       await this.pool.query(`
         ALTER TABLE tickets 
         ADD COLUMN IF NOT EXISTS is_scanned BOOLEAN DEFAULT FALSE,
-        ADD COLUMN IF NOT EXISTS scanned_at TIMESTAMP;
-        
-        ALTER TABLE session_questions 
-        ADD COLUMN IF NOT EXISTS options JSONB DEFAULT '[]'::jsonb;
+        ADD COLUMN IF NOT EXISTS scanned_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS guest_email VARCHAR(255);
       `);
-      console.log('Database Update: Fitur Scanner & Form Custom Options Ready! 🚀');
+      console.log('Database Update: Kolom guest_email berhasil ditambahkan! 🚀');
 
     } catch (error) {
       console.error('Gagal terhubung ke database:', error);
@@ -290,13 +299,25 @@ export class AppService implements OnModuleInit {
 
   // --- TICKETS, ATTENDEES, & SCANNER ---
   
-  // PERBAIKAN: userId sekarang bisa bernilai null (untuk Guest Checkout)
-  async buyTicket(userId: number | null, eventId: number, cart: any[], formAnswers: any) {
+  // PERBAIKAN: Fungsi Buy Ticket OPSI B (1 Tiket = 1 Baris di Database)
+  async buyTicket(userId: number | null, eventId: number, cart: any[], formAnswers: any, guestEmail?: string) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN'); 
 
       const boughtTickets: number[] = [];
+      let totalTransactionPrice = 0;
+
+      // Ambil Judul Event buat dikirim ke Email
+      const evRes = await client.query('SELECT title FROM events WHERE id = $1', [eventId]);
+      const eventTitle = evRes.rows.length > 0 ? evRes.rows[0].title : 'Event';
+
+      // Jika ada userId, cari email dari tabel users. Jika guest, pakai guestEmail
+      let targetEmail = guestEmail;
+      if (userId) {
+        const uRes = await client.query('SELECT email FROM users WHERE id = $1', [userId]);
+        if (uRes.rows.length > 0) targetEmail = uRes.rows[0].email;
+      }
 
       for (const item of cart) {
         const sessionId = item.sessionId;
@@ -310,20 +331,10 @@ export class AppService implements OnModuleInit {
 
         await client.query('UPDATE event_sessions SET stock = stock - $1 WHERE id = $2', [qty, sessionId]);
 
-        const totalPrice = session.price * qty;
-        const ticketRes = await client.query(
-          `INSERT INTO tickets (event_id, session_id, user_id, quantity, total_price) 
-           VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-          [eventId, sessionId, userId, qty, totalPrice]
-        );
-        const ticketId = ticketRes.rows[0].id;
-        boughtTickets.push(ticketId);
-
         const qRes = await client.query('SELECT id, question_text FROM session_questions WHERE session_id = $1', [sessionId]);
         const dbQuestions = qRes.rows;
 
-        const attendeesData: any[] = [];
-        
+        // --- INILAH OPSI B: Lakukan perulangan untuk memecah tiket menjadi baris terpisah ---
         for (let i = 0; i < qty; i++) {
           const prefix = `cart-${item.id}-ticket-${i}`;
           const name = formAnswers[`${prefix}-nama`] || `Peserta ${i + 1}`;
@@ -337,13 +348,32 @@ export class AppService implements OnModuleInit {
              }
           }
 
-          attendeesData.push({ name, email, customAnswers });
-        }
+          // Format Attendee menjadi array dengan 1 item saja
+          const singleAttendeeData = [{ name, email, customAnswers }];
+          
+          const singlePrice = session.price;
+          totalTransactionPrice += Number(singlePrice);
 
-        await client.query(`UPDATE tickets SET attendee_data = $1 WHERE id = $2`, [JSON.stringify(attendeesData), ticketId]);
+          // INSERT 1 BARIS TIKET DENGAN QTY = 1
+          const ticketRes = await client.query(
+            `INSERT INTO tickets (event_id, session_id, user_id, quantity, total_price, guest_email, attendee_data) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+            [eventId, sessionId, userId, 1, singlePrice, targetEmail || null, JSON.stringify(singleAttendeeData)]
+          );
+          
+          const newTicketId = ticketRes.rows[0].id;
+          boughtTickets.push(newTicketId);
+        }
       }
 
       await client.query('COMMIT');
+
+      // --- KIRIM EMAIL SETELAH COMMIT SUKSES (TIDAK BLOCKING) ---
+      if (targetEmail) {
+        this.sendEmailReceipt(targetEmail, eventTitle, boughtTickets, totalTransactionPrice)
+          .catch(e => console.error("Gagal mengirim email struk:", e)); 
+      }
+
       return { message: 'Pembelian tiket berhasil', ticketIds: boughtTickets };
 
     } catch (err) {
@@ -353,6 +383,77 @@ export class AppService implements OnModuleInit {
       throw new InternalServerErrorException('Gagal memproses pembelian tiket');
     } finally {
       client.release();
+    }
+  }
+
+  // --- FUNGSI PRIVAT UNTUK NGIRIM EMAIL (NODEMAILER) ---
+  private async sendEmailReceipt(targetEmail: string, eventTitle: string, ticketIds: number[], totalPrice: number) {
+    const mailOptions = {
+      from: '"EventRent System" <noreply@eventrent.com>',
+      to: targetEmail,
+      subject: `Konfirmasi Pembelian Tiket - ${eventTitle}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
+          <h2 style="color: #FF6B35;">Pembelian Berhasil! 🎉</h2>
+          <p>Terima kasih telah membeli tiket untuk acara <strong>${eventTitle}</strong>.</p>
+          <p>Berikut adalah <b>Order ID</b> (Ticket ID) Anda. <strong>SIMPAN ORDER ID INI</strong> untuk mencari dan menampilkan E-Ticket Anda di website:</p>
+          
+          <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; font-size: 18px; font-weight: bold; letter-spacing: 2px;">
+            Order ID: ${ticketIds.join(', ')}
+          </div>
+          
+          <p style="margin-top: 20px;">Total Pembayaran: Rp ${totalPrice.toLocaleString('id-ID')}</p>
+          <hr style="border: none; border-top: 1px solid #eee;" />
+          <p style="font-size: 12px; color: #777;">Gunakan email ini dan SALAH SATU Order ID di atas pada menu "Track Ticket" di website EventRent.</p>
+        </div>
+      `
+    };
+
+    await this.transporter.sendMail(mailOptions);
+  }
+
+  // --- TIMPA FUNGSI trackTicket INI DI app.service.ts ---
+  async trackTicket(ticketId: number, email: string) {
+    try {
+      // 1. Ambil event_id dan purchase_date 
+      // (Kita ubah waktunya jadi TEXT di database "::text" biar presisi milidetiknya gak hilang saat masuk NodeJS)
+      const checkQuery = `
+        SELECT t.event_id, t.purchase_date::text as exact_time
+        FROM tickets t
+        LEFT JOIN users u ON t.user_id = u.id
+        WHERE t.id = $1 AND (t.guest_email = $2 OR u.email = $2)
+      `;
+      const checkRes = await this.pool.query(checkQuery, [ticketId, email]);
+      
+      if (checkRes.rows.length === 0) {
+        throw new NotFoundException('Tiket tidak ditemukan. Pastikan Order ID dan Email sudah benar.');
+      }
+
+      const { event_id, exact_time } = checkRes.rows[0];
+
+      // 2. Ambil semua rombongan tiket menggunakan event_id dan exact_time (sebagai teks)
+      const query = `
+        SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price, t.attendee_data, t.is_scanned,
+               e.id as event_id, e.title, e.image_url as img, 
+               TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date, e.place as location,
+               s.name as session_name, TO_CHAR(s.session_date, 'Dy, DD Mon YYYY') as session_date, 
+               s.start_time, s.end_time
+        FROM tickets t
+        JOIN events e ON t.event_id = e.id
+        JOIN event_sessions s ON t.session_id = s.id
+        LEFT JOIN users u ON t.user_id = u.id
+        WHERE t.event_id = $1
+          AND t.purchase_date::text = $2
+          AND (t.guest_email = $3 OR u.email = $3)
+        ORDER BY t.id ASC
+      `;
+      const { rows } = await this.pool.query(query, [event_id, exact_time, email]);
+      
+      return rows; 
+    } catch (err) {
+      if (err instanceof NotFoundException) throw err;
+      console.error("Error dari Database:", err); // Biar kalau error lagi, kelihatan di terminal backend
+      throw new InternalServerErrorException('Gagal melacak tiket di server.');
     }
   }
 
@@ -386,7 +487,7 @@ export class AppService implements OnModuleInit {
 
       const query = `
         SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price, t.attendee_data, t.is_scanned,
-               u.name as buyer_name, u.email as buyer_email, u.picture as buyer_pic,
+               u.name as buyer_name, COALESCE(u.email, t.guest_email) as buyer_email, u.picture as buyer_pic,
                s.name as session_name
         FROM tickets t
         LEFT JOIN users u ON t.user_id = u.id
@@ -411,7 +512,7 @@ export class AppService implements OnModuleInit {
 
       const ticketRes = await this.pool.query(`
         SELECT t.id, t.is_scanned, t.scanned_at, t.quantity, t.attendee_data,
-               u.name as buyer_name, s.name as session_name
+               u.name as buyer_name, COALESCE(u.email, t.guest_email) as buyer_email, s.name as session_name
         FROM tickets t
         LEFT JOIN users u ON t.user_id = u.id
         JOIN event_sessions s ON t.session_id = s.id

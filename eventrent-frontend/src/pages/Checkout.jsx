@@ -187,9 +187,18 @@ export default function Checkout() {
     setIsSubmitting(true);
     
     try {
-      // --- PERBAIKAN: Jika user tidak login (Guest), kirim userId bernilai null ---
+      // --- TAMBAHAN BARU: Ambil email dari form tiket pertama jika user tidak login ---
+      let emailTamu = '';
+      if (!user && cart.length > 0) {
+        const firstCartItem = cart[0];
+        const emailKey = `cart-${firstCartItem.id}-ticket-0-email`;
+        emailTamu = formAnswers[emailKey] || '';
+      }
+
+      // --- PERBAIKAN: Masukkan guestEmail ke dalam payload ---
       const payload = { 
         userId: user ? user.id : null, 
+        guestEmail: emailTamu, // <-- INI KUNCI BIAR EMAIL TERKIRIM
         eventId: event.id, 
         cart: cart, 
         formAnswers: formAnswers 
@@ -205,6 +214,7 @@ export default function Checkout() {
       if (res.ok) {
         setPaymentStatus('success');
         setTimeout(() => {
+          // Arahkan ke halaman event lagi setelah sukses
           navigate(`/event/${id}`); 
         }, 2000);
       } else {
