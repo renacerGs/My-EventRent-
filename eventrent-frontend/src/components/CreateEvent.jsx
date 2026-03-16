@@ -11,7 +11,7 @@ export default function CreateEvent() {
 
   const categoriesList = ['Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports'];
 
-  // STATE UTAMA
+  // STATE UTAMA (Ditambah array 'options' di questions bawaan)
   const [formData, setFormData] = useState({
     title: '', description: '', eventStart: '', eventEnd: '', phone: '', category: '',
     location: { namePlace: '', place: '', city: '', province: '', mapUrl: '' },
@@ -19,7 +19,7 @@ export default function CreateEvent() {
       {
         id: crypto.randomUUID(), name: '', description: '', date: '', startTime: '', endTime: '', 
         contactPerson: '', typeEvent: 'Paid', price: '', stock: '', ticketDesc: '',
-        questions: [{ id: crypto.randomUUID(), text: '', type: 'Text', isRequired: true }]
+        questions: [{ id: crypto.randomUUID(), text: '', type: 'Text', isRequired: true, options: [''] }]
       }
     ]
   });
@@ -59,7 +59,7 @@ export default function CreateEvent() {
       sessions: [...prev.sessions, {
         id: crypto.randomUUID(), name: '', description: '', date: '', startTime: '', endTime: '', 
         contactPerson: '', typeEvent: 'Paid', price: '', stock: '', ticketDesc: '',
-        questions: [{ id: crypto.randomUUID(), text: '', type: 'Text', isRequired: true }]
+        questions: [{ id: crypto.randomUUID(), text: '', type: 'Text', isRequired: true, options: [''] }]
       }]
     }));
   };
@@ -73,18 +73,45 @@ export default function CreateEvent() {
   const handleQuestionChange = (sIndex, qIndex, field, value) => {
     const updated = [...formData.sessions];
     updated[sIndex].questions[qIndex][field] = value;
+    
+    // Pastikan array options selalu ada jika user switch ke Dropdown/Checkbox
+    if (field === 'type' && (value === 'Dropdown' || value === 'Checkbox')) {
+      if (!updated[sIndex].questions[qIndex].options || updated[sIndex].questions[qIndex].options.length === 0) {
+        updated[sIndex].questions[qIndex].options = [''];
+      }
+    }
+    
     setFormData({ ...formData, sessions: updated });
   };
 
   const addQuestion = (sIndex) => {
     const updated = [...formData.sessions];
-    updated[sIndex].questions.push({ id: crypto.randomUUID(), text: '', type: 'Text', isRequired: true });
+    updated[sIndex].questions.push({ id: crypto.randomUUID(), text: '', type: 'Text', isRequired: true, options: [''] });
     setFormData({ ...formData, sessions: updated });
   };
 
   const removeQuestion = (sIndex, qIndex) => {
     const updated = [...formData.sessions];
     updated[sIndex].questions = updated[sIndex].questions.filter((_, i) => i !== qIndex);
+    setFormData({ ...formData, sessions: updated });
+  };
+
+  // --- HANDLER BARU UNTUK OPTION DROPDOWN & CHECKBOX ---
+  const addQuestionOption = (sIndex, qIndex) => {
+    const updated = [...formData.sessions];
+    updated[sIndex].questions[qIndex].options.push('');
+    setFormData({ ...formData, sessions: updated });
+  };
+
+  const updateQuestionOption = (sIndex, qIndex, optIndex, value) => {
+    const updated = [...formData.sessions];
+    updated[sIndex].questions[qIndex].options[optIndex] = value;
+    setFormData({ ...formData, sessions: updated });
+  };
+
+  const removeQuestionOption = (sIndex, qIndex, optIndex) => {
+    const updated = [...formData.sessions];
+    updated[sIndex].questions[qIndex].options.splice(optIndex, 1);
     setFormData({ ...formData, sessions: updated });
   };
 
@@ -107,7 +134,7 @@ export default function CreateEvent() {
       });
 
       if (response.ok) {
-          navigate('/manage'); // Redirect kalau sukses
+          navigate('/manage'); 
       } else {
           const errorData = await response.json();
           console.error("Backend Error:", errorData);
@@ -128,7 +155,7 @@ export default function CreateEvent() {
     <div className="bg-gray-50 min-h-screen pb-20 font-sans">
       <main className="max-w-4xl mx-auto px-6 py-12">
         
-        {/* BANNER PERINGATAN (BARU) */}
+        {/* BANNER PERINGATAN */}
         <div className="bg-[#FFF5F0] border-l-[6px] border-[#FF6B35] p-6 mb-8 rounded-r-2xl shadow-sm flex items-start gap-4">
            <div className="bg-[#FF6B35] bg-opacity-10 p-3 rounded-full shrink-0">
               <svg className="w-6 h-6 text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
@@ -198,7 +225,7 @@ export default function CreateEvent() {
             </div>
           </div>
 
-          {/* SECTION 2: LOCATION (MANUAL INPUT) */}
+          {/* SECTION 2: LOCATION */}
           <div className="bg-white rounded-[24px] shadow-sm p-8 border border-gray-200">
             <h2 className="text-2xl font-black mb-6 uppercase tracking-tight">Event Location</h2>
             
@@ -323,7 +350,7 @@ export default function CreateEvent() {
             + Add Another Session / Category
           </button>
 
-          {/* SECTION 4: FORM BUILDER */}
+          {/* SECTION 4: FORM BUILDER - DIPERBARUI */}
           <div className="space-y-8">
             {formData.sessions.map((session, sIndex) => (
               <div key={`formbuilder-${session.id}`} className="bg-white rounded-[24px] shadow-sm p-8 border border-gray-200">
@@ -340,20 +367,76 @@ export default function CreateEvent() {
                 {session.questions.map((q, qIndex) => (
                   <div key={q.id} className="border border-orange-100 rounded-xl p-5 mb-4 shadow-sm relative border-l-4 border-l-[#FF6B35] bg-orange-50/20">
                     <div className="flex gap-4 mb-3">
-                      <input type="text" placeholder="Ketik pertanyaan custom di sini (Ex: Ukuran Kaos)" value={q.text} onChange={(e) => handleQuestionChange(sIndex, qIndex, 'text', e.target.value)} className={`${inputStyle} flex-1 border-orange-200`} required />
+                      <input 
+                        type="text" 
+                        placeholder="Ketik pertanyaan custom di sini (Ex: Ukuran Kaos)" 
+                        value={q.text} 
+                        onChange={(e) => handleQuestionChange(sIndex, qIndex, 'text', e.target.value)} 
+                        className={`${inputStyle} flex-1 border-orange-200`} 
+                        required 
+                      />
+                      <select 
+                        value={q.type} 
+                        onChange={(e) => handleQuestionChange(sIndex, qIndex, 'type', e.target.value)} 
+                        className={`${inputStyle} w-40 border-orange-200 cursor-pointer font-semibold`}
+                      >
+                        <option value="Text">Teks Singkat</option>
+                        <option value="Dropdown">Dropdown</option>
+                        <option value="Checkbox">Checkbox</option>
+                      </select>
                     </div>
-                    <input type="text" placeholder="Kolom jawaban peserta" disabled className={`${inputStyle} bg-gray-50 border-gray-200 opacity-60`} />
-                    <div className="flex justify-end items-center gap-4 mt-4 pt-3 border-t border-orange-100">
-                      <button type="button" onClick={() => removeQuestion(sIndex, qIndex)} className="text-xs font-bold text-gray-400 hover:text-red-500 uppercase tracking-widest">Hapus</button>
-                      <label className="flex items-center gap-2 text-xs font-bold text-gray-700 cursor-pointer uppercase tracking-widest">
+
+                    {/* RENDER JAWABAN BERDASARKAN TIPE */}
+                    {q.type === 'Text' && (
+                      <input type="text" placeholder="Kolom jawaban teks (diisi peserta nanti)" disabled className={`${inputStyle} bg-gray-50 border-gray-200 opacity-60`} />
+                    )}
+
+                    {(q.type === 'Dropdown' || q.type === 'Checkbox') && (
+                      <div className="pl-4 border-l-2 border-orange-200 mt-4 space-y-2">
+                        <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Atur Pilihan Jawaban:</label>
+                        {q.options?.map((opt, optIndex) => (
+                          <div key={optIndex} className="flex items-center gap-3">
+                            <div className="text-gray-400 shrink-0">
+                              {q.type === 'Checkbox' ? (
+                                <div className="w-4 h-4 border-2 border-gray-300 rounded-sm"></div>
+                              ) : (
+                                <div className="w-4 h-4 border-2 border-gray-300 rounded-full flex items-center justify-center">
+                                  <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                                </div>
+                              )}
+                            </div>
+                            <input 
+                              type="text" 
+                              placeholder={`Opsi ${optIndex + 1}`} 
+                              value={opt} 
+                              onChange={(e) => updateQuestionOption(sIndex, qIndex, optIndex, e.target.value)} 
+                              className={`${inputStyle} py-2 text-sm flex-1 bg-white border-gray-200`} 
+                              required 
+                            />
+                            {q.options.length > 1 && (
+                              <button type="button" onClick={() => removeQuestionOption(sIndex, qIndex, optIndex)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg font-bold transition">
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        <button type="button" onClick={() => addQuestionOption(sIndex, qIndex)} className="text-xs font-bold text-[#FF6B35] hover:text-orange-700 mt-2 px-2 py-1 bg-orange-50 rounded-lg">
+                          + Tambah Opsi
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="flex justify-end items-center gap-4 mt-6 pt-4 border-t border-orange-100">
+                      <button type="button" onClick={() => removeQuestion(sIndex, qIndex)} className="text-xs font-bold text-gray-400 hover:text-red-500 uppercase tracking-widest transition">Hapus Form</button>
+                      <label className="flex items-center gap-2 text-xs font-bold text-gray-700 cursor-pointer uppercase tracking-widest select-none">
                         Wajib Isi
-                        <input type="checkbox" checked={q.isRequired} onChange={(e) => handleQuestionChange(sIndex, qIndex, 'isRequired', e.target.checked)} className="w-4 h-4 text-orange-500" />
+                        <input type="checkbox" checked={q.isRequired} onChange={(e) => handleQuestionChange(sIndex, qIndex, 'isRequired', e.target.checked)} className="w-4 h-4 text-orange-500 rounded focus:ring-orange-500" />
                       </label>
                     </div>
                   </div>
                 ))}
-                <button type="button" onClick={() => addQuestion(sIndex)} className="text-sm font-bold text-[#FF6B35] hover:text-orange-700 flex items-center gap-2 mt-4">
-                  <span className="text-xl">⊕</span> Tambah Pertanyaan
+                <button type="button" onClick={() => addQuestion(sIndex)} className="text-sm font-bold text-[#FF6B35] hover:text-orange-700 flex items-center gap-2 mt-4 transition">
+                  <span className="text-xl">⊕</span> Tambah Pertanyaan Baru
                 </button>
               </div>
             ))}

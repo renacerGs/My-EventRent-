@@ -185,7 +185,6 @@ export default function EventDashboard() {
       )}
       {/* ======================================================== */}
 
-
       <div className="max-w-7xl mx-auto px-4 md:px-8">
         
         {isRefreshing && (

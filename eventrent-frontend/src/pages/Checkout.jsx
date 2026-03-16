@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Checkout() {
   const { id } = useParams();
@@ -21,6 +22,17 @@ export default function Checkout() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState(null); 
   const [paymentStatus, setPaymentStatus] = useState('idle'); 
+
+  // --- STATE UNTUK POP-UP MODERN PENGGANTI ALERT ---
+  const [popup, setPopup] = useState({ isOpen: false, message: '', type: 'info' });
+
+  const showPopup = (message, type = 'info') => {
+    setPopup({ isOpen: true, message, type });
+  };
+
+  const closePopup = () => {
+    setPopup({ isOpen: false, message: '', type: 'info' });
+  };
 
   useEffect(() => {
     if (!user) {
@@ -44,8 +56,8 @@ export default function Checkout() {
               }));
               setCart(allCartItems);
             } else {
-              alert("Maaf bro, semua tiket sudah habis terjual!");
-              navigate(`/event/${id}`);
+              showPopup("Maaf bro, semua tiket sudah habis terjual!", "error");
+              setTimeout(() => { navigate(`/event/${id}`); }, 2000);
             }
           } else if (preferredSessionId) {
             const initialSession = data.sessions.find(s => String(s.id) === String(preferredSessionId) && s.stock > 0);
@@ -57,8 +69,8 @@ export default function Checkout() {
         }
       } catch (err) {
         console.error(err);
-        alert("Gagal memuat data checkout");
-        navigate('/');
+        showPopup("Gagal memuat data checkout", "error");
+        setTimeout(() => { navigate('/'); }, 2000);
       } finally {
         setLoading(false);
       }
@@ -68,12 +80,18 @@ export default function Checkout() {
 
   const handleAddCartItem = () => {
     const availableSession = event.sessions.find(s => s.stock > 0 && !cart.some(item => String(item.sessionId) === String(s.id)));
-    if (!availableSession) return alert("Semua tipe tiket sudah kamu pilih bro!");
+    if (!availableSession) {
+      showPopup("Semua kategori tiket sudah kamu pilih bro!", "error");
+      return;
+    }
     setCart([...cart, { id: crypto.randomUUID(), sessionId: availableSession.id, qty: 1 }]);
   };
 
   const handleRemoveCartItem = (cartId) => {
-    if (cart.length === 1) return alert("Minimal beli 1 tiket bro!");
+    if (cart.length === 1) {
+      showPopup("Minimal beli 1 tiket bro!", "error");
+      return;
+    }
     setCart(cart.filter(item => item.id !== cartId));
   };
 
@@ -93,16 +111,21 @@ export default function Checkout() {
   const handleOpenPaymentModal = (e) => {
     e.preventDefault(); 
 
-    if (cart.length === 0) return alert("Keranjang kosong bro!");
+    if (cart.length === 0) {
+      showPopup("Keranjang kosong bro!", "error");
+      return;
+    }
     const invalidItem = cart.find(item => item.qty < 1);
-    if (invalidItem) return alert("Jumlah tiket minimal 1 per pilihan ya bro!");
+    if (invalidItem) {
+      showPopup("Jumlah tiket minimal 1 per kategori ya bro!", "error");
+      return;
+    }
     
-    // --- PERBAIKAN LOGIKA POP UP TIKET GRATIS ---
-    setShowPaymentModal(true); // Selalu buka Pop Up
+    setShowPaymentModal(true); 
     if (calculateTotal() === 0) {
-      setPaymentMethod('free'); // Set mode 'free' otomatis
+      setPaymentMethod('free'); 
     } else {
-      setPaymentMethod(null); // Reset biar milih bayar pakai apa
+      setPaymentMethod(null); 
     }
   };
 
@@ -125,13 +148,13 @@ export default function Checkout() {
           navigate(`/event/${id}`); 
         }, 2000);
       } else {
-        alert("Gagal bayar: " + (data.message || 'Terjadi kesalahan di server'));
+        showPopup("Gagal bayar: " + (data.message || 'Terjadi kesalahan di server'), "error");
         setShowPaymentModal(false);
         setPaymentStatus('idle');
       }
     } catch (err) {
       console.error(err);
-      alert("Terjadi kesalahan jaringan atau server mati.");
+      showPopup("Terjadi kesalahan jaringan atau server mati.", "error");
       setShowPaymentModal(false);
       setPaymentStatus('idle');
     } finally {
@@ -142,8 +165,43 @@ export default function Checkout() {
   if (loading) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-400">Loading Checkout...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-32 font-sans pt-10">
+    <div className="min-h-screen bg-gray-50 pb-32 font-sans pt-10 relative">
       
+      {/* --- UI POP UP MODERN ANIMATED --- */}
+      <AnimatePresence>
+        {popup.isOpen && (
+          <div className="fixed inset-0 z-[110] flex flex-col items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.8, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.8, y: -20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className={`w-full max-w-sm rounded-[32px] p-8 text-center shadow-2xl relative overflow-hidden ${popup.type === 'error' ? 'bg-[#E24A29]' : popup.type === 'success' ? 'bg-[#27AE60]' : 'bg-gray-800'}`}
+            >
+              <div className={`w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner ${popup.type === 'error' ? 'text-[#E24A29]' : popup.type === 'success' ? 'text-[#27AE60]' : 'text-gray-800'}`}>
+                {popup.type === 'error' ? (
+                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                ) : popup.type === 'success' ? (
+                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                ) : (
+                  <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                )}
+              </div>
+              <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight">
+                {popup.type === 'error' ? 'Ups!' : popup.type === 'success' ? 'Berhasil!' : 'Info'}
+              </h2>
+              <p className="text-white/90 font-medium mb-8">{popup.message}</p>
+              <button 
+                onClick={closePopup} 
+                className={`w-full bg-white py-4 rounded-xl font-bold uppercase tracking-widest shadow-lg transition-all active:scale-95 ${popup.type === 'error' ? 'text-[#E24A29] hover:bg-red-50' : popup.type === 'success' ? 'text-[#27AE60] hover:bg-green-50' : 'text-gray-900 hover:bg-gray-50'}`}
+              >
+                Tutup
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <form onSubmit={handleOpenPaymentModal}>
         
         <div className="max-w-7xl mx-auto px-4 md:px-8">
@@ -172,7 +230,7 @@ export default function Checkout() {
                 return (
                   <div key={item.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
                     <div className="flex justify-between items-center mb-3">
-                      <span className="text-xs font-bold text-[#FF6B35] uppercase tracking-widest">Pilihan {index + 1}</span>
+                      <span className="text-xs font-bold text-[#FF6B35] uppercase tracking-widest">Kategori Tiket {index + 1}</span>
                       {cart.length > 1 && (
                         <button type="button" onClick={() => handleRemoveCartItem(item.id)} className="text-gray-400 hover:text-red-500 font-bold text-sm">✕ Hapus</button>
                       )}
@@ -203,21 +261,22 @@ export default function Checkout() {
                 );
               })}
               {canAddNewSession && (
-                <button type="button" onClick={handleAddCartItem} className="w-full py-4 border-2 border-dashed border-green-500 text-green-600 font-bold rounded-2xl hover:bg-green-50 transition-colors uppercase text-xs tracking-widest">+ Tambah Pilihan Tiket</button>
+                <button type="button" onClick={handleAddCartItem} className="w-full py-4 border-2 border-dashed border-green-500 text-green-600 font-bold rounded-2xl hover:bg-green-50 transition-colors uppercase text-xs tracking-widest">+ Tambah Kategori Tiket</button>
               )}
             </div>
 
             <div className="lg:col-span-8 bg-white rounded-[32px] p-8 md:p-10 shadow-sm border border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900 mb-8 border-b border-gray-100 pb-4">Data Peserta</h2>
-              {cart.map((item, cartIndex) => {
+              <h2 className="text-2xl font-bold text-gray-900 mb-8 border-b border-gray-100 pb-4">Data Pemegang Tiket</h2>
+              {cart.map((item) => {
                 const session = event.sessions.find(s => String(s.id) === String(item.sessionId));
                 if (!session) return null;
+
                 return Array.from({ length: item.qty }).map((_, qtyIndex) => {
                   const formKeyPrefix = `cart-${item.id}-ticket-${qtyIndex}`;
                   return (
                     <div key={formKeyPrefix} className="mb-10 last:mb-0">
                       <div className="bg-orange-50 text-[#FF6B35] px-4 py-2 rounded-lg font-bold text-sm mb-5 inline-block border border-orange-100">
-                        Tiket {cartIndex + 1}.{qtyIndex + 1} - <span className="uppercase">{session.name}</span>
+                        Tiket {qtyIndex + 1} - <span className="uppercase">{session.name}</span>
                       </div>
                       <div className="space-y-4 pl-2 md:pl-4 border-l-2 border-gray-100">
                         <div>
@@ -228,16 +287,74 @@ export default function Checkout() {
                           <label className="block text-xs font-bold text-gray-700 mb-2">Email <span className="text-red-500">*</span></label>
                           <input type="email" required value={formAnswers[`${formKeyPrefix}-email`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-email`]: e.target.value}))} className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35]" placeholder="Masukkan email aktif" />
                         </div>
-                        {session.questions && session.questions.map((q) => (
-                          <div key={q.id}>
-                            <label className="block text-xs font-bold text-gray-700 mb-2">{q.question_text} {q.is_required && <span className="text-red-500">*</span>}</label>
-                            {q.answer_type === 'Text' ? (
-                              <input type="text" required={q.is_required} value={formAnswers[`${formKeyPrefix}-q${q.id}`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-q${q.id}`]: e.target.value}))} className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35]" placeholder="Ketik jawaban..." />
-                            ) : (
-                              <textarea required={q.is_required} value={formAnswers[`${formKeyPrefix}-q${q.id}`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-q${q.id}`]: e.target.value}))} className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35]" rows="3" placeholder="Ketik jawaban detail..." />
-                            )}
-                          </div>
-                        ))}
+                        
+                        {/* --- RENDER CUSTOM QUESTIONS (TEXT, DROPDOWN, CHECKBOX) --- */}
+                        {session.questions && session.questions.map((q) => {
+                          const formKey = `${formKeyPrefix}-q${q.id}`;
+                          return (
+                            <div key={q.id}>
+                              <label className="block text-xs font-bold text-gray-700 mb-2">
+                                {q.question_text} {q.is_required && <span className="text-red-500">*</span>}
+                              </label>
+
+                              {(!q.answer_type || q.answer_type === 'Text') && (
+                                <input 
+                                  type="text" 
+                                  required={q.is_required} 
+                                  value={formAnswers[formKey] || ''} 
+                                  onChange={(e) => setFormAnswers(prev => ({...prev, [formKey]: e.target.value}))} 
+                                  className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35]" 
+                                  placeholder="Ketik jawaban..." 
+                                />
+                              )}
+
+                              {q.answer_type === 'Dropdown' && (
+                                <select 
+                                  required={q.is_required} 
+                                  value={formAnswers[formKey] || ''} 
+                                  onChange={(e) => setFormAnswers(prev => ({...prev, [formKey]: e.target.value}))} 
+                                  className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35] cursor-pointer"
+                                >
+                                  <option value="" disabled hidden>Pilih jawaban...</option>
+                                  {q.options && q.options.map((opt, idx) => (
+                                    <option key={idx} value={opt}>{opt}</option>
+                                  ))}
+                                </select>
+                              )}
+
+                              {q.answer_type === 'Checkbox' && (
+                                <div className="space-y-2 mt-2">
+                                  {q.options && q.options.map((opt, idx) => {
+                                     const currentStr = formAnswers[formKey] || '';
+                                     const isChecked = currentStr.split(', ').includes(opt);
+                                     
+                                     return (
+                                       <label key={idx} className="flex items-center gap-3 text-sm text-gray-700 cursor-pointer">
+                                         <input 
+                                           type="checkbox" 
+                                           checked={isChecked}
+                                           onChange={(e) => {
+                                              const checked = e.target.checked;
+                                              setFormAnswers(prev => {
+                                                 const prevStr = prev[formKey] || '';
+                                                 let arr = prevStr ? prevStr.split(', ') : [];
+                                                 if (checked) arr.push(opt);
+                                                 else arr = arr.filter(x => x !== opt);
+                                                 return { ...prev, [formKey]: arr.join(', ') };
+                                              });
+                                           }} 
+                                           className="w-4 h-4 text-[#FF6B35] rounded border-gray-300 focus:ring-[#FF6B35] cursor-pointer" 
+                                         />
+                                         {opt}
+                                       </label>
+                                     )
+                                  })}
+                                </div>
+                              )}
+
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -283,7 +400,6 @@ export default function Checkout() {
               </button>
             )}
 
-            {/* STATE 1: PILIH METODE BAYAR (Hanya kalau tiket berbayar) */}
             {paymentStatus === 'idle' && !paymentMethod && calculateTotal() > 0 && (
               <div className="p-8">
                 <h3 className="text-xl font-black text-gray-900 mb-2">Pilih Pembayaran</h3>
@@ -315,10 +431,8 @@ export default function Checkout() {
               </div>
             )}
 
-            {/* STATE 2: DETAIL PEMBAYARAN ATAU TIKET GRATIS */}
             {paymentStatus === 'idle' && paymentMethod && (
               <div className="p-8 text-center">
-                {/* Tombol kembali cuma muncul kalau milih QR/VA */}
                 {paymentMethod !== 'free' && (
                   <button type="button" onClick={() => setPaymentMethod(null)} className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-gray-900 mb-6 flex items-center justify-center w-full">
                     ← Ganti Metode
@@ -352,7 +466,6 @@ export default function Checkout() {
                   </>
                 )}
 
-                {/* Tampilan Total Harga (Sembunyi kalau gratis) */}
                 {paymentMethod !== 'free' && (
                   <div className="bg-orange-50 text-[#FF6B35] p-4 rounded-xl font-black text-xl mb-8 border border-orange-100">
                     Rp {calculateTotal().toLocaleString('id-ID')}
@@ -369,7 +482,6 @@ export default function Checkout() {
               </div>
             )}
 
-            {/* STATE 3: PROCESSING / SUCCESS */}
             {paymentStatus !== 'idle' && (
               <div className="p-12 text-center flex flex-col items-center justify-center min-h-[300px]">
                 {paymentStatus === 'processing' ? (
