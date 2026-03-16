@@ -11,7 +11,7 @@ export class AppService implements OnModuleInit {
       user: 'postgres',
       host: 'localhost',
       database: 'eventrent_db',
-      password: '123', 
+      password: 'crissyen26', 
       port: 5432,
     });
   }
