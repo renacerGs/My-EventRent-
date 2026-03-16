@@ -51,6 +51,7 @@ export default function EventDetail() {
   }, [id, navigate]);
 
   const handleLikeClick = async () => {
+    // Kalau like tetep wajib login ya bro, biar nyimpennya jelas
     if (!user) return alert("Login dulu bro buat nyimpen event ke Likes!");
     try {
       const res = await fetch('http://localhost:3000/api/likes/toggle', {
@@ -64,14 +65,8 @@ export default function EventDetail() {
     } catch (error) { console.error(error); }
   };
 
-  // --- PERBAIKAN: NERIMA PARAMETER SESSION ID ---
   const handleGoToCheckout = (sessionId = null) => {
-    if (!user) {
-      alert("Login dulu bro untuk pesan tiket!");
-      return;
-    }
-    
-    // Lempar sessionId ke URL kalau ada
+    // --- PERBAIKAN: Validasi login dihapus biar Guest bisa langsung checkout! ---
     const url = sessionId 
       ? `/checkout/${event.id}?session=${sessionId}` 
       : `/checkout/${event.id}`;
@@ -106,7 +101,6 @@ export default function EventDetail() {
             
             <h1 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 leading-tight tracking-tight">{event.title}</h1>
             
-            {/* PERBAIKAN: Hapus "flex", sisakan "inline-flex" biar Tailwind gak protes */}
             <div className="inline-flex items-center text-sm font-bold text-gray-900 mb-8 bg-gray-50 px-4 py-2 rounded-xl border border-gray-100">
               <svg className="w-5 h-5 mr-3 text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
               {formatPrettyDate(event.date_start)} {event.date_end ? `- ${formatPrettyDate(event.date_end)}` : ''}
@@ -155,7 +149,6 @@ export default function EventDetail() {
               <div className="absolute top-0 left-0 w-full h-1 bg-[#FF6B35]"></div>
               <h3 className="text-sm font-black text-[#FF6B35] mb-6 uppercase tracking-widest">Dapatkan Tiketmu</h3>
               
-              {/* Tombol Umum (Tanpa Session ID) */}
               <button 
                 onClick={() => handleGoToCheckout('all')} 
                 className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-xl hover:bg-black transition-all active:scale-95"
@@ -203,14 +196,12 @@ export default function EventDetail() {
                       <p className="text-xs text-gray-500 leading-relaxed max-w-xl">{session.description || "No specific details for this session."}</p>
                     </div>
 
-                    {/* BAGIAN HARGA DI KANAN */}
                     <div className="w-full md:w-auto flex flex-col items-start md:items-end border-t md:border-t-0 md:border-l border-gray-100 pt-4 md:pt-0 md:pl-8 mt-4 md:mt-0 shrink-0">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Harga Tiket</p>
                       <p className="font-black text-3xl text-gray-900 mb-4">
                         {Number(session.price) === 0 ? <span className="text-[#27AE60]">FREE</span> : `Rp ${parseInt(session.price).toLocaleString('id-ID')}`}
                       </p>
                       
-                      {/* Tombol Spesifik (Kirim Session ID) */}
                       <button 
                         onClick={() => handleGoToCheckout(session.id)} 
                         disabled={isSoldOut}

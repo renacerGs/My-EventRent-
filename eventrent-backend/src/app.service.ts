@@ -94,7 +94,6 @@ export class AppService implements OnModuleInit {
       const sessions = sessionRes.rows;
 
       for (let session of sessions) {
-        // PERUBAHAN: Menambahkan 'options' di SELECT query
         const qQuery = `SELECT id, question_text, answer_type, is_required, options FROM session_questions WHERE session_id = $1`;
         const qRes = await this.pool.query(qQuery, [session.id]);
         session.questions = qRes.rows;
@@ -190,7 +189,6 @@ export class AppService implements OnModuleInit {
 
           if (session.questions && session.questions.length > 0) {
             for (const q of session.questions) {
-              // PERUBAHAN: Menyimpan 'options' ke database dalam bentuk JSON string
               const questionQuery = `
                 INSERT INTO session_questions (session_id, question_text, answer_type, is_required, options)
                 VALUES ($1, $2, $3, $4, $5)
@@ -291,7 +289,9 @@ export class AppService implements OnModuleInit {
   }
 
   // --- TICKETS, ATTENDEES, & SCANNER ---
-  async buyTicket(userId: number, eventId: number, cart: any[], formAnswers: any) {
+  
+  // PERBAIKAN: userId sekarang bisa bernilai null (untuk Guest Checkout)
+  async buyTicket(userId: number | null, eventId: number, cart: any[], formAnswers: any) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN'); 
@@ -389,7 +389,7 @@ export class AppService implements OnModuleInit {
                u.name as buyer_name, u.email as buyer_email, u.picture as buyer_pic,
                s.name as session_name
         FROM tickets t
-        JOIN users u ON t.user_id = u.id
+        LEFT JOIN users u ON t.user_id = u.id
         JOIN event_sessions s ON t.session_id = s.id
         WHERE t.event_id = $1
         ORDER BY t.purchase_date DESC
@@ -413,7 +413,7 @@ export class AppService implements OnModuleInit {
         SELECT t.id, t.is_scanned, t.scanned_at, t.quantity, t.attendee_data,
                u.name as buyer_name, s.name as session_name
         FROM tickets t
-        JOIN users u ON t.user_id = u.id
+        LEFT JOIN users u ON t.user_id = u.id
         JOIN event_sessions s ON t.session_id = s.id
         WHERE t.id = $1 AND t.event_id = $2
       `, [ticketId, eventId]);
