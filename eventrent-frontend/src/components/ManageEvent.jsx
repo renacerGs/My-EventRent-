@@ -49,7 +49,7 @@ export default function ManageEvent() {
   }, []);
 
   const fetchEvents = () => {
-    fetch(`http://localhost:3000/api/events/my?userId=${user.id}`)
+    fetch(`/api/events/my?userId=${user.id}`)
       .then(res => res.json())
       .then(data => { setMyEvents(Array.isArray(data) ? data : []); })
       .catch(err => console.error("Gagal ambil event:", err));
@@ -98,7 +98,7 @@ export default function ManageEvent() {
   const confirmDelete = async () => {
     if (!eventToDelete) return;
     try {
-      const res = await fetch(`http://localhost:3000/api/events/${eventToDelete}?userId=${user.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/events/${eventToDelete}?userId=${user.id}`, { method: 'DELETE' });
       if (res.ok) {
         setMyEvents(prev => prev.filter(event => event.id !== eventToDelete));
         setEventToDelete(null); // Tutup modal

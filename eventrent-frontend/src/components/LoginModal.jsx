@@ -23,7 +23,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
         });
         const googleUser = await res.json();
         
-        const backendRes = await fetch('http://localhost:3000/api/auth/google', {
+        const backendRes = await fetch('/api/auth/google', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -62,7 +62,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
       : { email: formData.email, password: formData.password };
 
     try {
-      const res = await fetch(`http://localhost:3000/api/auth/${endpoint}`, {
+      const res = await fetch(`/api/auth/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

@@ -30,7 +30,7 @@ export default function App() {
   });
 
   useEffect(() => {
-    fetch('http://localhost:3000/api/events')
+    fetch('/api/events')
       .then(res => res.json())
       .then(data => {
         setEvents(Array.isArray(data) ? data : []);

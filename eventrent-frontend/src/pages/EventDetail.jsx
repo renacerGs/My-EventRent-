@@ -40,12 +40,12 @@ export default function EventDetail() {
   useEffect(() => {
     const fetchEventDetail = async () => {
       try {
-        const response = await fetch(`http://localhost:3000/api/events/${id}`);
+        const response = await fetch(`/api/events/${id}`);
         if (!response.ok) throw new Error('Gagal mengambil data event');
         const data = await response.json();
         setEvent(data);
         
-        fetch(`http://localhost:3000/api/events/${id}/view`, { method: 'POST' }).catch(() => {});
+        fetch(`/api/events/${id}/view`, { method: 'POST' }).catch(() => {});
         
         const savedLikes = JSON.parse(localStorage.getItem('likedEvents')) || [];
         setIsLiked(savedLikes.some(item => String(item.id) === String(id)));
@@ -66,7 +66,7 @@ export default function EventDetail() {
     // Alert diubah jadi pop-up keren
     if (!user) return showPopup("Login dulu bro buat nyimpen event ke Wishlist!", "error");
     try {
-      const res = await fetch('http://localhost:3000/api/likes/toggle', {
+      const res = await fetch('/api/likes/toggle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, eventId: event.id })

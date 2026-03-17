@@ -88,7 +88,7 @@ export default function Checkout() {
     // --- Validasi redirect login DIBUANG agar Guest bisa masuk ---
     const fetchEvent = async () => {
       try {
-        const res = await fetch(`http://localhost:3000/api/events/${id}`);
+        const res = await fetch(`/api/events/${id}`);
         if (!res.ok) throw new Error("Gagal load");
         const data = await res.json();
         setEvent(data);
@@ -204,7 +204,7 @@ export default function Checkout() {
         formAnswers: formAnswers 
       };
       
-      const res = await fetch('http://localhost:3000/api/tickets/buy', {
+      const res = await fetch('/api/tickets/buy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

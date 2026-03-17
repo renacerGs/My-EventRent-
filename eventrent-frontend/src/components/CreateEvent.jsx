@@ -11,7 +11,6 @@ export default function CreateEvent() {
 
   const categoriesList = ['Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports'];
 
-  // STATE UTAMA (Ditambah array 'options' di questions bawaan)
   const [formData, setFormData] = useState({
     title: '', description: '', eventStart: '', eventEnd: '', phone: '', category: '',
     location: { namePlace: '', place: '', city: '', province: '', mapUrl: '' },
@@ -24,12 +23,11 @@ export default function CreateEvent() {
     ]
   });
 
-  // STATE UNTUK GAMBAR
   const [imagePreview, setImagePreview] = useState(null);
   const [imageBase64, setImageBase64] = useState(''); 
   const [isLoading, setIsLoading] = useState(false);
 
-  // --- HANDLERS ---
+  // --- HANDLERS DASAR ---
   const handleEventChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
   
   const handleLocationChange = (e) => {
@@ -46,8 +44,9 @@ export default function CreateEvent() {
     }
   };
 
+  // --- 🔥 HANDLERS ARRAY DEEP COPY (BIAR GAK FREEZE PAS NGETIK) 🔥 ---
   const handleSessionChange = (index, field, value) => {
-    const updated = [...formData.sessions];
+    const updated = JSON.parse(JSON.stringify(formData.sessions));
     updated[index][field] = value;
     if (field === 'typeEvent' && value === 'Free') updated[index]['price'] = 0;
     setFormData({ ...formData, sessions: updated });
@@ -71,10 +70,9 @@ export default function CreateEvent() {
   };
 
   const handleQuestionChange = (sIndex, qIndex, field, value) => {
-    const updated = [...formData.sessions];
+    const updated = JSON.parse(JSON.stringify(formData.sessions));
     updated[sIndex].questions[qIndex][field] = value;
     
-    // Pastikan array options selalu ada jika user switch ke Dropdown/Checkbox
     if (field === 'type' && (value === 'Dropdown' || value === 'Checkbox')) {
       if (!updated[sIndex].questions[qIndex].options || updated[sIndex].questions[qIndex].options.length === 0) {
         updated[sIndex].questions[qIndex].options = [''];
@@ -85,37 +83,36 @@ export default function CreateEvent() {
   };
 
   const addQuestion = (sIndex) => {
-    const updated = [...formData.sessions];
+    const updated = JSON.parse(JSON.stringify(formData.sessions));
     updated[sIndex].questions.push({ id: crypto.randomUUID(), text: '', type: 'Text', isRequired: true, options: [''] });
     setFormData({ ...formData, sessions: updated });
   };
 
   const removeQuestion = (sIndex, qIndex) => {
-    const updated = [...formData.sessions];
+    const updated = JSON.parse(JSON.stringify(formData.sessions));
     updated[sIndex].questions = updated[sIndex].questions.filter((_, i) => i !== qIndex);
     setFormData({ ...formData, sessions: updated });
   };
 
-  // --- HANDLER BARU UNTUK OPTION DROPDOWN & CHECKBOX ---
   const addQuestionOption = (sIndex, qIndex) => {
-    const updated = [...formData.sessions];
+    const updated = JSON.parse(JSON.stringify(formData.sessions));
     updated[sIndex].questions[qIndex].options.push('');
     setFormData({ ...formData, sessions: updated });
   };
 
   const updateQuestionOption = (sIndex, qIndex, optIndex, value) => {
-    const updated = [...formData.sessions];
+    const updated = JSON.parse(JSON.stringify(formData.sessions));
     updated[sIndex].questions[qIndex].options[optIndex] = value;
     setFormData({ ...formData, sessions: updated });
   };
 
   const removeQuestionOption = (sIndex, qIndex, optIndex) => {
-    const updated = [...formData.sessions];
+    const updated = JSON.parse(JSON.stringify(formData.sessions));
     updated[sIndex].questions[qIndex].options.splice(optIndex, 1);
     setFormData({ ...formData, sessions: updated });
   };
 
-  // --- SUBMIT DATA KE BACKEND ---
+  // --- 🌐 SUBMIT DATA KE BACKEND (UDAH DISESUAIKAN BUAT CLOUD) 🌐 ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
@@ -127,7 +124,8 @@ export default function CreateEvent() {
           img: imageBase64 
       };
 
-      const response = await fetch('http://localhost:3000/api/events', {
+      // 👇 INI YANG UDAH DIHAPUS LOCALHOST-NYA 👇
+      const response = await fetch('/api/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -350,7 +348,7 @@ export default function CreateEvent() {
             + Add Another Session / Category
           </button>
 
-          {/* SECTION 4: FORM BUILDER - DIPERBARUI */}
+          {/* SECTION 4: FORM BUILDER */}
           <div className="space-y-8">
             {formData.sessions.map((session, sIndex) => (
               <div key={`formbuilder-${session.id}`} className="bg-white rounded-[24px] shadow-sm p-8 border border-gray-200">
@@ -366,24 +364,29 @@ export default function CreateEvent() {
 
                 {session.questions.map((q, qIndex) => (
                   <div key={q.id} className="border border-orange-100 rounded-xl p-5 mb-4 shadow-sm relative border-l-4 border-l-[#FF6B35] bg-orange-50/20">
-                    <div className="flex gap-4 mb-3">
-                      <input 
-                        type="text" 
-                        placeholder="Ketik pertanyaan custom di sini (Ex: Ukuran Kaos)" 
-                        value={q.text} 
-                        onChange={(e) => handleQuestionChange(sIndex, qIndex, 'text', e.target.value)} 
-                        className={`${inputStyle} flex-1 border-orange-200`} 
-                        required 
-                      />
-                      <select 
-                        value={q.type} 
-                        onChange={(e) => handleQuestionChange(sIndex, qIndex, 'type', e.target.value)} 
-                        className={`${inputStyle} w-40 border-orange-200 cursor-pointer font-semibold`}
-                      >
-                        <option value="Text">Teks Singkat</option>
-                        <option value="Dropdown">Dropdown</option>
-                        <option value="Checkbox">Checkbox</option>
-                      </select>
+                    
+                    <div className="flex flex-col md:flex-row gap-4 mb-3 w-full">
+                      <div className="flex-1 min-w-0">
+                        <input 
+                          type="text" 
+                          placeholder="Ketik pertanyaan custom di sini (Ex: Ukuran Kaos)" 
+                          value={q.text} 
+                          onChange={(e) => handleQuestionChange(sIndex, qIndex, 'text', e.target.value)} 
+                          className={`${inputStyle} w-full border-orange-200`} 
+                          required 
+                        />
+                      </div>
+                      <div className="w-full md:w-48 shrink-0">
+                        <select 
+                          value={q.type} 
+                          onChange={(e) => handleQuestionChange(sIndex, qIndex, 'type', e.target.value)} 
+                          className={`${inputStyle} w-full border-orange-200 cursor-pointer font-semibold`}
+                        >
+                          <option value="Text">Teks Singkat</option>
+                          <option value="Dropdown">Dropdown</option>
+                          <option value="Checkbox">Checkbox</option>
+                        </select>
+                      </div>
                     </div>
 
                     {/* RENDER JAWABAN BERDASARKAN TIPE */}

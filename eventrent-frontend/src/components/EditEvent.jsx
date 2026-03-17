@@ -45,7 +45,7 @@ export default function EditEvent() {
   useEffect(() => {
     if (!user) { navigate('/'); return; }
 
-    fetch(`http://localhost:3000/api/events/${id}`) 
+    fetch(`/api/events/${id}`) 
       .then(res => {
         if (!res.ok) throw new Error("Gagal load event");
         return res.json();
@@ -109,7 +109,7 @@ export default function EditEvent() {
         img: imageBase64 
       };
 
-      const res = await fetch(`http://localhost:3000/api/events/${id}?userId=${user.id}`, {
+      const res = await fetch(`/api/events/${id}?userId=${user.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

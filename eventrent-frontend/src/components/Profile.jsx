@@ -80,7 +80,7 @@ export default function Profile() {
     e.preventDefault();
     setIsLoadingProfile(true);
     try {
-      const res = await fetch(`http://localhost:3000/api/users/${user.id}`, {
+      const res = await fetch(`/api/users/${user.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, img: imageBase64 })
@@ -127,7 +127,7 @@ export default function Profile() {
 
     setIsLoadingPass(true);
     try {
-      const res = await fetch(`http://localhost:3000/api/users/${user.id}/password`, {
+      const res = await fetch(`/api/users/${user.id}/password`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ oldPass: passData.oldPass, newPass: passData.newPass })

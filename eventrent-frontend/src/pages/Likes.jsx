@@ -51,7 +51,7 @@ export default function Likes() {
       }
       try {
         setLoading(true);
-        const response = await axios.get(`http://localhost:3000/api/likes/my?userId=${user.id}`);
+        const response = await axios.get(`/api/likes/my?userId=${user.id}`);
         if (response.data) {
           setLikedEvents(response.data);
           localStorage.setItem('likedEvents', JSON.stringify(response.data));
@@ -81,7 +81,7 @@ export default function Likes() {
     setEventToUnlike(null);
     
     try {
-      await axios.post('http://localhost:3000/api/likes/toggle', {
+      await axios.post('/api/likes/toggle', {
         userId: user.id,
         eventId: eventToUnlike
       });

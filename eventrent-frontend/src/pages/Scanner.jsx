@@ -30,7 +30,7 @@ export default function Scanner() {
     }
 
     try {
-      const res = await fetch('http://localhost:3000/api/tickets/scan', {
+      const res = await fetch('/api/tickets/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticketId, eventId, userId: user?.id })

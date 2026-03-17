@@ -65,7 +65,7 @@ export default function MyTickets() {
         return;
       }
       try {
-        const response = await axios.get(`http://localhost:3000/api/tickets/my?userId=${user.id}`);
+        const response = await axios.get(`/api/tickets/my?userId=${user.id}`);
         const rawTickets = response.data;
 
         const grouped = {};

@@ -21,10 +21,10 @@ export default function EventDashboard() {
       if (isBackground) setIsRefreshing(true);
       else setLoading(true);
       
-      const resEvent = await fetch(`http://localhost:3000/api/events/${id}`);
+      const resEvent = await fetch(`/api/events/${id}`);
       const eventData = await resEvent.json();
 
-      const resAttendees = await fetch(`http://localhost:3000/api/events/${id}/attendees?userId=${user?.id}`);
+      const resAttendees = await fetch(`/api/events/${id}/attendees?userId=${user?.id}`);
       const dataAttendees = await resAttendees.json();
 
       // --- MENGELOMPOKKAN TIKET (SOLUSI DOBEL) ---
@@ -82,7 +82,7 @@ export default function EventDashboard() {
     setConfirmDialog({ show: false, ticketId: null }); 
 
     try {
-      const res = await fetch('http://localhost:3000/api/tickets/scan', {
+      const res = await fetch('/api/tickets/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticketId: ticketId, eventId: parseInt(id), userId: user?.id })
