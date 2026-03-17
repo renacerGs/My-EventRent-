@@ -25,8 +25,11 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
 
-  await app.listen(3000);
-  console.log('🚀 Backend NestJS berjalan di http://localhost:3000');
-  console.log('📄 Swagger UI bisa dibuka di http://localhost:3000/api-docs');
+  // 👇👇👇 PERUBAHAN PORT UNTUK CLOUD (RENDER) 👇👇👇
+  const port = process.env.PORT || 3000;
+  await app.listen(port, '0.0.0.0'); // '0.0.0.0' wajib biar Render bisa buka pintunya
+  
+  console.log(`🚀 Backend NestJS berjalan di port ${port}`);
+  console.log(`📄 Swagger UI siap meluncur`);
 }
 bootstrap();

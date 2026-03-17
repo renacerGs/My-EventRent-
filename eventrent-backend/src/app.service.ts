@@ -9,12 +9,12 @@ export class AppService implements OnModuleInit {
   private transporter: nodemailer.Transporter; // <-- SETUP EMAIL
 
   constructor() {
+    // 👇👇👇 KONEKSI DATABASE AWAN (SUPABASE) 👇👇👇
     this.pool = new Pool({
-      user: 'postgres',
-      host: 'localhost',
-      database: 'eventrent_db',
-      password: 'crissyen26', 
-      port: 5432,
+      connectionString: 'postgresql://postgres:Eventrent_CAH4@db.fxmyvyqioycwvbbissal.supabase.co:5432/postgres', // <-- GANTI TEKS INI SAMA LINK URI SUPABASE LU!
+      ssl: {
+        rejectUnauthorized: false, // Wajib untuk cloud database
+      },
     });
 
     // --- SETUP NODEMAILER (GMAIL) ---
