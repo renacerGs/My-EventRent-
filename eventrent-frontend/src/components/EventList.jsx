@@ -111,19 +111,33 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
     <main className="max-w-6xl mx-auto px-6 py-10 font-sans">
       
       <div className="mb-10">
-        <h2 className="text-xl font-bold text-gray-900 mb-5">Browse by category</h2>
-        <div className="flex flex-wrap gap-2">
+        {/* 👇👇 JURUS UX AFFORDANCE DI SINI 👇👇 */}
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-xl font-bold text-gray-900">Browse by category</h2>
+          
+          {/* Tulisan "Geser" yang goyang-goyang, CUMA MUNCUL DI HP (sm:hidden) */}
+          <div className="sm:hidden flex items-center gap-1.5 text-[10px] font-black text-[#FF6B35] uppercase tracking-widest animate-pulse">
+            <span>Geser</span>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+            </svg>
+          </div>
+        </div>
+        {/* 👆👆 BATAS JURUS UX 👆👆 */}
+        
+        <div className="flex flex-nowrap sm:flex-wrap overflow-x-auto gap-2 pb-3 sm:pb-0 snap-x pr-8 sm:pr-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {categories.map(cat => (
             <button 
               key={cat} 
               onClick={() => handleCategoryClick(cat)} 
-              className={`px-5 py-2 rounded-2xl text-xs font-bold transition-all ${activeCategory === cat ? 'bg-[#FF6B35] text-white shadow-md' : 'bg-white text-gray-500 border border-gray-100 hover:bg-gray-50'}`}>
+              className={`shrink-0 snap-start px-5 py-2 rounded-2xl text-xs font-bold transition-all ${activeCategory === cat ? 'bg-[#FF6B35] text-white shadow-md' : 'bg-white text-gray-500 border border-gray-100 hover:bg-gray-50'}`}>
               {cat}
             </button>
           ))}
         </div>
       </div>
 
+      {/* SISA KODINGAN CARD EVENT TETAP SAMA */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
         {filteredEvents.length > 0 ? (
           filteredEvents.map(event => (

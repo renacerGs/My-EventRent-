@@ -122,9 +122,11 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
 
       <div className="flex items-center gap-2 md:gap-3 shrink-0">
         
-        {/* 👇👇👇 TOMBOL CEK TIKET (BARU) 👇👇👇 */}
+        {/* 👇👇👇 TOMBOL CEK TIKET YANG UDAH DI GANTI IKON TIKETNYA 👇👇👇 */}
         <Link to="/cek-tiket" className="flex items-center justify-center gap-1.5 bg-white border border-gray-200 text-gray-500 w-9 h-9 md:w-auto md:px-5 md:py-2.5 rounded-full font-bold text-[10px] md:text-xs uppercase tracking-wider hover:text-[#FF6B35] hover:border-orange-200 hover:bg-orange-50 transition shadow-sm shrink-0">
-          <svg className="w-[16px] h-[16px] md:w-[18px] md:h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          <svg className="w-[16px] h-[16px] md:w-[18px] md:h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path>
+          </svg>
           <span className="hidden md:inline">Cek Tiket</span>
         </Link>
 

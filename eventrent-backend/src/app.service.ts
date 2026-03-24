@@ -11,7 +11,8 @@ export class AppService implements OnModuleInit {
   constructor() {
     // 👇👇👇 KONEKSI DATABASE AWAN (SUPABASE) 👇👇👇
     this.pool = new Pool({
-      connectionString: 'postgresql://postgres:Eventrent_CAH4@db.fxmyvyqioycwvbbissal.supabase.co:5432/postgres', // <-- GANTI TEKS INI SAMA LINK URI SUPABASE LU!
+      
+      connectionString: 'postgresql://postgres.fxmyvyqioycwvbbissal:Eventrent_CAH4@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres', // <-- GANTI TEKS INI SAMA LINK URI SUPABASE LU!
       ssl: {
         rejectUnauthorized: false, // Wajib untuk cloud database
       },

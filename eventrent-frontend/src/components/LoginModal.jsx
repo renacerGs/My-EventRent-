@@ -37,8 +37,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
         if (!backendRes.ok) throw new Error("Gagal login dengan Google dari Server");
         
         const loggedInUser = await backendRes.json();
-        
-        // Panggil onLoginSuccess, App.jsx yang bakal nangani nyimpen ke localStorage
         onLoginSuccess(loggedInUser); 
         
       } catch (err) {
@@ -88,46 +86,67 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 font-sans">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6 font-sans">
       <motion.div 
-        initial={{ opacity: 0, scale: 0.9 }}
+        initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-white w-full max-w-[800px] h-[550px] rounded-[40px] shadow-2xl relative overflow-hidden flex"
+        // 👇 PERBAIKAN: Tinggi auto di HP, tinggi fixed 550px di Laptop 👇
+        className="bg-white w-full max-w-[800px] h-auto md:h-[550px] min-h-[450px] rounded-[32px] md:rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col md:flex-row"
       >
-        {/* Tombol Close tetap di pojok */}
-        <button onClick={onClose} className="absolute top-6 right-8 text-gray-400 hover:text-gray-900 text-2xl font-bold transition-all z-[110]">&times;</button>
+        {/* Tombol Close */}
+        <button onClick={onClose} className="absolute top-5 right-6 md:top-6 md:right-8 text-gray-400 hover:text-gray-900 text-3xl md:text-2xl font-black transition-all z-[110] leading-none">&times;</button>
 
         {/* 1. CONTAINER FORM (KIRI/KANAN BERGANTUNG MODE) */}
-        <div className={`w-1/2 h-full p-12 flex flex-col justify-center transition-all duration-700 ease-in-out ${isSignUp ? 'translate-x-full' : 'translate-x-0'}`}>
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-black text-gray-900 tracking-tighter uppercase italic">{isSignUp ? 'Create Account' : 'Sign In'}</h2>
-            <div className="flex gap-4 justify-center mt-4">
-              <button onClick={() => loginWithGoogle()} className="w-10 h-10 rounded-full border border-gray-100 flex items-center justify-center hover:bg-gray-50 transition-all shadow-sm active:scale-90">
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
+        {/* 👇 PERBAIKAN: Lebar 100% di HP, 50% di Laptop. Animasi geser cuma jalan di Laptop (md:translate-x-full) 👇 */}
+        <div className={`w-full md:w-1/2 h-full p-8 sm:p-12 flex flex-col justify-center transition-transform duration-700 ease-in-out ${isSignUp ? 'md:translate-x-full' : 'translate-x-0'}`}>
+          <div className="text-center mb-6 md:mb-8 mt-4 md:mt-0">
+            <h2 className="text-2xl md:text-3xl font-black text-gray-900 tracking-tighter uppercase italic">
+              {isSignUp ? 'Create Account' : 'Sign In'}
+            </h2>
+            <div className="flex gap-4 justify-center mt-5 md:mt-4">
+              <button type="button" onClick={() => loginWithGoogle()} className="w-12 h-12 md:w-10 md:h-10 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-all shadow-sm active:scale-90">
+                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 md:w-4 md:h-4" alt="Google" />
               </button>
             </div>
-            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-6">or use your email account</p>
+            <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-5 md:mt-6">or use your email account</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {isSignUp && (
-              <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Full Name" className="w-full px-5 py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-[#FF6B35]/20 focus:bg-white transition-all text-sm" required />
+              <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Full Name" className="w-full px-5 py-3.5 md:py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:bg-white border border-transparent focus:border-orange-100 transition-all text-sm" required />
             )}
-            <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Email" className="w-full px-5 py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-[#FF6B35]/20 focus:bg-white transition-all text-sm" required />
-            <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="Password" className="w-full px-5 py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-[#FF6B35]/20 focus:bg-white transition-all text-sm" required />
+            <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Email" className="w-full px-5 py-3.5 md:py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:bg-white border border-transparent focus:border-orange-100 transition-all text-sm" required />
+            <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="Password" className="w-full px-5 py-3.5 md:py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:bg-white border border-transparent focus:border-orange-100 transition-all text-sm" required />
             
-            {errorMsg && <p className="text-red-500 text-[10px] text-center font-bold bg-red-50 py-2 rounded-xl italic">{errorMsg}</p>}
-            {successMsg && <p className="text-green-600 text-[10px] text-center font-bold bg-green-50 py-2 rounded-xl italic">{successMsg}</p>}
+            {errorMsg && <p className="text-red-500 text-[10px] text-center font-bold bg-red-50 py-2.5 rounded-xl italic">{errorMsg}</p>}
+            {successMsg && <p className="text-green-600 text-[10px] text-center font-bold bg-green-50 py-2.5 rounded-xl italic">{successMsg}</p>}
 
-            <button type="submit" disabled={isLoading} className="w-full py-4 bg-[#FF6B35] text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-orange-100 hover:bg-[#e85526] transition-all active:scale-95 disabled:opacity-50 italic">
+            <button type="submit" disabled={isLoading} className="w-full py-4 bg-[#FF6B35] text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-[0_8px_20px_-6px_rgba(255,107,53,0.5)] hover:bg-[#e85526] hover:shadow-lg hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50 italic mt-2">
               {isLoading ? 'Processing...' : (isSignUp ? 'Sign Up' : 'Sign In')}
             </button>
           </form>
+
+          {/* 👇👇👇 FITUR KHUSUS MODE HP (Tombol Ganti Mode) 👇👇👇 */}
+          <div className="md:hidden mt-8 pt-6 border-t border-gray-100 text-center">
+             <p className="text-[11px] text-gray-500 font-medium">
+               {isSignUp ? "Already have an account?" : "Don't have an account?"}
+             </p>
+             <button 
+               type="button" 
+               onClick={() => { setIsSignUp(!isSignUp); setErrorMsg(''); setSuccessMsg(''); }}
+               className="mt-2 text-[#FF6B35] font-black text-xs uppercase tracking-widest active:scale-95 transition-transform"
+             >
+               {isSignUp ? "Sign In Here" : "Create Account"}
+             </button>
+          </div>
+          {/* 👆👆👆 BATAS FITUR KHUSUS HP 👆👆👆 */}
+
         </div>
 
-        {/* 2. OVERLAY PANEL (ORANGE) YANG BERGESER */}
+        {/* 2. OVERLAY PANEL (ORANGE) YANG BERGESER (KHUSUS LAPTOP) */}
+        {/* 👇 PERBAIKAN: Ditambah class "hidden md:flex" biar ngilang di HP 👇 */}
         <div 
-          className={`absolute top-0 left-0 w-1/2 h-full transition-all duration-700 ease-in-out z-100 
+          className={`hidden md:flex absolute top-0 left-0 w-1/2 h-full transition-transform duration-700 ease-in-out z-100 
           ${isSignUp ? '-translate-x-0' : 'translate-x-full'}`}
         >
           <div className="bg-[#FF6B35] h-full w-full flex flex-col items-center justify-center text-white p-12 text-center relative overflow-hidden">
@@ -151,6 +170,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                     : "Sign up if you still don't have an account and join the party!"}
                 </p>
                 <button 
+                  type="button"
                   onClick={() => { setIsSignUp(!isSignUp); setErrorMsg(''); setSuccessMsg(''); }}
                   className="px-12 py-3 border-2 border-white rounded-2xl font-black uppercase text-[10px] tracking-[2px] hover:bg-white hover:text-[#FF6B35] transition-all active:scale-90"
                 >

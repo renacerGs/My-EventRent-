@@ -8,8 +8,8 @@ import { AppService } from './app.service';
   imports: [
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'client'), 
-      // 👇 INI DIA FORMAT VERSI TERBARUNYA (Pake :path*) 👇
-      exclude: ['/api/:path*', '/api-docs/:path*'], 
+      // 👇 FORMAT PALING DEWA & AMAN BUAT EXPRESS V5 👇
+      exclude: ['/api', '/api/*path', '/api-docs', '/api-docs/*path'], 
     }),
   ],
   controllers: [AppController],
