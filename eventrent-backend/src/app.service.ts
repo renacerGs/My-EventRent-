@@ -1,29 +1,31 @@
 import { Injectable, OnModuleInit, InternalServerErrorException, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt'; 
-import * as nodemailer from 'nodemailer'; // <-- IMPORT NODEMAILER
+import * as nodemailer from 'nodemailer';
+import * as dotenv from 'dotenv'; // <-- Tambahan untuk baca .env
+
+dotenv.config(); // <-- Pastikan .env terbaca
 
 @Injectable()
 export class AppService implements OnModuleInit {
   private pool: Pool;
-  private transporter: nodemailer.Transporter; // <-- SETUP EMAIL
+  private transporter: nodemailer.Transporter;
 
   constructor() {
-    // 👇👇👇 KONEKSI DATABASE AWAN (SUPABASE) 👇👇👇
+    // 👇👇👇 KONEKSI DATABASE SEKARANG AMAN (DARI .ENV) 👇👇👇
     this.pool = new Pool({
-      
-      connectionString: 'postgresql://postgres.fxmyvyqioycwvbbissal:Eventrent_CAH4@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres', // <-- GANTI TEKS INI SAMA LINK URI SUPABASE LU!
+      connectionString: process.env.DATABASE_URL, 
       ssl: {
-        rejectUnauthorized: false, // Wajib untuk cloud database
+        rejectUnauthorized: false,
       },
     });
 
-    // --- SETUP NODEMAILER (GMAIL) ---
+    // --- SETUP NODEMAILER SEKARANG AMAN (DARI .ENV) ---
     this.transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: 'renacergosyen@gmail.com', // GANTI: Email Gmail lu
-        pass: 'aatd cyiv derw imhn'    // GANTI: App Password Gmail lu (Bukan password biasa)
+        user: process.env.EMAIL_USER, 
+        pass: process.env.EMAIL_PASS  
       }
     });
   }
@@ -33,7 +35,6 @@ export class AppService implements OnModuleInit {
       await this.pool.query('SELECT 1');
       console.log('Berhasil terhubung ke database PostgreSQL EventRent!');
       
-      // --- AUTO MIGRATE: Nambahin kolom guest_email ---
       await this.pool.query(`
         ALTER TABLE tickets 
         ADD COLUMN IF NOT EXISTS is_scanned BOOLEAN DEFAULT FALSE,
@@ -300,7 +301,6 @@ export class AppService implements OnModuleInit {
 
   // --- TICKETS, ATTENDEES, & SCANNER ---
   
-  // PERBAIKAN: Fungsi Buy Ticket OPSI B (1 Tiket = 1 Baris di Database)
   async buyTicket(userId: number | null, eventId: number, cart: any[], formAnswers: any, guestEmail?: string) {
     const client = await this.pool.connect();
     try {
@@ -309,11 +309,9 @@ export class AppService implements OnModuleInit {
       const boughtTickets: number[] = [];
       let totalTransactionPrice = 0;
 
-      // Ambil Judul Event buat dikirim ke Email
       const evRes = await client.query('SELECT title FROM events WHERE id = $1', [eventId]);
       const eventTitle = evRes.rows.length > 0 ? evRes.rows[0].title : 'Event';
 
-      // Jika ada userId, cari email dari tabel users. Jika guest, pakai guestEmail
       let targetEmail = guestEmail;
       if (userId) {
         const uRes = await client.query('SELECT email FROM users WHERE id = $1', [userId]);
@@ -335,7 +333,6 @@ export class AppService implements OnModuleInit {
         const qRes = await client.query('SELECT id, question_text FROM session_questions WHERE session_id = $1', [sessionId]);
         const dbQuestions = qRes.rows;
 
-        // --- INILAH OPSI B: Lakukan perulangan untuk memecah tiket menjadi baris terpisah ---
         for (let i = 0; i < qty; i++) {
           const prefix = `cart-${item.id}-ticket-${i}`;
           const name = formAnswers[`${prefix}-nama`] || `Peserta ${i + 1}`;
@@ -349,13 +346,10 @@ export class AppService implements OnModuleInit {
              }
           }
 
-          // Format Attendee menjadi array dengan 1 item saja
           const singleAttendeeData = [{ name, email, customAnswers }];
-          
           const singlePrice = session.price;
           totalTransactionPrice += Number(singlePrice);
 
-          // INSERT 1 BARIS TIKET DENGAN QTY = 1
           const ticketRes = await client.query(
             `INSERT INTO tickets (event_id, session_id, user_id, quantity, total_price, guest_email, attendee_data) 
              VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
@@ -369,7 +363,6 @@ export class AppService implements OnModuleInit {
 
       await client.query('COMMIT');
 
-      // --- KIRIM EMAIL SETELAH COMMIT SUKSES (TIDAK BLOCKING) ---
       if (targetEmail) {
         this.sendEmailReceipt(targetEmail, eventTitle, boughtTickets, totalTransactionPrice)
           .catch(e => console.error("Gagal mengirim email struk:", e)); 
@@ -387,7 +380,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // --- FUNGSI PRIVAT UNTUK NGIRIM EMAIL (NODEMAILER) ---
   private async sendEmailReceipt(targetEmail: string, eventTitle: string, ticketIds: number[], totalPrice: number) {
     const mailOptions = {
       from: '"EventRent System" <noreply@eventrent.com>',
@@ -413,11 +405,8 @@ export class AppService implements OnModuleInit {
     await this.transporter.sendMail(mailOptions);
   }
 
-  // --- TIMPA FUNGSI trackTicket INI DI app.service.ts ---
   async trackTicket(ticketId: number, email: string) {
     try {
-      // 1. Ambil event_id dan purchase_date 
-      // (Kita ubah waktunya jadi TEXT di database "::text" biar presisi milidetiknya gak hilang saat masuk NodeJS)
       const checkQuery = `
         SELECT t.event_id, t.purchase_date::text as exact_time
         FROM tickets t
@@ -432,7 +421,6 @@ export class AppService implements OnModuleInit {
 
       const { event_id, exact_time } = checkRes.rows[0];
 
-      // 2. Ambil semua rombongan tiket menggunakan event_id dan exact_time (sebagai teks)
       const query = `
         SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price, t.attendee_data, t.is_scanned,
                e.id as event_id, e.title, e.image_url as img, 
@@ -453,7 +441,7 @@ export class AppService implements OnModuleInit {
       return rows; 
     } catch (err) {
       if (err instanceof NotFoundException) throw err;
-      console.error("Error dari Database:", err); // Biar kalau error lagi, kelihatan di terminal backend
+      console.error("Error dari Database:", err); 
       throw new InternalServerErrorException('Gagal melacak tiket di server.');
     }
   }
@@ -504,7 +492,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // --- FUNGSI VALIDASI SCANNER QR CODE ---
   async scanTicket(ticketId: number, eventId: number, userId: number) {
     try {
       const eventCheck = await this.pool.query('SELECT created_by FROM events WHERE id = $1', [eventId]);
@@ -555,16 +542,29 @@ export class AppService implements OnModuleInit {
   async loginWithGoogle(user: any) {
     try {
       const checkRes = await this.pool.query('SELECT * FROM users WHERE email = $1', [user.email]);
+      // Kalau user udah ada, langsung return aja (nggak perlu merge lagi karena udah pernah)
       if (checkRes.rows.length > 0) return checkRes.rows[0];
       
       const defaultPic = user.picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name)}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4`;
       
+      // Bikin user baru
       const insertRes = await this.pool.query(
         `INSERT INTO users (email, name, picture, google_id) VALUES ($1, $2, $3, $4) RETURNING *`,
         [user.email, user.name, defaultPic, user.googleId]
       );
-      return insertRes.rows[0];
+      
+      const newUser = insertRes.rows[0];
+
+            // Otomatis nge-link tiket guest ke user baru ini
+      await this.pool.query(
+        `UPDATE tickets SET user_id = $1 WHERE guest_email = $2 AND user_id IS NULL`,
+        [newUser.id, newUser.email]
+      );
+      console.log(`[Auth] Auto-merged guest tickets for: ${newUser.email}`);
+
+      return newUser;
     } catch (err) {
+      console.error(err);
       throw new InternalServerErrorException('Gagal login Google');
     }
   }
@@ -576,11 +576,22 @@ export class AppService implements OnModuleInit {
     const hashedPassword = await bcrypt.hash(data.password, 10);
     const defaultPic = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(data.name)}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4`;
     
+    // Bikin user baru
     const insertRes = await this.pool.query(
       `INSERT INTO users (name, email, password, picture) VALUES ($1, $2, $3, $4) RETURNING *`,
       [data.name, data.email, hashedPassword, defaultPic]
     );
-    const { password, ...user } = insertRes.rows[0];
+    
+    const newUser = insertRes.rows[0];
+
+    // Otomatis nge-link tiket guest ke user baru ini
+    await this.pool.query(
+      `UPDATE tickets SET user_id = $1 WHERE guest_email = $2 AND user_id IS NULL`,
+      [newUser.id, newUser.email]
+    );
+    console.log(`[Auth] Auto-merged guest tickets for: ${newUser.email}`);
+
+    const { password, ...user } = newUser;
     return user;
   }
 
