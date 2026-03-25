@@ -87,15 +87,11 @@ export default function Scanner() {
     navigate(-1); 
   };
 
-  // --- FUNGSI PINTAR BUAT NGAMBIL NAMA PESERTA ---
+  // 👇👇👇 INI YANG UDAH DIPERBAIKI (JAUH LEBIH SIMPLE!) 👇👇👇
   const getAttendeeName = () => {
     if (!ticketData) return 'Peserta';
-    // Coba ambil dari form tiket dulu (attendee_data)
-    if (ticketData.attendee_data && ticketData.attendee_data[0] && ticketData.attendee_data[0].name) {
-      return ticketData.attendee_data[0].name;
-    }
-    // Kalau gak ada (misal data lama), pakai nama akun pembeli
-    return ticketData.buyer_name || 'Guest/Tamu';
+    // Langsung tembak ke attendee_name yang baru, kalau kosong lari ke buyer_name
+    return ticketData.attendee_name || ticketData.buyer_name || 'Guest/Tamu';
   };
 
   return (
@@ -136,7 +132,6 @@ export default function Scanner() {
                 <p className="text-green-100 font-medium mb-6">{message}</p>
                 <div className="bg-black/20 rounded-2xl p-4 text-left mb-8">
                   <p className="text-[10px] text-green-200 uppercase tracking-widest mb-1">Nama Peserta</p>
-                  {/* 👇👇👇 INI YANG BERUBAH 👇👇👇 */}
                   <p className="text-xl font-black text-white leading-tight mb-1">{getAttendeeName()}</p>
                   <p className="text-sm text-green-100 font-medium">{ticketData?.session_name}</p>
                 </div>
@@ -156,7 +151,6 @@ export default function Scanner() {
                 {ticketData && (
                   <div className="bg-black/20 rounded-2xl p-4 text-left mb-8">
                     <p className="text-[10px] text-red-200 uppercase tracking-widest mb-1">Data Tiket Tercatat:</p>
-                    {/* 👇👇👇 INI JUGA BERUBAH 👇👇👇 */}
                     <p className="text-xl font-black text-white leading-tight mb-1">{getAttendeeName()}</p>
                     <p className="text-sm text-red-100 font-medium">{ticketData?.session_name}</p>
                   </div>

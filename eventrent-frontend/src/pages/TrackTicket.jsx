@@ -8,9 +8,8 @@ export default function TrackTicket() {
   const [ticketData, setTicketData] = useState([]); 
 
   const handleSearch = async (e) => {
-    e.preventDefault(); // Mencegah halaman ke-refresh
+    e.preventDefault(); 
 
-    // --- VALIDASI MANUAL (ANTI BATU) ---
     if (!formData.ticketId.trim() || !formData.email.trim()) {
       setError("Order ID dan Email wajib diisi bro!");
       return;
@@ -52,7 +51,6 @@ export default function TrackTicket() {
       </div>
 
       <div className="w-full max-w-md bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 mb-12">
-        {/* Hapus required di HTML, biarkan React yang ngatur errornya */}
         <form onSubmit={handleSearch} className="flex flex-col gap-5">
           <div>
             <label className="block text-xs font-black text-gray-900 uppercase tracking-widest mb-2">Order ID</label>
@@ -76,7 +74,6 @@ export default function TrackTicket() {
             />
           </div>
           
-          {/* Tombol bisa ditekan dengan onClick sebagai backup */}
           <button 
             type="submit" 
             onClick={handleSearch}
@@ -87,7 +84,6 @@ export default function TrackTicket() {
           </button>
         </form>
 
-        {/* PESAN ERROR MUNCUL DI SINI */}
         {error && (
           <div className="mt-6 p-4 bg-red-50 border border-red-100 text-red-500 text-sm font-bold rounded-2xl text-center flex items-center justify-center gap-2">
             <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -96,7 +92,6 @@ export default function TrackTicket() {
         )}
       </div>
 
-      {/* RENDER SEMUA TIKET SECARA LOOPING */}
       {ticketData && ticketData.length > 0 && (
         <div className="w-full max-w-4xl mx-auto flex flex-col gap-8">
           {ticketData.map((ticket, index) => (
@@ -134,7 +129,8 @@ export default function TrackTicket() {
                   <div className="pt-6 border-t border-dashed border-gray-200">
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Detail Peserta</p>
                     <div className="flex justify-between items-center bg-gray-50 px-4 py-2.5 rounded-xl border border-gray-100">
-                      <span className="text-sm font-black text-gray-900">{ticket.attendee_data?.[0]?.name || 'Peserta'}</span>
+                      {/* UPDATE: Langsung panggil attendee_name */}
+                      <span className="text-sm font-black text-gray-900">{ticket.attendee_name || 'Peserta'}</span>
                     </div>
                   </div>
                 </div>

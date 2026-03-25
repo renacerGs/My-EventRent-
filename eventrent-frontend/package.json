@@ -14,9 +14,11 @@
     "@yudiel/react-qr-scanner": "^2.5.1",
     "axios": "^1.13.6",
     "framer-motion": "^12.35.0",
+    "html2canvas": "^1.4.1",
     "lucide-react": "^0.575.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-easy-crop": "^5.5.7",
     "react-qr-code": "^2.0.18",
     "react-router-dom": "^7.13.1"
   },

@@ -2,9 +2,9 @@ import { Injectable, OnModuleInit, InternalServerErrorException, UnauthorizedExc
 import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt'; 
 import * as nodemailer from 'nodemailer';
-import * as dotenv from 'dotenv'; // <-- Tambahan untuk baca .env
+import * as dotenv from 'dotenv'; 
 
-dotenv.config(); // <-- Pastikan .env terbaca
+dotenv.config(); 
 
 @Injectable()
 export class AppService implements OnModuleInit {
@@ -12,7 +12,6 @@ export class AppService implements OnModuleInit {
   private transporter: nodemailer.Transporter;
 
   constructor() {
-    // 👇👇👇 KONEKSI DATABASE SEKARANG AMAN (DARI .ENV) 👇👇👇
     this.pool = new Pool({
       connectionString: process.env.DATABASE_URL, 
       ssl: {
@@ -20,7 +19,6 @@ export class AppService implements OnModuleInit {
       },
     });
 
-    // --- SETUP NODEMAILER SEKARANG AMAN (DARI .ENV) ---
     this.transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -35,13 +33,13 @@ export class AppService implements OnModuleInit {
       await this.pool.query('SELECT 1');
       console.log('Berhasil terhubung ke database PostgreSQL EventRent!');
       
+      // Auto-migrate kita sederhanakan karena perubahan besar udah dilakukan manual via DBeaver
       await this.pool.query(`
         ALTER TABLE tickets 
         ADD COLUMN IF NOT EXISTS is_scanned BOOLEAN DEFAULT FALSE,
-        ADD COLUMN IF NOT EXISTS scanned_at TIMESTAMP,
-        ADD COLUMN IF NOT EXISTS guest_email VARCHAR(255);
+        ADD COLUMN IF NOT EXISTS scanned_at TIMESTAMP;
       `);
-      console.log('Database Update: Kolom guest_email berhasil ditambahkan! 🚀');
+      console.log('Database Check: OK! 🚀');
 
     } catch (error) {
       console.error('Gagal terhubung ke database:', error);
@@ -301,6 +299,7 @@ export class AppService implements OnModuleInit {
 
   // --- TICKETS, ATTENDEES, & SCANNER ---
   
+  // ✅ UPDATE: Menggunakan kolom attendee_name, attendee_email, price, dan custom_answers (JSONB)
   async buyTicket(userId: number | null, eventId: number, cart: any[], formAnswers: any, guestEmail?: string) {
     const client = await this.pool.connect();
     try {
@@ -346,14 +345,13 @@ export class AppService implements OnModuleInit {
              }
           }
 
-          const singleAttendeeData = [{ name, email, customAnswers }];
           const singlePrice = session.price;
           totalTransactionPrice += Number(singlePrice);
 
           const ticketRes = await client.query(
-            `INSERT INTO tickets (event_id, session_id, user_id, quantity, total_price, guest_email, attendee_data) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-            [eventId, sessionId, userId, 1, singlePrice, targetEmail || null, JSON.stringify(singleAttendeeData)]
+            `INSERT INTO tickets (event_id, session_id, user_id, price, guest_email, attendee_name, attendee_email, custom_answers) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+            [eventId, sessionId, userId, singlePrice, targetEmail || null, name, email, JSON.stringify(customAnswers)]
           );
           
           const newTicketId = ticketRes.rows[0].id;
@@ -405,6 +403,7 @@ export class AppService implements OnModuleInit {
     await this.transporter.sendMail(mailOptions);
   }
 
+  // ✅ UPDATE: Sesuaikan Query Track Ticket 
   async trackTicket(ticketId: number, email: string) {
     try {
       const checkQuery = `
@@ -415,14 +414,13 @@ export class AppService implements OnModuleInit {
       `;
       const checkRes = await this.pool.query(checkQuery, [ticketId, email]);
       
-      if (checkRes.rows.length === 0) {
-        throw new NotFoundException('Tiket tidak ditemukan. Pastikan Order ID dan Email sudah benar.');
-      }
+      if (checkRes.rows.length === 0) throw new NotFoundException('Tiket tidak ditemukan. Pastikan Order ID dan Email sudah benar.');
 
       const { event_id, exact_time } = checkRes.rows[0];
 
       const query = `
-        SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price, t.attendee_data, t.is_scanned,
+        SELECT t.id as ticket_id, t.purchase_date, t.price, 
+               t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned,
                e.id as event_id, e.title, e.image_url as img, 
                TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date, e.place as location,
                s.name as session_name, TO_CHAR(s.session_date, 'Dy, DD Mon YYYY') as session_date, 
@@ -431,25 +429,23 @@ export class AppService implements OnModuleInit {
         JOIN events e ON t.event_id = e.id
         JOIN event_sessions s ON t.session_id = s.id
         LEFT JOIN users u ON t.user_id = u.id
-        WHERE t.event_id = $1
-          AND t.purchase_date::text = $2
-          AND (t.guest_email = $3 OR u.email = $3)
+        WHERE t.event_id = $1 AND t.purchase_date::text = $2 AND (t.guest_email = $3 OR u.email = $3)
         ORDER BY t.id ASC
       `;
       const { rows } = await this.pool.query(query, [event_id, exact_time, email]);
-      
-      return rows; 
+      return rows; // <-- Langsung return data murni!
     } catch (err) {
       if (err instanceof NotFoundException) throw err;
-      console.error("Error dari Database:", err); 
       throw new InternalServerErrorException('Gagal melacak tiket di server.');
     }
   }
 
+  // ✅ UPDATE: Sesuaikan Query Get My Tickets
   async getMyTickets(userId: number) {
     try {
       const query = `
-        SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price, t.attendee_data, t.is_scanned,
+        SELECT t.id as ticket_id, t.purchase_date, t.price, 
+               t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned,
                e.id as event_id, e.title, e.image_url as img, 
                TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date, e.place as location,
                s.name as session_name, TO_CHAR(s.session_date, 'Dy, DD Mon YYYY') as session_date, 
@@ -461,13 +457,13 @@ export class AppService implements OnModuleInit {
         ORDER BY t.purchase_date DESC
       `;
       const { rows } = await this.pool.query(query, [userId]);
-      return rows;
+      return rows; // <-- Langsung return data murni!
     } catch (err) {
-      console.error(err);
       throw new InternalServerErrorException('Gagal mengambil tiket saya');
     }
   }
 
+  // ✅ UPDATE: Sesuaikan Query Attendees
   async getEventAttendees(eventId: number, userId: number) {
     try {
       const eventCheck = await this.pool.query('SELECT created_by FROM events WHERE id = $1', [eventId]);
@@ -475,7 +471,8 @@ export class AppService implements OnModuleInit {
       if (eventCheck.rows[0].created_by != userId) throw new UnauthorizedException('Bukan pemilik event!');
 
       const query = `
-        SELECT t.id as ticket_id, t.purchase_date, t.quantity, t.total_price, t.attendee_data, t.is_scanned,
+        SELECT t.id as ticket_id, t.purchase_date, t.price,
+               t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned,
                u.name as buyer_name, COALESCE(u.email, t.guest_email) as buyer_email, u.picture as buyer_pic,
                s.name as session_name
         FROM tickets t
@@ -485,13 +482,14 @@ export class AppService implements OnModuleInit {
         ORDER BY t.purchase_date DESC
       `;
       const { rows } = await this.pool.query(query, [eventId]);
-      return rows;
+      return rows; // <-- Langsung return data murni!
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
       throw new InternalServerErrorException('Gagal mengambil data peserta');
     }
   }
 
+  // ✅ UPDATE: Sesuaikan Scanner
   async scanTicket(ticketId: number, eventId: number, userId: number) {
     try {
       const eventCheck = await this.pool.query('SELECT created_by FROM events WHERE id = $1', [eventId]);
@@ -499,7 +497,8 @@ export class AppService implements OnModuleInit {
       if (eventCheck.rows[0].created_by != userId) throw new UnauthorizedException('Akses ditolak! Kamu bukan panitia event ini.');
 
       const ticketRes = await this.pool.query(`
-        SELECT t.id, t.is_scanned, t.scanned_at, t.quantity, t.attendee_data,
+        SELECT t.id, t.is_scanned, t.scanned_at, t.price as total_price, 1 as quantity,
+               t.attendee_name, t.attendee_email, t.custom_answers,
                u.name as buyer_name, COALESCE(u.email, t.guest_email) as buyer_email, s.name as session_name
         FROM tickets t
         LEFT JOIN users u ON t.user_id = u.id
@@ -512,6 +511,8 @@ export class AppService implements OnModuleInit {
       }
 
       const ticket = ticketRes.rows[0];
+      // MAPPING BALIK SEBELUM DIKIRIM KE FRONTEND
+      ticket.attendee_data = [{ name: ticket.attendee_name, email: ticket.attendee_email, customAnswers: ticket.custom_answers }];
 
       if (ticket.is_scanned) {
         const scanWaktu = new Date(ticket.scanned_at).toLocaleString('id-ID');
@@ -542,12 +543,10 @@ export class AppService implements OnModuleInit {
   async loginWithGoogle(user: any) {
     try {
       const checkRes = await this.pool.query('SELECT * FROM users WHERE email = $1', [user.email]);
-      // Kalau user udah ada, langsung return aja (nggak perlu merge lagi karena udah pernah)
       if (checkRes.rows.length > 0) return checkRes.rows[0];
       
       const defaultPic = user.picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name)}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4`;
       
-      // Bikin user baru
       const insertRes = await this.pool.query(
         `INSERT INTO users (email, name, picture, google_id) VALUES ($1, $2, $3, $4) RETURNING *`,
         [user.email, user.name, defaultPic, user.googleId]
@@ -555,7 +554,6 @@ export class AppService implements OnModuleInit {
       
       const newUser = insertRes.rows[0];
 
-            // Otomatis nge-link tiket guest ke user baru ini
       await this.pool.query(
         `UPDATE tickets SET user_id = $1 WHERE guest_email = $2 AND user_id IS NULL`,
         [newUser.id, newUser.email]
@@ -576,7 +574,6 @@ export class AppService implements OnModuleInit {
     const hashedPassword = await bcrypt.hash(data.password, 10);
     const defaultPic = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(data.name)}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4`;
     
-    // Bikin user baru
     const insertRes = await this.pool.query(
       `INSERT INTO users (name, email, password, picture) VALUES ($1, $2, $3, $4) RETURNING *`,
       [data.name, data.email, hashedPassword, defaultPic]
@@ -584,7 +581,6 @@ export class AppService implements OnModuleInit {
     
     const newUser = insertRes.rows[0];
 
-    // Otomatis nge-link tiket guest ke user baru ini
     await this.pool.query(
       `UPDATE tickets SET user_id = $1 WHERE guest_email = $2 AND user_id IS NULL`,
       [newUser.id, newUser.email]

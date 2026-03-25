@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -25,8 +25,10 @@ export default function EventDetail() {
   const [loading, setLoading] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const user = JSON.parse(localStorage.getItem('user'));
+  
+  // Ref buat Scroll Container biar kita bisa mainin efek scrollnya
+  const scrollContainerRef = useRef(null);
 
-  // --- STATE POP-UP MODERN PENGGANTI ALERT ---
   const [popup, setPopup] = useState({ isOpen: false, message: '', type: 'info' });
 
   const showPopup = (message, type = 'info') => {
@@ -82,6 +84,13 @@ export default function EventDetail() {
       : `/checkout/${event.id}`;
       
     navigate(url);
+  };
+
+  // 👇 FUNGSI MANUAL SCROLL BIAR MAKIN SMOOTH DI HP 👇
+  const scrollRight = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: 300, behavior: 'smooth' });
+    }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-400 tracking-widest uppercase">Memuat Event...</div>;
@@ -206,30 +215,41 @@ export default function EventDetail() {
 
         </div>
 
-        {/* CARD SESSION HORIZONTAL SCROLL DI HP */}
-        <div className="bg-white rounded-[28px] md:rounded-[40px] shadow-sm border border-gray-100 p-6 md:p-12 mb-10 overflow-hidden">
+        {/* CARD SESSION HORIZONTAL SCROLL DI HP & VERTICAL SMOOTH SCROLL DI DESKTOP */}
+        <div className="bg-white rounded-[28px] md:rounded-[40px] shadow-sm border border-gray-100 p-6 md:p-12 mb-10 overflow-hidden relative">
           
-          {/* 👇👇 JURUS UX AFFORDANCE DI SINI 👇👇 */}
           <div className="flex items-center justify-between mb-6 md:mb-8">
             <h2 className="text-xl md:text-2xl font-black text-gray-900 uppercase tracking-tight">Session</h2>
             
-            {/* Tulisan "Geser Tiket" yang goyang-goyang, CUMA MUNCUL DI HP (md:hidden) */}
-            <div className="md:hidden flex items-center gap-1.5 text-[10px] font-black text-[#FF6B35] uppercase tracking-widest animate-pulse">
-              <span>Geser Session</span>
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
-              </svg>
-            </div>
+            {/* 👇 TOMBOL MANUAL SCROLL HP 👇 */}
+            {event.sessions && event.sessions.length > 1 && (
+               <button onClick={scrollRight} className="md:hidden flex items-center gap-1.5 text-[10px] font-black text-[#FF6B35] uppercase tracking-widest bg-orange-50 px-3 py-1.5 rounded-full active:scale-95 transition-transform">
+                 <span>Geser</span>
+                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                 </svg>
+               </button>
+            )}
           </div>
-          {/* 👆👆 BATAS JURUS UX 👆👆 */}
 
-          <div className="flex flex-nowrap md:grid md:grid-cols-1 gap-4 md:gap-6 overflow-x-auto md:overflow-y-auto md:overflow-x-hidden max-h-none md:max-h-[800px] pb-6 md:pb-0 snap-x snap-mandatory [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] md:custom-scrollbar -mx-6 px-6 md:mx-0 md:px-0">
+          {/* 👇 CONTAINER DENGAN KELAS CSS "scroll-smooth" 👇 */}
+         <div 
+            ref={scrollContainerRef}
+            className="flex flex-nowrap md:grid md:grid-cols-1 gap-4 md:gap-6 overflow-x-auto md:overflow-y-auto md:overflow-x-hidden max-h-none md:max-h-[800px] pb-6 md:pb-0 snap-x snap-mandatory scroll-smooth overscroll-x-contain md:overscroll-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] -mx-6 px-6 md:mx-0 md:px-0"
+          >
             {event.sessions && event.sessions.length > 0 ? (
               event.sessions.map((session, index) => {
                 const isSoldOut = session.stock < 1;
                 
                 return (
-                  <div key={session.id} className={`shrink-0 snap-center w-[85vw] md:w-auto border-2 rounded-[20px] md:rounded-[24px] p-5 md:p-8 relative flex flex-col md:flex-row justify-between items-start md:items-center gap-5 md:gap-6 transition-colors ${isSoldOut ? 'border-gray-200 bg-gray-50 opacity-70' : 'border-gray-100 bg-white hover:border-[#FF6B35]'}`}>
+                  <motion.div 
+                    key={session.id} 
+                    initial={{ opacity: 0.3, scale: 0.9 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ amount: 0.5, margin: "0px", once: false }}
+                    transition={{ duration: 0.4, ease: "easeOut" }}
+                    className={`shrink-0 snap-center w-[85vw] md:w-auto border-2 rounded-[20px] md:rounded-[24px] p-5 md:p-8 relative flex flex-col md:flex-row justify-between items-start md:items-center gap-5 md:gap-6 transition-colors ${isSoldOut ? 'border-gray-200 bg-gray-50 opacity-70' : 'border-gray-100 bg-white hover:border-[#FF6B35]'}`}
+                  >
                     
                     <div className="flex-1 w-full">
                       <div className="flex items-center gap-2 md:gap-3 mb-3">
@@ -272,11 +292,11 @@ export default function EventDetail() {
                       </button>
                     </div>
 
-                  </div>
+                  </motion.div>
                 );
               })
             ) : (
-              <div className="text-center py-16 bg-gray-50 rounded-[24px] border border-dashed border-gray-200">
+              <div className="text-center py-16 bg-gray-50 rounded-[24px] border border-dashed border-gray-200 w-full">
                 <p className="text-gray-400 text-sm font-bold uppercase tracking-widest">Tiket belum tersedia.</p>
               </div>
             )}

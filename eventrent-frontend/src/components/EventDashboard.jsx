@@ -99,29 +99,37 @@ export default function EventDashboard() {
     }
   };
 
+  // 👇 UPGRADE TINGKAT DEWA: Export CSV Anti-Numpuk di Excel 👇
   const handleExportCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Order ID,Ticket ID,Status Kehadiran,Session,Pembeli,Email Pembeli,Nama Peserta,Email Peserta,Jawaban Custom\n";
+    // 1. Kita ganti pemisahnya pakai Titik Koma (;) biar Excel Indonesia langsung ngebaca
+    let csvContent = "Order ID;Ticket ID;Status Kehadiran;Session;Pembeli;Email Pembeli;Nama Peserta;Email Peserta;Jawaban Custom\n";
     
     groupedAttendees.forEach(order => {
       order.tickets.forEach(t => {
         const statusKehadiran = t.is_scanned ? "Telah Hadir" : "Belum Hadir";
-        const p = t.attendee_data?.[0] || {}; 
 
         let customAnsText = "";
-        if (p.customAnswers && p.customAnswers.length > 0) {
-          customAnsText = p.customAnswers.map(ans => `${ans.question}: ${ans.answer}`).join(" | ");
+        if (t.custom_answers && t.custom_answers.length > 0) {
+          customAnsText = t.custom_answers.map(ans => `${ans.question}: ${ans.answer}`).join(" | ");
         }
         
-        let row = `"${order.order_id}","${t.ticket_id}","${statusKehadiran}","${t.session_name}","${order.buyer_name}","${order.buyer_email}","${p.name || ''}","${p.email || ''}","${customAnsText}"`;
+        // 2. Format baris pakai Titik Koma (;)
+        let row = `"${order.order_id}";"${t.ticket_id}";"${statusKehadiran}";"${t.session_name}";"${order.buyer_name}";"${order.buyer_email}";"${t.attendee_name || ''}";"${t.attendee_email || ''}";"${customAnsText}"`;
         csvContent += row + "\n";
       });
     });
-    const encodedUri = encodeURI(csvContent);
+
+    // 3. Kita pakai metode BLOB + BOM (\uFEFF) biar Excel ngebaca spasi/huruf aneh dengan sempurna!
+    const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", url);
     link.setAttribute("download", `Data_Peserta_${event?.title || 'Event'}.csv`);
+    
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link); // Bersihin memori
   };
 
   const handleCopy = () => {
@@ -129,10 +137,11 @@ export default function EventDashboard() {
     setPopup({ show: true, message: "Link Dashboard berhasil disalin!", type: 'success' }); 
   };
 
+  // 👇 UPDATE: Filter/Pencarian pakai attendee_name 👇
   const filteredOrders = groupedAttendees.filter(order => {
     if (!searchQuery) return true;
     return order.tickets.some(t => 
-      t.attendee_data?.[0]?.name.toLowerCase().includes(searchQuery.toLowerCase())
+      t.attendee_name?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   });
 
@@ -143,13 +152,14 @@ export default function EventDashboard() {
     </div>
   );
 
+  // 👇 UPDATE: Hitung Revenue pakai t.price 👇
   let totalSold = 0;
   let totalCheckedIn = 0;
   let totalRevenue = 0;
   groupedAttendees.forEach(o => {
     totalSold += o.total_qty;
     totalCheckedIn += o.scanned_qty;
-    o.tickets.forEach(t => totalRevenue += Number(t.total_price));
+    o.tickets.forEach(t => totalRevenue += Number(t.price)); 
   });
 
   return (
@@ -196,7 +206,7 @@ export default function EventDashboard() {
           </div>
         )}
 
-        {/* HEADER DASHBOARD (Disesuaikan untuk HP) */}
+        {/* HEADER DASHBOARD */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-4 mb-6 md:mb-8 mt-2 md:mt-0">
           <div className="flex items-start md:items-center gap-3">
              <button onClick={() => navigate('/manage')} className="w-8 h-8 md:w-8 md:h-8 rounded-full bg-white border border-gray-200 flex items-center justify-center text-gray-400 hover:text-[#FF6B35] hover:border-[#FF6B35] transition-colors shrink-0 mt-1 md:mt-0">
@@ -219,7 +229,7 @@ export default function EventDashboard() {
           </div>
         </div>
 
-        {/* KOTAK STATISTIK (Disesuaikan untuk HP) */}
+        {/* KOTAK STATISTIK */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 mb-6 md:mb-10">
           <div className="bg-white p-5 md:p-8 rounded-[20px] md:rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden flex flex-col justify-center">
             <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-3">Tickets Sold</p>
@@ -241,7 +251,7 @@ export default function EventDashboard() {
           </div>
         </div>
 
-        {/* TABEL DATA PENGUNJUNG (Responsive: Tabel di Laptop, Card di HP) */}
+        {/* TABEL DATA PENGUNJUNG */}
         <div className="bg-white rounded-[24px] md:rounded-[32px] shadow-sm border border-gray-200 overflow-hidden">
           <div className="px-5 py-5 md:px-8 md:py-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <h3 className="text-lg md:text-xl font-bold text-gray-900">Peserta Event</h3>
@@ -264,7 +274,7 @@ export default function EventDashboard() {
           </div>
           
           <div className="overflow-x-auto bg-gray-50/20 md:bg-white p-4 md:p-0">
-            {/* 👇👇 MODE LAPTOP: TABEL (hidden di HP) 👇👇 */}
+            {/* 👇👇 MODE LAPTOP: TABEL 👇👇 */}
             <table className="hidden md:table w-full text-left border-collapse min-w-[900px]">
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-widest">
@@ -306,9 +316,9 @@ export default function EventDashboard() {
                         <td colSpan="6" className="px-8 py-6 border-l-4 border-[#FF6B35]">
                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Daftar Tiket Individual</p>
                           <div className="grid grid-cols-3 gap-4">
+                            {/* 👇 UPDATE: Render pakai attendee_name 👇 */}
                             {order.tickets.map((t, idx) => {
-                              const p = t.attendee_data?.[0] || {};
-                              const isMatch = searchQuery && p.name?.toLowerCase().includes(searchQuery.toLowerCase());
+                              const isMatch = searchQuery && t.attendee_name?.toLowerCase().includes(searchQuery.toLowerCase());
                               return (
                                 <div key={t.ticket_id} className="bg-white p-4 rounded-2xl border border-orange-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
                                   {isMatch && <div className="absolute top-0 right-0 bg-[#FF6B35] text-white text-[8px] font-black uppercase px-2 py-1 rounded-bl-lg">MATCH</div>}
@@ -317,11 +327,11 @@ export default function EventDashboard() {
                                       <p className="text-[10px] font-black text-[#FF6B35] uppercase">Tiket #{t.ticket_id}</p>
                                       {t.is_scanned && <span className="text-[8px] font-black bg-green-100 text-green-600 px-2 py-0.5 rounded-full uppercase">Hadir</span>}
                                     </div>
-                                    <p className="font-bold text-gray-900 truncate">{p.name || `Peserta ${idx + 1}`}</p>
-                                    <p className="text-xs text-gray-500 mb-3 truncate">{p.email || '-'}</p>
-                                    {p.customAnswers && p.customAnswers.length > 0 && (
+                                    <p className="font-bold text-gray-900 truncate">{t.attendee_name || `Peserta ${idx + 1}`}</p>
+                                    <p className="text-xs text-gray-500 mb-3 truncate">{t.attendee_email || '-'}</p>
+                                    {t.custom_answers && t.custom_answers.length > 0 && (
                                       <div className="mt-2 pt-2 border-t border-orange-100/50 flex flex-wrap gap-2 mb-3">
-                                        {p.customAnswers.map((ans, aIdx) => (
+                                        {t.custom_answers.map((ans, aIdx) => (
                                           <div key={aIdx} title={ans.question} className="cursor-help bg-orange-50/50 border border-orange-100 px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-orange-100 transition-colors">
                                             <span className="text-[10px] font-bold text-gray-700 truncate max-w-[100px]">{ans.answer}</span>
                                           </div>
@@ -357,7 +367,7 @@ export default function EventDashboard() {
               )}
             </table>
 
-            {/* 👇👇 MODE HP: CARD LIST (hidden di Laptop) 👇👇 */}
+            {/* 👇👇 MODE HP: CARD LIST 👇👇 */}
             <div className="md:hidden flex flex-col gap-3">
               {filteredOrders.length > 0 ? (
                 filteredOrders.map((order) => (
@@ -386,16 +396,15 @@ export default function EventDashboard() {
                       </div>
                       <button onClick={() => toggleExpand(order.order_id)} className="text-[10px] font-black text-[#FF6B35] uppercase tracking-wider flex items-center gap-1 bg-orange-50 px-3 py-1.5 rounded-lg active:scale-95 transition-all">
                         {expandedRow === order.order_id ? 'Tutup' : 'Lihat Tiket'}
-                        <svg className={`w-3 h-3 transition-transform ${expandedRow === order.order_id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7"></path></svg>
+                        <svg className={`w-3 h-3 transition-transform ${expandedRow === order.order_id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7-7-7-7"></path></svg>
                       </button>
                     </div>
 
-                    {/* EXPAND AREA HP */}
                     {expandedRow === order.order_id && (
                       <div className="mt-4 pt-4 border-t-2 border-dashed border-orange-100 flex flex-col gap-3">
+                        {/* 👇 UPDATE: Render HP pakai attendee_name 👇 */}
                         {order.tickets.map((t, idx) => {
-                          const p = t.attendee_data?.[0] || {};
-                          const isMatch = searchQuery && p.name?.toLowerCase().includes(searchQuery.toLowerCase());
+                          const isMatch = searchQuery && t.attendee_name?.toLowerCase().includes(searchQuery.toLowerCase());
                           return (
                             <div key={t.ticket_id} className={`p-3 rounded-xl border relative ${t.is_scanned ? 'bg-green-50/30 border-green-100' : 'bg-white border-gray-200'}`}>
                               {isMatch && <div className="absolute top-0 right-0 bg-[#FF6B35] text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-bl-lg rounded-tr-xl">MATCH</div>}
@@ -403,12 +412,12 @@ export default function EventDashboard() {
                                 <p className="text-[9px] font-black text-gray-500 uppercase">TIKET #{t.ticket_id.toString().slice(-5)}</p>
                                 {t.is_scanned && <span className="text-[8px] font-black bg-green-100 text-green-600 px-2 py-0.5 rounded-full uppercase">Telah Hadir</span>}
                               </div>
-                              <p className="font-bold text-gray-900 text-sm truncate">{p.name || `Peserta ${idx + 1}`}</p>
-                              <p className="text-[10px] text-gray-500 mb-2 truncate">{p.email || '-'}</p>
+                              <p className="font-bold text-gray-900 text-sm truncate">{t.attendee_name || `Peserta ${idx + 1}`}</p>
+                              <p className="text-[10px] text-gray-500 mb-2 truncate">{t.attendee_email || '-'}</p>
                               
-                              {p.customAnswers && p.customAnswers.length > 0 && (
+                              {t.custom_answers && t.custom_answers.length > 0 && (
                                 <div className="mt-2 pt-2 border-t border-gray-100 flex flex-wrap gap-1.5 mb-2">
-                                  {p.customAnswers.map((ans, aIdx) => (
+                                  {t.custom_answers.map((ans, aIdx) => (
                                     <div key={aIdx} className="bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded flex items-center">
                                       <span className="text-[9px] font-bold text-gray-600 truncate max-w-[120px]">{ans.answer}</span>
                                     </div>

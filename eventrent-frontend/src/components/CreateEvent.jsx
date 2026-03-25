@@ -1,5 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Cropper from 'react-easy-crop'; // 👇 IMPORT CROPPERNYA 👇
+
+// --- FUNGSI AJAIB BUAT MOTONG GAMBAR JADI 736x436 ---
+const getCroppedImg = (imageSrc, pixelCrop) => {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.src = imageSrc;
+    image.setAttribute('crossOrigin', 'anonymous'); // Biar gak kena error CORS
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      // PAKSA UKURAN JADI 736 x 436!
+      canvas.width = 736;
+      canvas.height = 436;
+
+      ctx.drawImage(
+        image,
+        pixelCrop.x,
+        pixelCrop.y,
+        pixelCrop.width,
+        pixelCrop.height,
+        0,
+        0,
+        736,
+        436
+      );
+
+      // Convert ke Base64 kualitas tinggi (0.9)
+      resolve(canvas.toDataURL('image/jpeg', 0.9));
+    };
+    image.onerror = (error) => reject(error);
+  });
+};
 
 export default function CreateEvent() {
   const navigate = useNavigate();
@@ -27,6 +61,13 @@ export default function CreateEvent() {
   const [imageBase64, setImageBase64] = useState(''); 
   const [isLoading, setIsLoading] = useState(false);
 
+  // 👇 STATE BARU KHUSUS BUAT FITUR CROP GAMBAR 👇
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [rawImageSrc, setRawImageSrc] = useState(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+
   // --- HANDLERS DASAR ---
   const handleEventChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
   
@@ -34,17 +75,40 @@ export default function CreateEvent() {
     setFormData({ ...formData, location: { ...formData.location, [e.target.name]: e.target.value }});
   };
 
+  // 👇 UBAH HANDLE IMAGE BIAR MUNCULIN POP-UP CROP DULU 👇
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      setImagePreview(URL.createObjectURL(file));
       const reader = new FileReader();
-      reader.onloadend = () => setImageBase64(reader.result);
+      reader.onloadend = () => {
+        setRawImageSrc(reader.result); // Simpan gambar mentahnya
+        setShowCropModal(true); // Buka Pop-up potong gambar!
+      };
       reader.readAsDataURL(file);
+    }
+    // Reset nilai input file biar bisa milih gambar yang sama lagi kalau batal
+    e.target.value = null; 
+  };
+
+  // Nangkep kordinat pas user geser-geser gambar
+  const onCropComplete = useCallback((croppedArea, croppedAreaPixels) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  // Pas user klik tombol "Done / Simpan" di Pop-Up
+  const handleSaveCrop = async () => {
+    try {
+      const croppedImageBase64 = await getCroppedImg(rawImageSrc, croppedAreaPixels);
+      setImagePreview(croppedImageBase64); // Tampilkan di kotak preview
+      setImageBase64(croppedImageBase64); // Simpan Base64-nya buat dikirim ke backend
+      setShowCropModal(false); // Tutup Pop-up
+    } catch (e) {
+      console.error(e);
+      alert('Gagal memotong gambar!');
     }
   };
 
-  // --- 🔥 HANDLERS ARRAY DEEP COPY (BIAR GAK FREEZE PAS NGETIK) 🔥 ---
+  // --- HANDLERS ARRAY DEEP COPY ---
   const handleSessionChange = (index, field, value) => {
     const updated = JSON.parse(JSON.stringify(formData.sessions));
     updated[index][field] = value;
@@ -112,9 +176,14 @@ export default function CreateEvent() {
     setFormData({ ...formData, sessions: updated });
   };
 
-  // --- 🌐 SUBMIT DATA KE BACKEND (UDAH DISESUAIKAN BUAT CLOUD) 🌐 ---
+  // --- SUBMIT DATA KE BACKEND ---
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!imageBase64) {
+      alert("Poster event wajib diupload!");
+      return;
+    }
+    
     setIsLoading(true);
 
     try {
@@ -124,7 +193,6 @@ export default function CreateEvent() {
           img: imageBase64 
       };
 
-      // 👇 INI YANG UDAH DIHAPUS LOCALHOST-NYA 👇
       const response = await fetch('/api/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -150,7 +218,52 @@ export default function CreateEvent() {
   const labelStyle = 'text-xs font-semibold text-gray-700 mb-1.5 block uppercase tracking-wider';
 
   return (
-    <div className="bg-gray-50 min-h-screen pb-20 font-sans">
+    <div className="bg-gray-50 min-h-screen pb-20 font-sans relative">
+      
+      {/* 👇 MODAL POP-UP CROP GAMBAR 👇 */}
+      {showCropModal && (
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-[24px] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col">
+            <div className="p-5 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="text-lg font-black uppercase tracking-widest text-gray-900">Sesuaikan Poster</h3>
+              <button onClick={() => setShowCropModal(false)} className="text-gray-400 hover:text-red-500 font-bold">✕ Batal</button>
+            </div>
+            
+            {/* AREA CROPPER */}
+            <div className="relative w-full h-[50vh] md:h-[60vh] bg-gray-900">
+              <Cropper
+                image={rawImageSrc}
+                crop={crop}
+                zoom={zoom}
+                aspect={736 / 436} // INI RASIO SAKTINYA KAPTEN! (Bentuk Persegi Panjang)
+                onCropChange={setCrop}
+                onCropComplete={onCropComplete}
+                onZoomChange={setZoom}
+              />
+            </div>
+            
+            <div className="p-6 bg-white flex flex-col sm:flex-row justify-between items-center gap-4">
+              <div className="w-full sm:w-1/2 flex items-center gap-3">
+                <span className="text-xs font-bold text-gray-400 uppercase">Zoom:</span>
+                <input 
+                  type="range" 
+                  min={1} max={3} step={0.1} 
+                  value={zoom} 
+                  onChange={(e) => setZoom(e.target.value)} 
+                  className="w-full accent-[#FF6B35]"
+                />
+              </div>
+              <button 
+                onClick={handleSaveCrop}
+                className="w-full sm:w-auto px-8 py-3 bg-[#FF6B35] text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-lg shadow-orange-100 hover:bg-[#E85526] transition-all active:scale-95"
+              >
+                ✔ Potong & Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <main className="max-w-4xl mx-auto px-6 py-12">
         
         {/* BANNER PERINGATAN */}
@@ -173,20 +286,21 @@ export default function CreateEvent() {
             <h2 className="text-2xl font-black mb-6 uppercase tracking-tight">Event Details</h2>
             
             <div className="space-y-5">
-              {/* IMAGE UPLOAD */}
+              {/* IMAGE UPLOAD YANG UDAH DIUPGRADE */}
               <div>
-                <label className={labelStyle}>Event Poster</label>
+                <label className={labelStyle}>Event Poster <span className="text-orange-500 normal-case ml-1">(Rasio Otomatis 736x436)</span></label>
                 <div className="relative group">
                   <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all overflow-hidden">
                     {imagePreview ? (
                       <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
                     ) : (
-                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <span className="text-3xl mb-2 text-gray-400">➕</span>
-                        <p className="text-xs text-gray-500 font-medium">Click to upload poster</p>
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
+                        <span className="text-3xl mb-2 text-gray-400">🖼️</span>
+                        <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Click to upload poster</p>
+                        <p className="text-[10px] text-gray-400 mt-1">Bisa foto tegak/mendatar, potong nanti!</p>
                       </div>
                     )}
-                    <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} required />
+                    <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} required={!imagePreview} />
                   </label>
                 </div>
               </div>
