@@ -67,7 +67,7 @@ export default function TrackTicket() {
             <label className="block text-xs font-black text-gray-900 uppercase tracking-widest mb-2">Email Pembeli</label>
             <input 
               type="email" 
-              placeholder="Contoh: andri@gmail.com" 
+              placeholder="Contoh: eventrent26@gmail.com" 
               value={formData.email} 
               onChange={(e) => setFormData({...formData, email: e.target.value})} 
               className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm font-bold rounded-2xl px-5 py-4 outline-none focus:ring-2 focus:ring-[#FF6B35]/20 focus:border-[#FF6B35] transition-all" 

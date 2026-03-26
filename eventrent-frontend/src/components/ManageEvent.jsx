@@ -35,8 +35,6 @@ const isEventPassed = (dateStr) => {
 export default function ManageEvent() {
   const [myEvents, setMyEvents] = useState([]);
   const [activeMenuId, setActiveMenuId] = useState(null); 
-  
-  // --- STATE BUAT POP-UP DELETE ---
   const [eventToDelete, setEventToDelete] = useState(null);
 
   const navigate = useNavigate();
@@ -51,7 +49,10 @@ export default function ManageEvent() {
   const fetchEvents = () => {
     fetch(`/api/events/my?userId=${user.id}`)
       .then(res => res.json())
-      .then(data => { setMyEvents(Array.isArray(data) ? data : []); })
+      .then(data => { 
+        // Pastikan yang masuk beneran Array, kalau backend error, set array kosong
+        setMyEvents(Array.isArray(data) ? data : []); 
+      })
       .catch(err => console.error("Gagal ambil event:", err));
   };
 
@@ -66,8 +67,9 @@ export default function ManageEvent() {
   }, []);
 
   const sortedEvents = [...myEvents].sort((a, b) => {
-    const isAPast = isEventPassed(a.date);
-    const isBPast = isEventPassed(b.date);
+    // 👇 FIX: Pakai date_start sesuai respons backend 👇
+    const isAPast = isEventPassed(a.date_start);
+    const isBPast = isEventPassed(b.date_start);
     if (isAPast && !isBPast) return 1;  
     if (!isAPast && isBPast) return -1; 
     return 0; 
@@ -87,21 +89,19 @@ export default function ManageEvent() {
     setActiveMenuId(null);
   };
 
-  // --- TRIGGER POP-UP ---
   const triggerDelete = (e, id) => {
     e.stopPropagation();
-    setEventToDelete(id); // Munculin modal konfirmasi
+    setEventToDelete(id); 
     setActiveMenuId(null);
   };
 
-  // --- EKSEKUSI DELETE ---
   const confirmDelete = async () => {
     if (!eventToDelete) return;
     try {
       const res = await fetch(`/api/events/${eventToDelete}?userId=${user.id}`, { method: 'DELETE' });
       if (res.ok) {
         setMyEvents(prev => prev.filter(event => event.id !== eventToDelete));
-        setEventToDelete(null); // Tutup modal
+        setEventToDelete(null); 
       } else {
         console.error("Gagal menghapus event");
         setEventToDelete(null);
@@ -125,7 +125,6 @@ export default function ManageEvent() {
 
         <div className="bg-white rounded-[24px] shadow-sm border border-gray-200 min-h-[500px]">
           
-          {/* 👇 PERBAIKAN: Header Tabel Disembunyikan di Layar HP (hidden md:grid) 👇 */}
           <div className="hidden md:grid grid-cols-12 gap-4 px-8 py-4 bg-gray-50/50 rounded-t-[24px] border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-widest">
             <div className="col-span-5">Event Details</div>
             <div className="col-span-2 text-center">Status</div>
@@ -137,14 +136,15 @@ export default function ManageEvent() {
           <div className="divide-y divide-gray-100">
             {sortedEvents.length > 0 ? (
               sortedEvents.map((event) => {
-                const isPast = isEventPassed(event.date);
+                // 👇 FIX: Pakai date_start 👇
+                const isPast = isEventPassed(event.date_start);
                 const isMenuActive = activeMenuId === event.id;
+                const isWed = event.is_private || event.isPrivate; // Deteksi Wedding
 
                 return (
                   <div 
                     key={event.id} 
                     onClick={() => handleCardClick(event.id)} 
-                    // 👇 PERBAIKAN: flex-col di HP, grid di Desktop 👇
                     className={`flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 p-5 md:px-8 md:py-5 md:items-center hover:bg-gray-50 transition-colors group cursor-pointer relative ${isMenuActive ? 'z-50' : 'z-0'} ${isPast ? 'opacity-80' : ''}`}
                   >
                     {/* FOTO & JUDUL EVENT */}
@@ -153,29 +153,38 @@ export default function ManageEvent() {
                          <img src={event.img} alt={event.title} className="w-full h-full object-cover" />
                       </div>
                       <div className="text-left flex-1 min-w-0">
-                        <h3 className="font-bold text-gray-900 text-sm md:text-base mb-0.5 group-hover:text-[#FF6B35] transition-colors truncate">{event.title}</h3>
+                        <h3 className="font-bold text-gray-900 text-sm md:text-base mb-0.5 group-hover:text-[#FF6B35] transition-colors truncate flex items-center gap-2">
+                          {event.title}
+                          {/* 👇 BADGE KHUSUS WEDDING / PRIVATE 👇 */}
+                          {isWed && (
+                            <span className="bg-[#D4AF37]/10 text-[#D4AF37] px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border border-[#D4AF37]/20 shrink-0">
+                              Private
+                            </span>
+                          )}
+                        </h3>
                         <div className="flex items-center gap-3 text-[10px] md:text-xs text-gray-500 font-medium">
-                          <span className="truncate">{formatPrettyDate(event.date)}</span>
+                          {/* 👇 FIX: Pakai date_start 👇 */}
+                          <span className="truncate">{formatPrettyDate(event.date_start)}</span>
                         </div>
                       </div>
                     </div>
 
-                    {/* 👇👇 BUNGKUSAN STATS KHUSUS MOBILE 👇👇 */}
+                    {/* BUNGKUSAN STATS KHUSUS MOBILE */}
                     <div className="flex md:hidden items-center flex-wrap gap-2 w-full mt-1">
                       <span className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border ${
                         isPast ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-green-50 text-green-600 border-green-100'
                       }`}>
                         {isPast ? 'Ended' : 'Active'}
                       </span>
-                      <span className={`px-2.5 py-1 rounded-md text-[9px] font-bold ${event.stock > 0 ? 'bg-orange-50 text-[#FF6B35]' : 'bg-red-100 text-red-600'}`}>
+                      <span className={`px-2.5 py-1 rounded-md text-[9px] font-bold ${event.stock > 0 ? (isWed ? 'bg-[#D4AF37]/10 text-[#D4AF37]' : 'bg-orange-50 text-[#FF6B35]') : 'bg-red-100 text-red-600'}`}>
                         {event.stock > 0 ? `${event.stock} Left` : 'Sold Out'}
                       </span>
-                      <span className="ml-auto text-xs font-bold text-gray-900">
-                        {Number(event.price) === 0 ? 'Free' : `Rp ${parseInt(event.price).toLocaleString()}`}
+                      <span className={`ml-auto text-xs font-bold ${isWed ? 'text-[#D4AF37]' : 'text-gray-900'}`}>
+                        {Number(event.price) === 0 ? 'Free RSVP' : `Rp ${parseInt(event.price).toLocaleString()}`}
                       </span>
                     </div>
 
-                    {/* 👇👇 BUNGKUSAN STATS KHUSUS DESKTOP 👇👇 */}
+                    {/* BUNGKUSAN STATS KHUSUS DESKTOP */}
                     <div className="hidden md:block md:col-span-2 text-center">
                       <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
                         isPast ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-green-50 text-green-600 border-green-100'
@@ -184,23 +193,22 @@ export default function ManageEvent() {
                       </span>
                     </div>
                     <div className="hidden md:block md:col-span-2 text-center">
-                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${event.stock > 0 ? 'bg-orange-50 text-[#FF6B35]' : 'bg-red-100 text-red-600'}`}>
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${event.stock > 0 ? (isWed ? 'bg-[#D4AF37]/10 text-[#D4AF37]' : 'bg-orange-50 text-[#FF6B35]') : 'bg-red-100 text-red-600'}`}>
                         {event.stock > 0 ? `${event.stock} Left` : 'Sold Out'}
                       </span>
                     </div>
-                    <div className="hidden md:block md:col-span-2 text-center text-sm font-bold text-gray-900">
-                      {Number(event.price) === 0 ? 'Free' : `Rp ${parseInt(event.price).toLocaleString()}`}
+                    <div className={`hidden md:block md:col-span-2 text-center text-sm font-bold ${isWed ? 'text-[#D4AF37]' : 'text-gray-900'}`}>
+                      {Number(event.price) === 0 ? 'Free RSVP' : `Rp ${parseInt(event.price).toLocaleString()}`}
                     </div>
 
                     {/* TOMBOL ACTION (Titik Tiga) */}
-                    {/* 👇 PERBAIKAN: Absolute di HP (Pojok Kanan Atas), Relative di Desktop 👇 */}
                     <div className="absolute top-4 right-4 md:relative md:top-0 md:right-0 md:col-span-1 flex justify-end">
                       <button 
                         onClick={(e) => {
                           e.stopPropagation(); 
                           setActiveMenuId(isMenuActive ? null : event.id);
                         }}
-                        className="p-1.5 md:p-2 text-gray-400 hover:text-[#FF6B35] hover:bg-orange-50 rounded-full transition-colors active:scale-90"
+                        className={`p-1.5 md:p-2 text-gray-400 rounded-full transition-colors active:scale-90 ${isWed ? 'hover:text-[#D4AF37] hover:bg-[#D4AF37]/10' : 'hover:text-[#FF6B35] hover:bg-orange-50'}`}
                       >
                         <svg className="w-5 h-5 md:w-6 md:h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"></path></svg>
                       </button>

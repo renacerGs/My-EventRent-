@@ -33,7 +33,7 @@ export class AppService implements OnModuleInit {
       await this.pool.query('SELECT 1');
       console.log('Berhasil terhubung ke database PostgreSQL EventRent!');
       
-      // Auto-migrate kita sederhanakan karena perubahan besar udah dilakukan manual via DBeaver
+      // Auto-migrate kita sederhanakan
       await this.pool.query(`
         ALTER TABLE tickets 
         ADD COLUMN IF NOT EXISTS is_scanned BOOLEAN DEFAULT FALSE,
@@ -50,19 +50,20 @@ export class AppService implements OnModuleInit {
 
   async getEvents() {
     try {
+      // 👇 FIX: Hapus e.date_time, tambahin e.is_private, & Filter cuma event Publik 👇
       const query = `
         SELECT e.id, e.title, 
                TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start,
                TO_CHAR(e.event_end, 'Dy, DD Mon YYYY') as date_end,
-               TO_CHAR(e.date_time, 'Dy, DD Mon YYYY') as date_old,
                e.name_place, e.city, e.place, e.location as old_location,
-               e.image_url as img, c.name as category, 
+               e.image_url as img, c.name as category, e.is_private,
                COALESCE((SELECT MIN(price) FROM event_sessions WHERE event_id = e.id), 0) as price,
                COALESCE((SELECT SUM(stock) FROM event_sessions WHERE event_id = e.id), 0) as stock,
                e.description, e.views, u.name as author 
         FROM events e
         JOIN categories c ON e.category_id = c.id
         LEFT JOIN users u ON e.created_by = u.id 
+        WHERE e.is_private = FALSE OR e.is_private IS NULL
         ORDER BY e.created_at DESC
       `;
       const { rows } = await this.pool.query(query);
@@ -75,10 +76,12 @@ export class AppService implements OnModuleInit {
 
   async getEventById(eventId: number) {
     try {
+      // 👇 FIX: Tambahin e.is_private 👇
       const eventQuery = `
         SELECT e.id, e.title, e.description, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start, 
                TO_CHAR(e.event_end, 'Dy, DD Mon YYYY') as date_end, e.place, e.name_place, e.city, e.province, e.map_url,
-               e.image_url as img, c.name as category, e.phone as contact, u.name as organizer_name
+               e.image_url as img, c.name as category, e.phone as contact, u.name as organizer_name,
+               e.is_private
         FROM events e
         JOIN categories c ON e.category_id = c.id
         LEFT JOIN users u ON e.created_by = u.id
@@ -92,9 +95,11 @@ export class AppService implements OnModuleInit {
 
       const eventData = eventRes.rows[0];
 
+      // 👇 FIX: Tambahin kolom lokasi sesi 👇
       const sessionQuery = `
         SELECT id, name, description, TO_CHAR(session_date, 'Dy, DD Mon YYYY') as date, 
-               start_time, end_time, contact_person, event_type, price, stock
+              start_time, end_time, contact_person, event_type, price, stock,
+              name_place, place, city, province, map_url 
         FROM event_sessions
         WHERE event_id = $1
         ORDER BY session_date ASC, start_time ASC
@@ -119,13 +124,13 @@ export class AppService implements OnModuleInit {
 
   async getMyEvents(userId: number) {
     try {
+      // 👇 FIX: Hapus e.date_time, tambahin e.is_private 👇
       const query = `
         SELECT e.id, e.title, 
                TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start,
                TO_CHAR(e.event_end, 'Dy, DD Mon YYYY') as date_end,
-               TO_CHAR(e.date_time, 'Dy, DD Mon YYYY') as date_old,
                e.name_place, e.city, e.place, e.location as old_location,
-               e.image_url as img, c.name as category, 
+               e.image_url as img, c.name as category, e.is_private,
                COALESCE((SELECT MIN(price) FROM event_sessions WHERE event_id = e.id), 0) as price,
                COALESCE((SELECT SUM(stock) FROM event_sessions WHERE event_id = e.id), 0) as stock,
                e.description, e.views, u.name as author
@@ -158,14 +163,15 @@ export class AppService implements OnModuleInit {
     try {
       await client.query('BEGIN'); 
 
+      // 👇 FIX: Insert is_private 👇
       const eventQuery = `
         INSERT INTO events (
           title, description, event_start, event_end, category_id, 
-          created_by, phone, place, name_place, city, province, map_url, image_url
+          created_by, phone, place, name_place, city, province, map_url, image_url, is_private
         )
         VALUES (
           $1, $2, $3, $4, (SELECT id FROM categories WHERE name = $5 LIMIT 1), 
-          $6, $7, $8, $9, $10, $11, $12, $13
+          $6, $7, $8, $9, $10, $11, $12, $13, $14
         )
         RETURNING id
       `;
@@ -174,7 +180,8 @@ export class AppService implements OnModuleInit {
         data.category, data.userId, data.phone, data.location?.place, 
         data.location?.namePlace, data.location?.city, data.location?.province, 
         data.location?.mapUrl || null, 
-        data.img || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=1000&q=80'
+        data.img || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=1000&q=80',
+        data.isPrivate ? true : false
       ];
       
       const eventRes = await client.query(eventQuery, eventValues);
@@ -182,16 +189,19 @@ export class AppService implements OnModuleInit {
 
       if (data.sessions && data.sessions.length > 0) {
         for (const session of data.sessions) {
+          // 👇 FIX: Insert lokasi ke event_sessions 👇
           const sessionQuery = `
             INSERT INTO event_sessions 
-            (event_id, name, description, session_date, start_time, end_time, contact_person, event_type, price, stock)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            (event_id, name, description, session_date, start_time, end_time, contact_person, event_type, price, stock, name_place, place, city, province, map_url)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
             RETURNING id
           `;
           const sessionValues = [
             eventId, session.name, session.description || session.ticketDesc, 
             session.date || null, session.startTime || '00:00', session.endTime || '00:00', 
-            session.contactPerson, session.typeEvent, session.price || 0, session.stock || 0
+            session.contactPerson, session.typeEvent, session.price || 0, session.stock || 0,
+            session.location?.namePlace || null, session.location?.place || null, 
+            session.location?.city || null, session.location?.province || null, session.location?.mapUrl || null
           ];
           const sessionRes = await client.query(sessionQuery, sessionValues);
           const sessionId = sessionRes.rows[0].id;
@@ -203,11 +213,7 @@ export class AppService implements OnModuleInit {
                 VALUES ($1, $2, $3, $4, $5)
               `;
               await client.query(questionQuery, [
-                sessionId, 
-                q.text, 
-                q.type, 
-                q.isRequired, 
-                q.options ? JSON.stringify(q.options) : '[]'
+                sessionId, q.text, q.type, q.isRequired, q.options ? JSON.stringify(q.options) : '[]'
               ]);
             }
           }
@@ -232,14 +238,15 @@ export class AppService implements OnModuleInit {
         SET title = $1, description = $2, event_start = $3, event_end = $4,
             organizer = $5, place = $6, name_place = $7, city = $8, province = $9,
             image_url = COALESCE($10, image_url), 
-            category_id = (SELECT id FROM categories WHERE name = $11 LIMIT 1)
+            category_id = (SELECT id FROM categories WHERE name = $11 LIMIT 1),
+            is_private = $14
         WHERE id = $12 AND created_by = $13
         RETURNING *
       `;
       const values = [
         data.title, data.description, data.eventStart, data.eventEnd,
         data.organizer, data.location?.place, data.location?.namePlace, data.location?.city, data.location?.province,
-        data.img, data.category, eventId, userId
+        data.img, data.category, eventId, userId, data.isPrivate ? true : false
       ];
       const res = await this.pool.query(query, values);
       if (res.rowCount === 0) throw new InternalServerErrorException('Event not found or unauthorized');
@@ -299,7 +306,6 @@ export class AppService implements OnModuleInit {
 
   // --- TICKETS, ATTENDEES, & SCANNER ---
   
-  // ✅ UPDATE: Menggunakan kolom attendee_name, attendee_email, price, dan custom_answers (JSONB)
   async buyTicket(userId: number | null, eventId: number, cart: any[], formAnswers: any, guestEmail?: string) {
     const client = await this.pool.connect();
     try {
@@ -337,6 +343,10 @@ export class AppService implements OnModuleInit {
           const name = formAnswers[`${prefix}-nama`] || `Peserta ${i + 1}`;
           const email = formAnswers[`${prefix}-email`] || ``;
           
+          // 👇 FIX: Ambil Pax & Greeting buat diinsert ke tabel tickets 👇
+          const pax = formAnswers[`${prefix}-pax`] ? parseInt(formAnswers[`${prefix}-pax`]) : 1;
+          const greeting = formAnswers[`${prefix}-greeting`] || null;
+          
           const customAnswers: any[] = [];
           for (const q of dbQuestions) {
              const ans = formAnswers[`${prefix}-q${q.id}`];
@@ -348,10 +358,11 @@ export class AppService implements OnModuleInit {
           const singlePrice = session.price;
           totalTransactionPrice += Number(singlePrice);
 
+          // 👇 FIX: Masukin pax dan greeting ke Insert SQL 👇
           const ticketRes = await client.query(
-            `INSERT INTO tickets (event_id, session_id, user_id, price, guest_email, attendee_name, attendee_email, custom_answers) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-            [eventId, sessionId, userId, singlePrice, targetEmail || null, name, email, JSON.stringify(customAnswers)]
+            `INSERT INTO tickets (event_id, session_id, user_id, price, guest_email, attendee_name, attendee_email, custom_answers, pax, greeting) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+            [eventId, sessionId, userId, singlePrice, targetEmail || null, name, email, JSON.stringify(customAnswers), pax, greeting]
           );
           
           const newTicketId = ticketRes.rows[0].id;
@@ -403,7 +414,6 @@ export class AppService implements OnModuleInit {
     await this.transporter.sendMail(mailOptions);
   }
 
-  // ✅ UPDATE: Sesuaikan Query Track Ticket 
   async trackTicket(ticketId: number, email: string) {
     try {
       const checkQuery = `
@@ -418,9 +428,10 @@ export class AppService implements OnModuleInit {
 
       const { event_id, exact_time } = checkRes.rows[0];
 
+      // 👇 FIX: Tambahin t.pax dan t.greeting 👇
       const query = `
         SELECT t.id as ticket_id, t.purchase_date, t.price, 
-               t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned,
+               t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned, t.pax, t.greeting,
                e.id as event_id, e.title, e.image_url as img, 
                TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date, e.place as location,
                s.name as session_name, TO_CHAR(s.session_date, 'Dy, DD Mon YYYY') as session_date, 
@@ -433,19 +444,19 @@ export class AppService implements OnModuleInit {
         ORDER BY t.id ASC
       `;
       const { rows } = await this.pool.query(query, [event_id, exact_time, email]);
-      return rows; // <-- Langsung return data murni!
+      return rows; 
     } catch (err) {
       if (err instanceof NotFoundException) throw err;
       throw new InternalServerErrorException('Gagal melacak tiket di server.');
     }
   }
 
-  // ✅ UPDATE: Sesuaikan Query Get My Tickets
   async getMyTickets(userId: number) {
     try {
+      // 👇 FIX: Tambahin t.pax dan t.greeting 👇
       const query = `
         SELECT t.id as ticket_id, t.purchase_date, t.price, 
-               t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned,
+               t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned, t.pax, t.greeting,
                e.id as event_id, e.title, e.image_url as img, 
                TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date, e.place as location,
                s.name as session_name, TO_CHAR(s.session_date, 'Dy, DD Mon YYYY') as session_date, 
@@ -457,22 +468,22 @@ export class AppService implements OnModuleInit {
         ORDER BY t.purchase_date DESC
       `;
       const { rows } = await this.pool.query(query, [userId]);
-      return rows; // <-- Langsung return data murni!
+      return rows; 
     } catch (err) {
       throw new InternalServerErrorException('Gagal mengambil tiket saya');
     }
   }
 
-  // ✅ UPDATE: Sesuaikan Query Attendees
   async getEventAttendees(eventId: number, userId: number) {
     try {
       const eventCheck = await this.pool.query('SELECT created_by FROM events WHERE id = $1', [eventId]);
       if (eventCheck.rows.length === 0) throw new BadRequestException('Event tidak ditemukan');
       if (eventCheck.rows[0].created_by != userId) throw new UnauthorizedException('Bukan pemilik event!');
 
+      // 👇 FIX: Tambahin t.pax dan t.greeting 👇
       const query = `
         SELECT t.id as ticket_id, t.purchase_date, t.price,
-               t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned,
+               t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned, t.pax, t.greeting,
                u.name as buyer_name, COALESCE(u.email, t.guest_email) as buyer_email, u.picture as buyer_pic,
                s.name as session_name
         FROM tickets t
@@ -482,22 +493,22 @@ export class AppService implements OnModuleInit {
         ORDER BY t.purchase_date DESC
       `;
       const { rows } = await this.pool.query(query, [eventId]);
-      return rows; // <-- Langsung return data murni!
+      return rows; 
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
       throw new InternalServerErrorException('Gagal mengambil data peserta');
     }
   }
 
-  // ✅ UPDATE: Sesuaikan Scanner
   async scanTicket(ticketId: number, eventId: number, userId: number) {
     try {
       const eventCheck = await this.pool.query('SELECT created_by FROM events WHERE id = $1', [eventId]);
       if (eventCheck.rows.length === 0) throw new BadRequestException('Event tidak ditemukan');
       if (eventCheck.rows[0].created_by != userId) throw new UnauthorizedException('Akses ditolak! Kamu bukan panitia event ini.');
 
+      // 👇 FIX: Tambahin t.pax dan t.greeting 👇
       const ticketRes = await this.pool.query(`
-        SELECT t.id, t.is_scanned, t.scanned_at, t.price as total_price, 1 as quantity,
+        SELECT t.id, t.is_scanned, t.scanned_at, t.price, t.pax, t.greeting,
                t.attendee_name, t.attendee_email, t.custom_answers,
                u.name as buyer_name, COALESCE(u.email, t.guest_email) as buyer_email, s.name as session_name
         FROM tickets t
@@ -506,34 +517,19 @@ export class AppService implements OnModuleInit {
         WHERE t.id = $1 AND t.event_id = $2
       `, [ticketId, eventId]);
 
-      if (ticketRes.rows.length === 0) {
-        return { valid: false, message: 'TIKET PALSU ATAU SALAH EVENT!' };
-      }
+      if (ticketRes.rows.length === 0) return { valid: false, message: 'TIKET PALSU ATAU SALAH EVENT!' };
 
       const ticket = ticketRes.rows[0];
-      // MAPPING BALIK SEBELUM DIKIRIM KE FRONTEND
-      ticket.attendee_data = [{ name: ticket.attendee_name, email: ticket.attendee_email, customAnswers: ticket.custom_answers }];
 
       if (ticket.is_scanned) {
         const scanWaktu = new Date(ticket.scanned_at).toLocaleString('id-ID');
-        return { 
-          valid: false, 
-          message: `TIKET SUDAH DIGUNAKAN pada ${scanWaktu}!`,
-          data: ticket
-        };
+        return { valid: false, message: `TIKET SUDAH DIGUNAKAN pada ${scanWaktu}!`, data: ticket };
       }
 
       await this.pool.query('UPDATE tickets SET is_scanned = TRUE, scanned_at = NOW() WHERE id = $1', [ticketId]);
-
-      return { 
-        valid: true, 
-        message: 'SCAN SUKSES! Tiket Valid.',
-        data: ticket 
-      };
-
+      return { valid: true, message: 'SCAN SUKSES! Tiket Valid.', data: ticket };
     } catch (err) {
       if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
-      console.error(err);
       throw new InternalServerErrorException('Gagal memproses validasi tiket');
     }
   }
