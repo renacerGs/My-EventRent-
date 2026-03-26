@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt'; 
 import * as nodemailer from 'nodemailer';
 import * as dotenv from 'dotenv'; 
+import * as QRCode from 'qrcode'; // 👇 FIX: IMPORT LIBRARY QR CODE DI SINI 👇
 
 dotenv.config(); 
 
@@ -50,7 +51,6 @@ export class AppService implements OnModuleInit {
 
   async getEvents() {
     try {
-      // 👇 FIX: Hapus e.date_time, tambahin e.is_private, & Filter cuma event Publik 👇
       const query = `
         SELECT e.id, e.title, 
                TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start,
@@ -76,7 +76,6 @@ export class AppService implements OnModuleInit {
 
   async getEventById(eventId: number) {
     try {
-      // 👇 FIX: Tambahin e.is_private 👇
       const eventQuery = `
         SELECT e.id, e.title, e.description, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start, 
                TO_CHAR(e.event_end, 'Dy, DD Mon YYYY') as date_end, e.place, e.name_place, e.city, e.province, e.map_url,
@@ -95,7 +94,6 @@ export class AppService implements OnModuleInit {
 
       const eventData = eventRes.rows[0];
 
-      // 👇 FIX: Tambahin kolom lokasi sesi 👇
       const sessionQuery = `
         SELECT id, name, description, TO_CHAR(session_date, 'Dy, DD Mon YYYY') as date, 
               start_time, end_time, contact_person, event_type, price, stock,
@@ -124,7 +122,6 @@ export class AppService implements OnModuleInit {
 
   async getMyEvents(userId: number) {
     try {
-      // 👇 FIX: Hapus e.date_time, tambahin e.is_private 👇
       const query = `
         SELECT e.id, e.title, 
                TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start,
@@ -163,7 +160,6 @@ export class AppService implements OnModuleInit {
     try {
       await client.query('BEGIN'); 
 
-      // 👇 FIX: Insert is_private 👇
       const eventQuery = `
         INSERT INTO events (
           title, description, event_start, event_end, category_id, 
@@ -189,7 +185,6 @@ export class AppService implements OnModuleInit {
 
       if (data.sessions && data.sessions.length > 0) {
         for (const session of data.sessions) {
-          // 👇 FIX: Insert lokasi ke event_sessions 👇
           const sessionQuery = `
             INSERT INTO event_sessions 
             (event_id, name, description, session_date, start_time, end_time, contact_person, event_type, price, stock, name_place, place, city, province, map_url)
@@ -343,7 +338,6 @@ export class AppService implements OnModuleInit {
           const name = formAnswers[`${prefix}-nama`] || `Peserta ${i + 1}`;
           const email = formAnswers[`${prefix}-email`] || ``;
           
-          // 👇 FIX: Ambil Pax & Greeting buat diinsert ke tabel tickets 👇
           const pax = formAnswers[`${prefix}-pax`] ? parseInt(formAnswers[`${prefix}-pax`]) : 1;
           const greeting = formAnswers[`${prefix}-greeting`] || null;
           
@@ -358,7 +352,6 @@ export class AppService implements OnModuleInit {
           const singlePrice = session.price;
           totalTransactionPrice += Number(singlePrice);
 
-          // 👇 FIX: Masukin pax dan greeting ke Insert SQL 👇
           const ticketRes = await client.query(
             `INSERT INTO tickets (event_id, session_id, user_id, price, guest_email, attendee_name, attendee_email, custom_answers, pax, greeting) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
@@ -373,7 +366,8 @@ export class AppService implements OnModuleInit {
       await client.query('COMMIT');
 
       if (targetEmail) {
-        this.sendEmailReceipt(targetEmail, eventTitle, boughtTickets, totalTransactionPrice)
+        // 👇 FIX: Nambahin param eventId ke dalam fungsi sendEmailReceipt 👇
+        this.sendEmailReceipt(targetEmail, eventTitle, boughtTickets, totalTransactionPrice, eventId)
           .catch(e => console.error("Gagal mengirim email struk:", e)); 
       }
 
@@ -389,24 +383,61 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  private async sendEmailReceipt(targetEmail: string, eventTitle: string, ticketIds: number[], totalPrice: number) {
+  // 👇🔥 FUNGSI EMAIL QR CODE SAKTI (VERSI KEMBAR SIAM DENGAN FRONTEND) 🔥👇
+  private async sendEmailReceipt(targetEmail: string, eventTitle: string, ticketIds: number[], totalPrice: number, eventId: number) {
+    let qrCodesHtml = '';
+    const emailAttachments: any[] = []; 
+
+    for (const id of ticketIds) {
+      // 👇 FIX: Format teks QR Code di-set ke JSON biar sama persis sama Frontend Scanner 👇
+      const qrPayload = JSON.stringify({ ticketId: id, eventId: eventId });
+      
+      const qrDataUrl = await QRCode.toDataURL(qrPayload, { errorCorrectionLevel: 'H', margin: 2 });
+      
+      const uniqueCid = `qr-ticket-${id}@eventrent.com`;
+
+      qrCodesHtml += `
+        <div style="text-align: center; margin: 20px auto; padding: 20px; border: 2px dashed #ccc; border-radius: 12px; background-color: #fafafa; max-width: 250px;">
+          <p style="margin: 0; font-size: 12px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: 1px;">Tunjukkan Saat Check-In</p>
+          <img src="cid:${uniqueCid}" alt="QR Code Tiket ${id}" style="width: 200px; height: 200px; margin: 15px 0;" />
+          <p style="margin: 0; font-size: 20px; font-weight: 900; letter-spacing: 3px; color: #333;">ID: ${id}</p>
+        </div>
+      `;
+
+      emailAttachments.push({
+        filename: `qr-ticket-${id}.png`,
+        path: qrDataUrl, 
+        cid: uniqueCid 
+      });
+    }
+
     const mailOptions = {
       from: '"EventRent System" <noreply@eventrent.com>',
       to: targetEmail,
-      subject: `Konfirmasi Pembelian Tiket - ${eventTitle}`,
+      subject: `🎟️ E-Ticket Resmi: ${eventTitle}`,
+      attachments: emailAttachments, 
       html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 10px;">
-          <h2 style="color: #FF6B35;">Pembelian Berhasil! 🎉</h2>
-          <p>Terima kasih telah membeli tiket untuk acara <strong>${eventTitle}</strong>.</p>
-          <p>Berikut adalah <b>Order ID</b> (Ticket ID) Anda. <strong>SIMPAN ORDER ID INI</strong> untuk mencari dan menampilkan E-Ticket Anda di website:</p>
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #eaeaea; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); background-color: #ffffff;">
           
-          <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; font-size: 18px; font-weight: bold; letter-spacing: 2px;">
-            Order ID: ${ticketIds.join(', ')}
+          <div style="text-align: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 20px; margin-bottom: 25px;">
+             <h1 style="color: #FF6B35; margin: 0; font-size: 28px; font-weight: 900;">🎟️ E-TICKET</h1>
+             <p style="color: #666; font-size: 16px; margin-top: 8px;">Acara: <strong style="color: #222;">${eventTitle}</strong></p>
           </div>
           
-          <p style="margin-top: 20px;">Total Pembayaran: Rp ${totalPrice.toLocaleString('id-ID')}</p>
-          <hr style="border: none; border-top: 1px solid #eee;" />
-          <p style="font-size: 12px; color: #777;">Gunakan email ini dan SALAH SATU Order ID di atas pada menu "Track Ticket" di website EventRent.</p>
+          <p style="font-size: 15px; color: #444; margin-top: 10px;">Halo!</p>
+          <p style="font-size: 15px; color: #444; line-height: 1.6;">Terima kasih telah melakukan reservasi/pembelian tiket untuk acara <strong>${eventTitle}</strong>. Berikut adalah E-Ticket resmi Anda.</p>
+          
+          ${qrCodesHtml}
+          
+          <div style="margin-top: 35px; padding: 20px; background-color: #FFF5F0; border-left: 5px solid #FF6B35; border-radius: 8px;">
+            <p style="margin: 0; font-size: 16px; color: #333;"><strong>Total Pembayaran: Rp ${totalPrice.toLocaleString('id-ID')}</strong></p>
+          </div>
+          
+          <p style="font-size: 11px; color: #aaa; text-align: center; margin-top: 40px; line-height: 1.5;">
+            Simpan email ini baik-baik atau Screenshot bagian QR Code.<br/>
+            QR Code bersifat rahasia dan hanya berlaku untuk 1 (satu) kali scan di pintu masuk.<br/>
+            <strong>Powered by EventRent</strong>
+          </p>
         </div>
       `
     };
@@ -428,7 +459,6 @@ export class AppService implements OnModuleInit {
 
       const { event_id, exact_time } = checkRes.rows[0];
 
-      // 👇 FIX: Tambahin t.pax dan t.greeting 👇
       const query = `
         SELECT t.id as ticket_id, t.purchase_date, t.price, 
                t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned, t.pax, t.greeting,
@@ -453,7 +483,6 @@ export class AppService implements OnModuleInit {
 
   async getMyTickets(userId: number) {
     try {
-      // 👇 FIX: Tambahin t.pax dan t.greeting 👇
       const query = `
         SELECT t.id as ticket_id, t.purchase_date, t.price, 
                t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned, t.pax, t.greeting,
@@ -480,7 +509,6 @@ export class AppService implements OnModuleInit {
       if (eventCheck.rows.length === 0) throw new BadRequestException('Event tidak ditemukan');
       if (eventCheck.rows[0].created_by != userId) throw new UnauthorizedException('Bukan pemilik event!');
 
-      // 👇 FIX: Tambahin t.pax dan t.greeting 👇
       const query = `
         SELECT t.id as ticket_id, t.purchase_date, t.price,
                t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned, t.pax, t.greeting,
@@ -506,7 +534,6 @@ export class AppService implements OnModuleInit {
       if (eventCheck.rows.length === 0) throw new BadRequestException('Event tidak ditemukan');
       if (eventCheck.rows[0].created_by != userId) throw new UnauthorizedException('Akses ditolak! Kamu bukan panitia event ini.');
 
-      // 👇 FIX: Tambahin t.pax dan t.greeting 👇
       const ticketRes = await this.pool.query(`
         SELECT t.id, t.is_scanned, t.scanned_at, t.price, t.pax, t.greeting,
                t.attendee_name, t.attendee_email, t.custom_answers,

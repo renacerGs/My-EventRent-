@@ -4,8 +4,11 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // 👇 INI TAMBAHANNYA BIAR MODE DEV LU BISA NYEDOT DATA DARI BACKEND 👇
   server: {
+    // 👇 INI KUNCI SAKTINYA: Izinkan semua domain (termasuk Cloudflare) buat akses Vite lu 👇
+    allowedHosts: true, 
+    
+    // 👇 INI TETEP ADA BIAR API BACKEND LU JALAN 👇
     proxy: {
       '/api': {
         target: 'http://localhost:3000',

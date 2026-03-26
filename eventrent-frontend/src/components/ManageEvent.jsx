@@ -50,7 +50,6 @@ export default function ManageEvent() {
     fetch(`/api/events/my?userId=${user.id}`)
       .then(res => res.json())
       .then(data => { 
-        // Pastikan yang masuk beneran Array, kalau backend error, set array kosong
         setMyEvents(Array.isArray(data) ? data : []); 
       })
       .catch(err => console.error("Gagal ambil event:", err));
@@ -67,7 +66,6 @@ export default function ManageEvent() {
   }, []);
 
   const sortedEvents = [...myEvents].sort((a, b) => {
-    // 👇 FIX: Pakai date_start sesuai respons backend 👇
     const isAPast = isEventPassed(a.date_start);
     const isBPast = isEventPassed(b.date_start);
     if (isAPast && !isBPast) return 1;  
@@ -136,10 +134,11 @@ export default function ManageEvent() {
           <div className="divide-y divide-gray-100">
             {sortedEvents.length > 0 ? (
               sortedEvents.map((event) => {
-                // 👇 FIX: Pakai date_start 👇
                 const isPast = isEventPassed(event.date_start);
                 const isMenuActive = activeMenuId === event.id;
-                const isWed = event.is_private || event.isPrivate; // Deteksi Wedding
+                
+                // 👇 FIX: Pengecekan KETAT biar nggak gampang ketipu 👇
+                const isWed = event.is_private === true || event.is_private === 'true' || event.isPrivate === true; 
 
                 return (
                   <div 
@@ -155,7 +154,6 @@ export default function ManageEvent() {
                       <div className="text-left flex-1 min-w-0">
                         <h3 className="font-bold text-gray-900 text-sm md:text-base mb-0.5 group-hover:text-[#FF6B35] transition-colors truncate flex items-center gap-2">
                           {event.title}
-                          {/* 👇 BADGE KHUSUS WEDDING / PRIVATE 👇 */}
                           {isWed && (
                             <span className="bg-[#D4AF37]/10 text-[#D4AF37] px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border border-[#D4AF37]/20 shrink-0">
                               Private
@@ -163,7 +161,6 @@ export default function ManageEvent() {
                           )}
                         </h3>
                         <div className="flex items-center gap-3 text-[10px] md:text-xs text-gray-500 font-medium">
-                          {/* 👇 FIX: Pakai date_start 👇 */}
                           <span className="truncate">{formatPrettyDate(event.date_start)}</span>
                         </div>
                       </div>
@@ -180,7 +177,8 @@ export default function ManageEvent() {
                         {event.stock > 0 ? `${event.stock} Left` : 'Sold Out'}
                       </span>
                       <span className={`ml-auto text-xs font-bold ${isWed ? 'text-[#D4AF37]' : 'text-gray-900'}`}>
-                        {Number(event.price) === 0 ? 'Free RSVP' : `Rp ${parseInt(event.price).toLocaleString()}`}
+                        {/* 👇 FIX TAMPILAN HARGA HP 👇 */}
+                        {Number(event.price) === 0 ? (isWed ? 'Free RSVP' : 'Free') : `Rp ${parseInt(event.price).toLocaleString()}`}
                       </span>
                     </div>
 
@@ -198,7 +196,8 @@ export default function ManageEvent() {
                       </span>
                     </div>
                     <div className={`hidden md:block md:col-span-2 text-center text-sm font-bold ${isWed ? 'text-[#D4AF37]' : 'text-gray-900'}`}>
-                      {Number(event.price) === 0 ? 'Free RSVP' : `Rp ${parseInt(event.price).toLocaleString()}`}
+                       {/* 👇 FIX TAMPILAN HARGA DESKTOP 👇 */}
+                       {Number(event.price) === 0 ? (isWed ? 'Free RSVP' : 'Free') : `Rp ${parseInt(event.price).toLocaleString()}`}
                     </div>
 
                     {/* TOMBOL ACTION (Titik Tiga) */}
