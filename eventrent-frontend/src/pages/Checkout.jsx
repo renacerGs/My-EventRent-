@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // --- KOMPONEN CUSTOM DROPDOWN ALA GOOGLE FORMS ---
-function CustomDropdown({ options, value, onChange, placeholder }) {
+function CustomDropdown({ options, value, onChange, placeholder, isWed }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -17,14 +17,20 @@ function CustomDropdown({ options, value, onChange, placeholder }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const bgNormal = isWed ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-300 text-gray-900';
+  const focusRing = isWed ? 'border-[#D4AF37] ring-[#D4AF37]' : 'border-[#FF6B35] ring-[#FF6B35]';
+  const bgMenu = isWed ? 'bg-slate-800 border-slate-700 shadow-xl' : 'bg-white border-gray-100 shadow-[0_10px_40px_rgba(0,0,0,0.08)]';
+  const itemHover = isWed ? 'hover:bg-slate-700 text-gray-300' : 'hover:bg-gray-50 text-gray-700';
+  const itemActive = isWed ? 'bg-slate-900 text-[#D4AF37] font-bold' : 'bg-orange-50 text-[#FF6B35] font-bold';
+
   return (
     <div className="relative" ref={dropdownRef}>
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full bg-white border ${isOpen ? 'border-[#FF6B35] ring-1 ring-[#FF6B35]' : 'border-gray-300'} rounded-xl px-4 py-3 text-sm outline-none cursor-pointer flex justify-between items-center transition-all hover:border-gray-400`}
+        className={`w-full border ${isOpen ? `${focusRing} ring-1` : bgNormal} rounded-xl px-4 py-3 text-sm outline-none cursor-pointer flex justify-between items-center transition-all ${isWed ? 'hover:border-slate-500' : 'hover:border-gray-400'}`}
       >
-        <span className={value ? 'text-gray-900 font-medium' : 'text-gray-400'}>{value || placeholder}</span>
-        <svg className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"></path></svg>
+        <span className={value ? (isWed ? 'text-white font-medium' : 'text-gray-900 font-medium') : 'text-gray-500'}>{value || placeholder}</span>
+        <svg className={`w-4 h-4 ${isWed ? 'text-gray-400' : 'text-gray-500'} transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"></path></svg>
       </div>
       
       <AnimatePresence>
@@ -34,13 +40,13 @@ function CustomDropdown({ options, value, onChange, placeholder }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
-            className="absolute z-20 w-full mt-2 bg-white border border-gray-100 shadow-[0_10px_40px_rgba(0,0,0,0.08)] rounded-xl py-2 max-h-60 overflow-y-auto"
+            className={`absolute z-20 w-full mt-2 border rounded-xl py-2 max-h-60 overflow-y-auto ${bgMenu}`}
           >
             {options.map((opt, idx) => (
               <div 
                 key={idx}
                 onClick={() => { onChange(opt); setIsOpen(false); }}
-                className={`px-5 py-3 text-sm cursor-pointer transition-colors flex items-center gap-2 ${value === opt ? 'bg-orange-50 text-[#FF6B35] font-bold' : 'text-gray-700 hover:bg-gray-50'}`}
+                className={`px-5 py-3 text-sm cursor-pointer transition-colors flex items-center gap-2 ${value === opt ? itemActive : itemHover}`}
               >
                 {value === opt && <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>}
                 <span className={value === opt ? '' : 'pl-6'}>{opt}</span>
@@ -85,7 +91,6 @@ export default function Checkout() {
   };
 
   useEffect(() => {
-    // --- Validasi redirect login DIBUANG agar Guest bisa masuk ---
     const fetchEvent = async () => {
       try {
         const res = await fetch(`/api/events/${id}`);
@@ -102,7 +107,7 @@ export default function Checkout() {
               }));
               setCart(allCartItems);
             } else {
-              showPopup("Maaf bro, semua tiket sudah habis terjual!", "error");
+              showPopup("Maaf bro, semua tiket/kuota sudah habis!", "error");
               setTimeout(() => { navigate(`/event/${id}`); }, 2000);
             }
           } else if (preferredSessionId) {
@@ -121,7 +126,7 @@ export default function Checkout() {
         }
       } catch (err) {
         console.error(err);
-        showPopup("Gagal memuat data checkout", "error");
+        showPopup("Gagal memuat data", "error");
         setTimeout(() => { navigate('/'); }, 2000);
       } finally {
         setLoading(false);
@@ -133,7 +138,7 @@ export default function Checkout() {
   const handleAddCartItem = () => {
     const availableSession = event.sessions.find(s => s.stock > 0 && !cart.some(item => String(item.sessionId) === String(s.id)));
     if (!availableSession) {
-      showPopup("Semua kategori tiket sudah kamu pilih bro!", "error");
+      showPopup("Semua kategori sudah kamu pilih!", "error");
       return;
     }
     const newCartId = crypto.randomUUID();
@@ -142,7 +147,7 @@ export default function Checkout() {
 
   const handleRemoveCartItem = (cartId) => {
     if (cart.length === 1) {
-      showPopup("Minimal beli 1 tiket bro!", "error");
+      showPopup("Minimal pilih 1 kategori!", "error");
       return;
     }
     setCart(cart.filter(item => item.id !== cartId));
@@ -165,12 +170,12 @@ export default function Checkout() {
     e.preventDefault(); 
 
     if (cart.length === 0) {
-      showPopup("Keranjang kosong bro!", "error");
+      showPopup("Form belum lengkap!", "error");
       return;
     }
     const invalidItem = cart.find(item => item.qty < 1);
     if (invalidItem) {
-      showPopup("Jumlah tiket minimal 1 per kategori ya bro!", "error");
+      showPopup("Jumlah tiket minimal 1 per kategori!", "error");
       return;
     }
     
@@ -187,7 +192,6 @@ export default function Checkout() {
     setIsSubmitting(true);
     
     try {
-      // --- TAMBAHAN BARU: Ambil email dari form tiket pertama jika user tidak login ---
       let emailTamu = '';
       if (!user && cart.length > 0) {
         const firstCartItem = cart[0];
@@ -195,10 +199,9 @@ export default function Checkout() {
         emailTamu = formAnswers[emailKey] || '';
       }
 
-      // --- PERBAIKAN: Masukkan guestEmail ke dalam payload ---
       const payload = { 
         userId: user ? user.id : null, 
-        guestEmail: emailTamu, // <-- INI KUNCI BIAR EMAIL TERKIRIM
+        guestEmail: emailTamu, 
         eventId: event.id, 
         cart: cart, 
         formAnswers: formAnswers 
@@ -214,11 +217,10 @@ export default function Checkout() {
       if (res.ok) {
         setPaymentStatus('success');
         setTimeout(() => {
-          // Arahkan ke halaman event lagi setelah sukses
           navigate(`/event/${id}`); 
         }, 2000);
       } else {
-        showPopup("Gagal bayar: " + (data.message || 'Terjadi kesalahan di server'), "error");
+        showPopup("Gagal memproses: " + (data.message || 'Terjadi kesalahan di server'), "error");
         setShowPaymentModal(false);
         setPaymentStatus('idle');
       }
@@ -232,10 +234,23 @@ export default function Checkout() {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-400">Loading Checkout...</div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-400">Loading Form...</div>;
+
+  // 👇 DETEKTOR TEMA EKSKLUSIF (Persis kayak CreateEvent) 👇
+  const isWed = event?.is_private || event?.category === 'Wedding';
+  const primaryColor = isWed ? 'bg-[#D4AF37] hover:bg-[#B5952F] text-slate-950' : 'bg-gray-900 hover:bg-black text-white';
+  const textHighlight = isWed ? 'text-[#D4AF37]' : 'text-[#FF6B35]';
+  const bgMain = isWed ? 'bg-slate-950' : 'bg-gray-50';
+  const bgCard = isWed ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-200';
+  const textTitle = isWed ? 'text-white' : 'text-gray-900';
+  const textLabel = isWed ? 'text-gray-300' : 'text-gray-700';
+  const inputBg = isWed ? 'bg-slate-800 text-white border-slate-700 placeholder-gray-500' : 'bg-white text-gray-900 border border-gray-300 placeholder-gray-400';
+  const focusStyle = isWed ? 'focus:border-[#D4AF37] focus:ring-[#D4AF37]' : 'focus:border-[#FF6B35] focus:ring-[#FF6B35]';
+  const inputStyle = `w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-1 ${inputBg} ${focusStyle}`;
+  const labelStyle = `block text-xs font-bold mb-2 uppercase tracking-widest ${textLabel}`;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-32 font-sans pt-10 relative">
+    <div className={`min-h-screen ${bgMain} pb-32 font-sans pt-10 relative transition-colors duration-500`}>
       
       <AnimatePresence>
         {popup.isOpen && (
@@ -278,14 +293,16 @@ export default function Checkout() {
             <button 
               type="button" 
               onClick={() => navigate(-1)} 
-              className="w-12 h-12 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-500 hover:text-[#FF6B35] hover:border-[#FF6B35] shadow-sm transition-all active:scale-95" 
-              title="Kembali ke Event"
+              className={`w-12 h-12 flex items-center justify-center rounded-full border shadow-sm transition-all active:scale-95 ${isWed ? 'bg-slate-900 border-slate-700 text-gray-400 hover:text-[#D4AF37] hover:border-[#D4AF37]' : 'bg-white border-gray-200 text-gray-500 hover:text-[#FF6B35] hover:border-[#FF6B35]'}`} 
+              title="Kembali"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
             </button>
             <div>
-              <h1 className="text-3xl font-extrabold text-gray-900 uppercase tracking-tight leading-none mb-1">Checkout Tiket</h1>
-              <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">{event.title}</p>
+              <h1 className={`text-3xl font-extrabold uppercase tracking-tight leading-none mb-1 ${textTitle}`}>
+                {isWed ? 'RSVP Kehadiran' : 'Checkout Tiket'}
+              </h1>
+              <p className={`text-xs font-bold uppercase tracking-widest ${isWed ? 'text-[#D4AF37]' : 'text-gray-500'}`}>{event.title}</p>
             </div>
           </div>
 
@@ -297,14 +314,20 @@ export default function Checkout() {
                 const availableStock = selectedSession ? selectedSession.stock : 0;
 
                 return (
-                  <div key={item.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
+                  <div key={item.id} className={`${bgCard} p-5 rounded-2xl shadow-sm border`}>
                     <div className="flex justify-between items-center mb-3">
-                      <span className="text-xs font-bold text-[#FF6B35] uppercase tracking-widest">Kategori Tiket {index + 1}</span>
+                      <span className={`text-xs font-bold uppercase tracking-widest ${textHighlight}`}>
+                        {isWed ? 'Kategori Undangan' : `Kategori Tiket ${index + 1}`}
+                      </span>
                       {cart.length > 1 && (
                         <button type="button" onClick={() => handleRemoveCartItem(item.id)} className="text-gray-400 hover:text-red-500 font-bold text-sm">✕ Hapus</button>
                       )}
                     </div>
-                    <select value={item.sessionId} onChange={(e) => updateCartItem(item.id, 'sessionId', e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 mb-4 focus:ring-1 focus:ring-[#FF6B35] outline-none">
+                    <select 
+                      value={item.sessionId} 
+                      onChange={(e) => updateCartItem(item.id, 'sessionId', e.target.value)} 
+                      className={`w-full ${isWed ? 'bg-slate-800 border-slate-700 text-white' : 'bg-gray-50 border-gray-200 text-gray-700'} rounded-xl px-4 py-3 text-sm font-bold mb-4 focus:ring-1 ${focusStyle} outline-none`}
+                    >
                       {event.sessions.map(s => {
                         const isAlreadySelectedByOtherCartItem = cart.some(c => String(c.sessionId) === String(s.id) && c.id !== item.id);
                         const isOutOfStock = s.stock < 1;
@@ -317,27 +340,30 @@ export default function Checkout() {
                     </select>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-[10px] text-gray-400 font-bold uppercase mb-1">Sisa Stok</p>
-                        <p className="text-sm font-bold text-gray-900">{availableStock} Tiket</p>
+                        <p className={`text-[10px] font-bold uppercase mb-1 ${isWed ? 'text-gray-500' : 'text-gray-400'}`}>{isWed ? 'Sisa Kuota' : 'Sisa Stok'}</p>
+                        <p className={`text-sm font-bold ${textTitle}`}>{availableStock} Orang</p>
                       </div>
-                      <div className="flex items-center bg-gray-100 rounded-xl p-1">
-                        <button type="button" onClick={() => item.qty > 1 && updateCartItem(item.id, 'qty', item.qty - 1)} className="w-8 h-8 flex items-center justify-center bg-white rounded-lg text-gray-600 hover:bg-gray-200 font-bold shadow-sm">-</button>
-                        <span className="w-10 text-center font-bold text-gray-900">{item.qty}</span>
-                        <button type="button" onClick={() => item.qty < availableStock && updateCartItem(item.id, 'qty', item.qty + 1)} className="w-8 h-8 flex items-center justify-center bg-[#FF6B35] rounded-lg text-white hover:bg-orange-600 font-bold shadow-sm">+</button>
+                      <div className={`flex items-center rounded-xl p-1 ${isWed ? 'bg-slate-800' : 'bg-gray-100'}`}>
+                        <button type="button" onClick={() => item.qty > 1 && updateCartItem(item.id, 'qty', item.qty - 1)} className={`w-8 h-8 flex items-center justify-center rounded-lg font-bold shadow-sm ${isWed ? 'bg-slate-700 text-gray-300 hover:bg-slate-600' : 'bg-white text-gray-600 hover:bg-gray-200'}`}>-</button>
+                        <span className={`w-10 text-center font-bold ${textTitle}`}>{item.qty}</span>
+                        <button type="button" onClick={() => item.qty < availableStock && updateCartItem(item.id, 'qty', item.qty + 1)} className={`w-8 h-8 flex items-center justify-center rounded-lg font-bold shadow-sm ${isWed ? 'bg-[#D4AF37] text-slate-900 hover:bg-[#B5952F]' : 'bg-[#FF6B35] text-white hover:bg-orange-600'}`}>+</button>
                       </div>
                     </div>
                   </div>
                 );
               })}
               {canAddNewSession && (
-                <button type="button" onClick={handleAddCartItem} className="w-full py-4 border-2 border-dashed border-green-500 text-green-600 font-bold rounded-2xl hover:bg-green-50 transition-colors uppercase text-xs tracking-widest">+ Tambah Kategori Tiket</button>
+                <button type="button" onClick={handleAddCartItem} className={`w-full py-4 border-2 border-dashed font-bold rounded-2xl transition-colors uppercase text-xs tracking-widest ${isWed ? 'border-[#D4AF37] text-[#D4AF37] hover:bg-slate-900' : 'border-green-500 text-green-600 hover:bg-green-50'}`}>
+                  + {isWed ? 'Tambah Kategori Undangan' : 'Tambah Kategori Tiket'}
+                </button>
               )}
             </div>
 
-            <div className="lg:col-span-8 bg-white rounded-[32px] p-8 md:p-10 shadow-sm border border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4">Data Pemegang Tiket</h2>
+            <div className={`lg:col-span-8 ${bgCard} rounded-[32px] p-8 md:p-10 shadow-sm border`}>
+              <h2 className={`text-2xl font-bold mb-6 border-b pb-4 ${isWed ? 'text-white border-slate-800' : 'text-gray-900 border-gray-100'}`}>
+                {isWed ? 'Data Tamu Undangan' : 'Data Pemegang Tiket'}
+              </h2>
               
-              {/* --- KEMBALI KE UI FLAT (TIDAK BERJENJANG) --- */}
               <div className="space-y-4">
                 {cart.map((item, cartIndex) => {
                   const session = event.sessions.find(s => String(s.id) === String(item.sessionId));
@@ -348,26 +374,43 @@ export default function Checkout() {
 
                     return (
                       <div key={formKeyPrefix} className="mb-10 last:mb-0">
-                        <div className="bg-orange-50 text-[#FF6B35] px-4 py-2 rounded-lg font-bold text-sm mb-5 inline-block border border-orange-100">
-                          Tiket {qtyIndex + 1} - <span className="uppercase">{session.name}</span>
+                        <div className={`px-4 py-2 rounded-lg font-bold text-sm mb-5 inline-block border ${isWed ? 'bg-slate-800 text-[#D4AF37] border-slate-700' : 'bg-orange-50 text-[#FF6B35] border-orange-100'}`}>
+                          {isWed ? 'Tamu' : 'Tiket'} {qtyIndex + 1} - <span className="uppercase">{session.name}</span>
                         </div>
                         
-                        <div className="space-y-5 pl-2 md:pl-4 border-l-2 border-gray-100">
+                        <div className={`space-y-5 pl-2 md:pl-4 border-l-2 ${isWed ? 'border-slate-800' : 'border-gray-100'}`}>
                           <div>
-                            <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-widest">Nama Lengkap <span className="text-red-500">*</span></label>
-                            <input type="text" required value={formAnswers[`${formKeyPrefix}-nama`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-nama`]: e.target.value}))} className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35] focus:ring-1 focus:ring-[#FF6B35] transition-all" placeholder="Masukkan nama sesuai KTP" />
+                            <label className={labelStyle}>Nama Lengkap <span className="text-red-500">*</span></label>
+                            <input type="text" required value={formAnswers[`${formKeyPrefix}-nama`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-nama`]: e.target.value}))} className={inputStyle} placeholder={isWed ? "Bapak/Ibu/Saudara..." : "Masukkan nama sesuai KTP"} />
                           </div>
                           <div>
-                            <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-widest">Email <span className="text-red-500">*</span></label>
-                            <input type="email" required value={formAnswers[`${formKeyPrefix}-email`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-email`]: e.target.value}))} className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35] focus:ring-1 focus:ring-[#FF6B35] transition-all" placeholder="Masukkan email aktif" />
+                            <label className={labelStyle}>Email <span className="text-red-500">*</span></label>
+                            <input type="email" required value={formAnswers[`${formKeyPrefix}-email`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-email`]: e.target.value}))} className={inputStyle} placeholder={isWed ? "Untuk pengiriman E-Ticket (QR Code)" : "Masukkan email aktif"} />
                           </div>
+                          
+                          {/* 👇 TAMBAHAN KHUSUS WEDDING (PAX & UCAPAN) 👇 */}
+                          {isWed && (
+                            <>
+                              <div>
+                                <label className={labelStyle}>Jumlah Rombongan (Pax) <span className="text-red-500">*</span></label>
+                                <select required value={formAnswers[`${formKeyPrefix}-pax`] || '1'} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-pax`]: e.target.value}))} className={`${inputStyle} cursor-pointer`}>
+                                  <option value="1">1 Orang (Hanya Saya)</option>
+                                  <option value="2">2 Orang (+ Partner)</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className={labelStyle}>Ucapan & Doa <span className="text-red-500">*</span></label>
+                                <textarea required value={formAnswers[`${formKeyPrefix}-greeting`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-greeting`]: e.target.value}))} className={inputStyle} rows="3" placeholder="Tuliskan ucapan selamat dan doa untuk kedua mempelai..."></textarea>
+                              </div>
+                            </>
+                          )}
                           
                           {/* --- RENDER CUSTOM QUESTIONS --- */}
                           {session.questions && session.questions.map((q) => {
                             const formKey = `${formKeyPrefix}-q${q.id}`;
                             return (
-                              <div key={q.id} className="pt-4 border-t border-gray-100">
-                                <label className="block text-xs font-bold text-gray-700 mb-2 uppercase tracking-widest">
+                              <div key={q.id} className={`pt-4 border-t ${isWed ? 'border-slate-800' : 'border-gray-100'}`}>
+                                <label className={labelStyle}>
                                   {q.question_text} {q.is_required && <span className="text-red-500">*</span>}
                                 </label>
 
@@ -377,7 +420,7 @@ export default function Checkout() {
                                     required={q.is_required} 
                                     value={formAnswers[formKey] || ''} 
                                     onChange={(e) => setFormAnswers(prev => ({...prev, [formKey]: e.target.value}))} 
-                                    className="w-full bg-white border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#FF6B35] focus:ring-1 focus:ring-[#FF6B35] transition-all" 
+                                    className={inputStyle} 
                                     placeholder="Ketik jawaban..." 
                                   />
                                 )}
@@ -385,6 +428,7 @@ export default function Checkout() {
                                 {/* --- CUSTOM DROPDOWN --- */}
                                 {q.answer_type === 'Dropdown' && (
                                   <CustomDropdown 
+                                    isWed={isWed}
                                     options={q.options} 
                                     value={formAnswers[formKey] || ''} 
                                     onChange={(val) => setFormAnswers(prev => ({...prev, [formKey]: val}))} 
@@ -395,7 +439,7 @@ export default function Checkout() {
 
                                 {/* --- CUSTOM CHECKBOX --- */}
                                 {q.answer_type === 'Checkbox' && (
-                                  <div className="space-y-3 mt-3 bg-gray-50 p-4 rounded-xl border border-gray-200">
+                                  <div className={`space-y-3 mt-3 p-4 rounded-xl border ${isWed ? 'bg-slate-800/50 border-slate-700' : 'bg-gray-50 border-gray-200'}`}>
                                     {q.options && q.options.map((opt, idx) => {
                                        const currentStr = formAnswers[formKey] || '';
                                        const isChecked = currentStr.split(', ').includes(opt);
@@ -418,11 +462,11 @@ export default function Checkout() {
                                                }} 
                                                className="peer w-full h-full absolute opacity-0 cursor-pointer" 
                                              />
-                                             <div className="w-5 h-5 border-2 border-gray-400 rounded-[3px] flex items-center justify-center peer-checked:bg-[#FF6B35] peer-checked:border-[#FF6B35] transition-all group-hover:border-gray-600">
-                                                <svg className="w-3.5 h-3.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                                             <div className={`w-5 h-5 border-2 rounded-[3px] flex items-center justify-center transition-all ${isWed ? 'border-slate-500 group-hover:border-[#D4AF37] peer-checked:bg-[#D4AF37] peer-checked:border-[#D4AF37]' : 'border-gray-400 group-hover:border-gray-600 peer-checked:bg-[#FF6B35] peer-checked:border-[#FF6B35]'}`}>
+                                                <svg className={`w-3.5 h-3.5 opacity-0 peer-checked:opacity-100 transition-opacity ${isWed ? 'text-slate-900' : 'text-white'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
                                              </div>
                                            </div>
-                                           <span className="text-sm font-medium text-gray-700 group-hover:text-gray-900 transition-colors">{opt}</span>
+                                           <span className={`text-sm font-medium transition-colors ${isWed ? 'text-gray-300 group-hover:text-white' : 'text-gray-700 group-hover:text-gray-900'}`}>{opt}</span>
                                          </label>
                                        )
                                     })}
@@ -442,19 +486,20 @@ export default function Checkout() {
           </div>
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-[0_-10px_30px_rgba(0,0,0,0.05)] p-5 z-50">
+        {/* BOTTOM FIXED BAR */}
+        <div className={`fixed bottom-0 left-0 right-0 border-t shadow-[0_-10px_30px_rgba(0,0,0,0.05)] p-5 z-50 ${isWed ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-200'}`}>
           <div className="max-w-7xl mx-auto flex items-center justify-between px-4">
             <div>
-              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-1">Total Pembayaran</p>
-              <p className="text-2xl font-black text-[#FF6B35]">Rp {calculateTotal().toLocaleString('id-ID')}</p>
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-1">{isWed ? 'Status RSVP' : 'Total Pembayaran'}</p>
+              <p className={`text-2xl font-black ${textHighlight}`}>{isWed ? 'GRATIS / VIP' : `Rp ${calculateTotal().toLocaleString('id-ID')}`}</p>
             </div>
             
             <button 
               type="submit" 
               disabled={isSubmitting || cart.length === 0}
-              className="px-8 py-4 bg-gray-900 text-white font-bold rounded-xl uppercase tracking-widest text-sm shadow-xl hover:bg-black transition-all active:scale-95 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className={`px-8 py-4 font-bold rounded-xl uppercase tracking-widest text-sm shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${primaryColor}`}
             >
-              {isSubmitting ? 'Memproses...' : 'Lanjut Bayar'}
+              {isSubmitting ? 'Memproses...' : (isWed ? 'Kirim RSVP' : 'Lanjut Bayar')}
             </button>
           </div>
         </div>
@@ -466,19 +511,19 @@ export default function Checkout() {
       {/* ======================================================= */}
       {showPaymentModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl relative">
+          <div className={`rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl relative ${isWed ? 'bg-slate-900 border border-slate-700' : 'bg-white'}`}>
             
             {paymentStatus === 'idle' && (
               <button 
                 type="button"
                 onClick={() => { setShowPaymentModal(false); setPaymentMethod(null); }} 
-                className="absolute top-5 right-5 text-gray-400 hover:text-gray-900 bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
+                className={`absolute top-5 right-5 rounded-full w-8 h-8 flex items-center justify-center transition-colors ${isWed ? 'text-gray-400 bg-slate-800 hover:text-white' : 'text-gray-400 bg-gray-100 hover:text-gray-900'}`}
               >
                 ✕
               </button>
             )}
 
-            {paymentStatus === 'idle' && !paymentMethod && calculateTotal() > 0 && (
+            {paymentStatus === 'idle' && !paymentMethod && calculateTotal() > 0 && !isWed && (
               <div className="p-8">
                 <h3 className="text-xl font-black text-gray-900 mb-2">Pilih Pembayaran</h3>
                 <p className="text-sm text-gray-500 mb-8 font-medium">Total: <strong className="text-[#FF6B35]">Rp {calculateTotal().toLocaleString('id-ID')}</strong></p>
@@ -511,7 +556,7 @@ export default function Checkout() {
 
             {paymentStatus === 'idle' && paymentMethod && (
               <div className="p-8 text-center">
-                {paymentMethod !== 'free' && (
+                {paymentMethod !== 'free' && !isWed && (
                   <button type="button" onClick={() => setPaymentMethod(null)} className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-gray-900 mb-6 flex items-center justify-center w-full transition-colors">
                     ← Ganti Metode
                   </button>
@@ -519,9 +564,11 @@ export default function Checkout() {
 
                 {paymentMethod === 'free' ? (
                   <>
-                    <h3 className="text-2xl font-black text-gray-900 mb-2">Tiket Gratis! 🎉</h3>
-                    <p className="text-sm text-gray-500 mb-8 font-medium">Asyik, kamu gak perlu bayar sepeserpun untuk event ini.</p>
-                    <div className="w-32 h-32 mx-auto bg-green-50 text-green-500 rounded-full flex items-center justify-center mb-8 border-[8px] border-green-100">
+                    <h3 className={`text-2xl font-black mb-2 ${textTitle}`}>{isWed ? 'Konfirmasi RSVP 💍' : 'Tiket Gratis! 🎉'}</h3>
+                    <p className={`text-sm mb-8 font-medium ${isWed ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {isWed ? 'Silakan kirim form ini untuk mendapatkan E-Ticket (QR Code) Anda.' : 'Asyik, kamu gak perlu bayar sepeserpun untuk event ini.'}
+                    </p>
+                    <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center mb-8 border-[8px] ${isWed ? 'bg-slate-800 text-[#D4AF37] border-slate-700' : 'bg-green-50 text-green-500 border-green-100'}`}>
                       <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>
                     </div>
                   </>
@@ -544,7 +591,7 @@ export default function Checkout() {
                   </>
                 )}
 
-                {paymentMethod !== 'free' && (
+                {paymentMethod !== 'free' && !isWed && (
                   <div className="bg-orange-50 text-[#FF6B35] p-4 rounded-xl font-black text-xl mb-8 border border-orange-100">
                     Rp {calculateTotal().toLocaleString('id-ID')}
                   </div>
@@ -553,9 +600,9 @@ export default function Checkout() {
                 <button 
                   type="button"
                   onClick={executeRealPayment}
-                  className="w-full py-4 bg-gray-900 text-white rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl hover:bg-black transition-all active:scale-95"
+                  className={`w-full py-4 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl transition-all active:scale-95 ${primaryColor}`}
                 >
-                  {paymentMethod === 'free' ? 'Dapatkan Tiket' : 'Saya Sudah Bayar'}
+                  {paymentMethod === 'free' ? (isWed ? 'Kirim Undangan Saya' : 'Dapatkan Tiket') : 'Saya Sudah Bayar'}
                 </button>
               </div>
             )}
@@ -564,19 +611,21 @@ export default function Checkout() {
               <div className="p-12 text-center flex flex-col items-center justify-center min-h-[300px]">
                 {paymentStatus === 'processing' ? (
                   <>
-                    <div className="w-16 h-16 border-4 border-gray-100 border-t-[#FF6B35] rounded-full animate-spin mb-6"></div>
-                    <h3 className="text-lg font-black text-gray-900 uppercase tracking-wide">Memverifikasi...</h3>
-                    <p className="text-xs text-gray-500 mt-2 font-medium">Jangan tutup halaman ini</p>
+                    <div className={`w-16 h-16 border-4 rounded-full animate-spin mb-6 ${isWed ? 'border-slate-800 border-t-[#D4AF37]' : 'border-gray-100 border-t-[#FF6B35]'}`}></div>
+                    <h3 className={`text-lg font-black uppercase tracking-wide ${textTitle}`}>Memverifikasi...</h3>
+                    <p className={`text-xs mt-2 font-medium ${isWed ? 'text-gray-400' : 'text-gray-500'}`}>Jangan tutup halaman ini</p>
                   </>
                 ) : (
                   <>
-                    <div className="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mb-6 border-[6px] border-green-100 animate-bounce">
+                    <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 border-[6px] animate-bounce ${isWed ? 'bg-slate-800 text-[#D4AF37] border-slate-700' : 'bg-green-50 text-green-500 border-green-100'}`}>
                       <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                     </div>
-                    <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">
-                      {paymentMethod === 'free' ? 'Tiket Diklaim!' : 'Pembayaran Sukses!'}
+                    <h3 className={`text-2xl font-black uppercase tracking-tight ${textTitle}`}>
+                      {paymentMethod === 'free' ? (isWed ? 'RSVP Terkirim!' : 'Tiket Diklaim!') : 'Pembayaran Sukses!'}
                     </h3>
-                    <p className="text-sm text-gray-500 mt-2 font-medium">Tiket kamu sedang disiapkan...</p>
+                    <p className={`text-sm mt-2 font-medium ${isWed ? 'text-gray-400' : 'text-gray-500'}`}>
+                       {isWed ? 'E-Ticket sedang dikirim ke email Anda...' : 'Tiket kamu sedang disiapkan...'}
+                    </p>
                   </>
                 )}
               </div>

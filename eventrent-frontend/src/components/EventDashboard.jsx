@@ -99,10 +99,14 @@ export default function EventDashboard() {
     }
   };
 
-  // 👇 UPGRADE TINGKAT DEWA: Export CSV Anti-Numpuk di Excel 👇
+  const isWed = event?.is_private || event?.category === 'Wedding';
+
   const handleExportCSV = () => {
-    // 1. Kita ganti pemisahnya pakai Titik Koma (;) biar Excel Indonesia langsung ngebaca
-    let csvContent = "Order ID;Ticket ID;Status Kehadiran;Session;Pembeli;Email Pembeli;Nama Peserta;Email Peserta;Jawaban Custom\n";
+    let csvHeader = isWed 
+      ? "Order ID;Ticket ID;Status Kehadiran;Session;Pembeli;Email Pembeli;Nama Tamu;Email Tamu;Jumlah Pax;Ucapan Doa;Jawaban Custom\n"
+      : "Order ID;Ticket ID;Status Kehadiran;Session;Pembeli;Email Pembeli;Nama Peserta;Email Peserta;Jawaban Custom\n";
+    
+    let csvContent = csvHeader;
     
     groupedAttendees.forEach(order => {
       order.tickets.forEach(t => {
@@ -113,23 +117,26 @@ export default function EventDashboard() {
           customAnsText = t.custom_answers.map(ans => `${ans.question}: ${ans.answer}`).join(" | ");
         }
         
-        // 2. Format baris pakai Titik Koma (;)
-        let row = `"${order.order_id}";"${t.ticket_id}";"${statusKehadiran}";"${t.session_name}";"${order.buyer_name}";"${order.buyer_email}";"${t.attendee_name || ''}";"${t.attendee_email || ''}";"${customAnsText}"`;
+        const cleanGreeting = t.greeting ? t.greeting.replace(/(\r\n|\n|\r)/gm, " ") : "";
+        
+        let row = isWed
+          ? `"${order.order_id}";"${t.ticket_id}";"${statusKehadiran}";"${t.session_name}";"${order.buyer_name}";"${order.buyer_email}";"${t.attendee_name || ''}";"${t.attendee_email || ''}";"${t.pax || 1}";"${cleanGreeting}";"${customAnsText}"`
+          : `"${order.order_id}";"${t.ticket_id}";"${statusKehadiran}";"${t.session_name}";"${order.buyer_name}";"${order.buyer_email}";"${t.attendee_name || ''}";"${t.attendee_email || ''}";"${customAnsText}"`;
+        
         csvContent += row + "\n";
       });
     });
 
-    // 3. Kita pakai metode BLOB + BOM (\uFEFF) biar Excel ngebaca spasi/huruf aneh dengan sempurna!
     const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `Data_Peserta_${event?.title || 'Event'}.csv`);
+    link.setAttribute("download", `Data_${isWed ? 'Tamu' : 'Peserta'}_${event?.title || 'Event'}.csv`);
     
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link); // Bersihin memori
+    document.body.removeChild(link); 
   };
 
   const handleCopy = () => {
@@ -137,11 +144,11 @@ export default function EventDashboard() {
     setPopup({ show: true, message: "Link Dashboard berhasil disalin!", type: 'success' }); 
   };
 
-  // 👇 UPDATE: Filter/Pencarian pakai attendee_name 👇
   const filteredOrders = groupedAttendees.filter(order => {
     if (!searchQuery) return true;
     return order.tickets.some(t => 
-      t.attendee_name?.toLowerCase().includes(searchQuery.toLowerCase())
+      t.attendee_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (t.greeting && t.greeting.toLowerCase().includes(searchQuery.toLowerCase())) 
     );
   });
 
@@ -152,7 +159,6 @@ export default function EventDashboard() {
     </div>
   );
 
-  // 👇 UPDATE: Hitung Revenue pakai t.price 👇
   let totalSold = 0;
   let totalCheckedIn = 0;
   let totalRevenue = 0;
@@ -232,9 +238,11 @@ export default function EventDashboard() {
         {/* KOTAK STATISTIK */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 mb-6 md:mb-10">
           <div className="bg-white p-5 md:p-8 rounded-[20px] md:rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden flex flex-col justify-center">
-            <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-3">Tickets Sold</p>
+            <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-3">{isWed ? 'Undangan Terkirim' : 'Tickets Sold'}</p>
             <h3 className="text-2xl md:text-4xl font-black text-gray-900 mb-1">{totalSold}</h3>
-            <p className="text-[9px] md:text-xs font-bold text-[#27AE60] mt-1 md:mt-3 bg-[#E7F9F1] w-max px-2 py-0.5 md:px-3 md:py-1 rounded-md truncate max-w-full">Rp {(totalRevenue/1000)}K</p>
+            {!isWed && (
+              <p className="text-[9px] md:text-xs font-bold text-[#27AE60] mt-1 md:mt-3 bg-[#E7F9F1] w-max px-2 py-0.5 md:px-3 md:py-1 rounded-md truncate max-w-full">Rp {(totalRevenue/1000)}K</p>
+            )}
           </div>
           
           <div className="bg-white p-5 md:p-8 rounded-[20px] md:rounded-[32px] border border-gray-200 shadow-[0_10px_30px_rgba(39,174,96,0.1)] relative overflow-hidden ring-2 ring-[#27AE60]/20 flex flex-col justify-center">
@@ -254,12 +262,12 @@ export default function EventDashboard() {
         {/* TABEL DATA PENGUNJUNG */}
         <div className="bg-white rounded-[24px] md:rounded-[32px] shadow-sm border border-gray-200 overflow-hidden">
           <div className="px-5 py-5 md:px-8 md:py-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <h3 className="text-lg md:text-xl font-bold text-gray-900">Peserta Event</h3>
+            <h3 className="text-lg md:text-xl font-bold text-gray-900">{isWed ? 'Daftar Kehadiran Tamu' : 'Peserta Event'}</h3>
             <div className="flex flex-row items-center gap-2 md:gap-3 w-full md:w-auto">
               <div className="relative flex-1 sm:w-64">
                 <input 
                   type="text" 
-                  placeholder="Cari peserta..." 
+                  placeholder={isWed ? "Cari tamu atau ucapan..." : "Cari peserta..."} 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-3 md:pl-10 md:pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs md:text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/20 focus:border-[#FF6B35] transition-all"
@@ -278,8 +286,8 @@ export default function EventDashboard() {
             <table className="hidden md:table w-full text-left border-collapse min-w-[900px]">
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                  <th className="px-8 py-5">Order ID</th>
-                  <th className="px-8 py-5">Buyer Account</th>
+                  <th className="px-8 py-5">ID</th>
+                  <th className="px-8 py-5">{isWed ? 'Nama Pengirim' : 'Buyer Account'}</th>
                   <th className="px-8 py-5">Session</th>
                   <th className="px-8 py-5 text-center">Qty</th>
                   <th className="px-8 py-5">Status</th> 
@@ -314,33 +322,46 @@ export default function EventDashboard() {
                     {expandedRow === order.order_id && (
                       <tr className="bg-orange-50/30">
                         <td colSpan="6" className="px-8 py-6 border-l-4 border-[#FF6B35]">
-                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Daftar Tiket Individual</p>
-                          <div className="grid grid-cols-3 gap-4">
-                            {/* 👇 UPDATE: Render pakai attendee_name 👇 */}
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">
+                            {isWed ? 'Detail Undangan & Ucapan' : 'Daftar Tiket Individual'}
+                          </p>
+                          <div className={`grid gap-4 ${isWed ? 'grid-cols-2' : 'grid-cols-3'}`}>
                             {order.tickets.map((t, idx) => {
-                              const isMatch = searchQuery && t.attendee_name?.toLowerCase().includes(searchQuery.toLowerCase());
+                              const isMatch = searchQuery && (t.attendee_name?.toLowerCase().includes(searchQuery.toLowerCase()) || t.greeting?.toLowerCase().includes(searchQuery.toLowerCase()));
                               return (
-                                <div key={t.ticket_id} className="bg-white p-4 rounded-2xl border border-orange-100 shadow-sm relative overflow-hidden flex flex-col justify-between">
+                                <div key={t.ticket_id} className={`bg-white p-5 rounded-2xl border ${isWed ? 'border-[#D4AF37]/30 shadow-md' : 'border-orange-100 shadow-sm'} relative overflow-hidden flex flex-col justify-between`}>
                                   {isMatch && <div className="absolute top-0 right-0 bg-[#FF6B35] text-white text-[8px] font-black uppercase px-2 py-1 rounded-bl-lg">MATCH</div>}
+                                  
                                   <div>
-                                    <div className="flex justify-between items-center mb-1">
-                                      <p className="text-[10px] font-black text-[#FF6B35] uppercase">Tiket #{t.ticket_id}</p>
+                                    <div className="flex justify-between items-center mb-2">
+                                      <p className={`text-[10px] font-black uppercase ${isWed ? 'text-[#D4AF37]' : 'text-[#FF6B35]'}`}>
+                                        {isWed ? 'Tamu VIP' : `Tiket #${t.ticket_id}`}
+                                      </p>
                                       {t.is_scanned && <span className="text-[8px] font-black bg-green-100 text-green-600 px-2 py-0.5 rounded-full uppercase">Hadir</span>}
                                     </div>
-                                    <p className="font-bold text-gray-900 truncate">{t.attendee_name || `Peserta ${idx + 1}`}</p>
-                                    <p className="text-xs text-gray-500 mb-3 truncate">{t.attendee_email || '-'}</p>
+                                    <h4 className="font-black text-gray-900 text-lg truncate">{t.attendee_name || `Peserta ${idx + 1}`}</h4>
+                                    <p className={`text-xs text-gray-500 truncate ${isWed ? 'mb-1' : 'mb-3'}`}>{t.attendee_email || '-'}</p>
+                                    
+                                    {/* 👇 TAMBAHAN PAX & UCAPAN KHUSUS WEDDING DI LAPTOP (UKURAN RAPI & KECIL) 👇 */}
+                                    {isWed && (
+                                      <div className="mt-2 space-y-1">
+                                        <p className="text-xs text-gray-600"><span className="font-bold text-gray-800">Pax:</span> {t.pax || 1} Orang</p>
+                                        <p className="text-xs text-gray-600 italic line-clamp-2 hover:line-clamp-none" title={t.greeting}><span className="font-bold text-gray-800 not-italic">Ucapan:</span> "{t.greeting || '-'}"</p>
+                                      </div>
+                                    )}
+
                                     {t.custom_answers && t.custom_answers.length > 0 && (
-                                      <div className="mt-2 pt-2 border-t border-orange-100/50 flex flex-wrap gap-2 mb-3">
+                                      <div className={`mt-3 pt-3 border-t flex flex-wrap gap-2 mb-3 ${isWed ? 'border-[#D4AF37]/20' : 'border-orange-100/50'}`}>
                                         {t.custom_answers.map((ans, aIdx) => (
-                                          <div key={aIdx} title={ans.question} className="cursor-help bg-orange-50/50 border border-orange-100 px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-orange-100 transition-colors">
-                                            <span className="text-[10px] font-bold text-gray-700 truncate max-w-[100px]">{ans.answer}</span>
+                                          <div key={aIdx} title={ans.question} className={`cursor-help px-2 py-1 rounded-lg flex items-center gap-1 transition-colors ${isWed ? 'bg-[#D4AF37]/10 border border-[#D4AF37]/20 hover:bg-[#D4AF37]/20' : 'bg-orange-50/50 border border-orange-100 hover:bg-orange-100'}`}>
+                                            <span className="text-[10px] font-bold text-gray-700 truncate max-w-[150px]">{ans.answer}</span>
                                           </div>
                                         ))}
                                       </div>
                                     )}
                                   </div>
                                   {!t.is_scanned && (
-                                    <button onClick={() => initiateManualCheckIn(t.ticket_id)} className="w-full mt-2 text-[10px] font-black text-white bg-[#FF6B35] py-2 rounded-lg uppercase tracking-widest shadow-sm hover:bg-orange-600 transition-colors">
+                                    <button onClick={() => initiateManualCheckIn(t.ticket_id)} className={`w-full mt-4 text-[10px] font-black text-white py-2.5 rounded-xl uppercase tracking-widest shadow-sm transition-colors ${isWed ? 'bg-slate-900 hover:bg-black' : 'bg-[#FF6B35] hover:bg-orange-600'}`}>
                                       Manual Check-In
                                     </button>
                                   )}
@@ -402,21 +423,31 @@ export default function EventDashboard() {
 
                     {expandedRow === order.order_id && (
                       <div className="mt-4 pt-4 border-t-2 border-dashed border-orange-100 flex flex-col gap-3">
-                        {/* 👇 UPDATE: Render HP pakai attendee_name 👇 */}
                         {order.tickets.map((t, idx) => {
-                          const isMatch = searchQuery && t.attendee_name?.toLowerCase().includes(searchQuery.toLowerCase());
+                          const isMatch = searchQuery && (t.attendee_name?.toLowerCase().includes(searchQuery.toLowerCase()) || t.greeting?.toLowerCase().includes(searchQuery.toLowerCase()));
                           return (
-                            <div key={t.ticket_id} className={`p-3 rounded-xl border relative ${t.is_scanned ? 'bg-green-50/30 border-green-100' : 'bg-white border-gray-200'}`}>
+                            <div key={t.ticket_id} className={`p-4 rounded-xl border relative shadow-sm ${t.is_scanned ? 'bg-green-50/30 border-green-100' : 'bg-white border-gray-200'}`}>
                               {isMatch && <div className="absolute top-0 right-0 bg-[#FF6B35] text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-bl-lg rounded-tr-xl">MATCH</div>}
+                              
                               <div className="flex justify-between items-center mb-2">
-                                <p className="text-[9px] font-black text-gray-500 uppercase">TIKET #{t.ticket_id.toString().slice(-5)}</p>
+                                <p className={`text-[9px] font-black uppercase ${isWed ? 'text-[#D4AF37]' : 'text-gray-500'}`}>
+                                  {isWed ? 'Tamu VIP' : `TIKET #${t.ticket_id.toString().slice(-5)}`}
+                                </p>
                                 {t.is_scanned && <span className="text-[8px] font-black bg-green-100 text-green-600 px-2 py-0.5 rounded-full uppercase">Telah Hadir</span>}
                               </div>
-                              <p className="font-bold text-gray-900 text-sm truncate">{t.attendee_name || `Peserta ${idx + 1}`}</p>
-                              <p className="text-[10px] text-gray-500 mb-2 truncate">{t.attendee_email || '-'}</p>
+                              <p className="font-black text-gray-900 text-base truncate">{t.attendee_name || `Peserta ${idx + 1}`}</p>
+                              <p className={`text-[10px] text-gray-500 truncate ${isWed ? 'mb-1' : 'mb-2'}`}>{t.attendee_email || '-'}</p>
                               
+                              {/* 👇 TAMBAHAN PAX & UCAPAN KHUSUS WEDDING DI HP (UKURAN KECIL RAPI) 👇 */}
+                              {isWed && (
+                                <div className="mt-1 space-y-0.5 border-t border-gray-100 pt-2">
+                                  <p className="text-[10px] text-gray-600"><span className="font-bold text-gray-800">Pax:</span> {t.pax || 1} Orang</p>
+                                  <p className="text-[10px] text-gray-600 italic line-clamp-2"><span className="font-bold text-gray-800 not-italic">Ucapan:</span> "{t.greeting || '-'}"</p>
+                                </div>
+                              )}
+
                               {t.custom_answers && t.custom_answers.length > 0 && (
-                                <div className="mt-2 pt-2 border-t border-gray-100 flex flex-wrap gap-1.5 mb-2">
+                                <div className="mt-3 pt-2 border-t border-gray-100 flex flex-wrap gap-1.5 mb-2">
                                   {t.custom_answers.map((ans, aIdx) => (
                                     <div key={aIdx} className="bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded flex items-center">
                                       <span className="text-[9px] font-bold text-gray-600 truncate max-w-[120px]">{ans.answer}</span>
@@ -426,7 +457,7 @@ export default function EventDashboard() {
                               )}
 
                               {!t.is_scanned && (
-                                <button onClick={() => initiateManualCheckIn(t.ticket_id)} className="w-full mt-2 text-[10px] font-black text-[#FF6B35] bg-orange-50 border border-orange-100 py-2 rounded-lg uppercase tracking-widest shadow-sm active:scale-95 transition-all">
+                                <button onClick={() => initiateManualCheckIn(t.ticket_id)} className={`w-full mt-3 text-[10px] font-black text-white py-2.5 rounded-lg uppercase tracking-widest shadow-sm active:scale-95 transition-all ${isWed ? 'bg-slate-900' : 'bg-[#FF6B35]'}`}>
                                   Check-In Manual
                                 </button>
                               )}
