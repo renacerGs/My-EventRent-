@@ -236,11 +236,11 @@ export default function CreateEvent() {
   const isWed = eventType === 'private';
   const primaryColor = isWed ? 'bg-[#D4AF37] hover:bg-[#B5952F]' : 'bg-[#FF6B35] hover:bg-[#E85526]';
   const textColor = isWed ? 'text-[#D4AF37]' : 'text-[#FF6B35]';
-  const borderColor = isWed ? 'border-[#D4AF37] focus:border-[#D4AF37] focus:ring-[#D4AF37]' : 'border-orange-500 focus:border-orange-500 focus:ring-orange-500';
+  const borderColor = isWed ? 'border-[#D4AF37] focus:border-[#D4AF37] focus:ring-[#D4AF37]' : 'border-grey-500 focus:border-orange-500 focus:ring-orange-500';
   const bgCard = isWed ? 'bg-slate-900 border-slate-800' : 'bg-white border-gray-200';
   const textLabel = isWed ? 'text-gray-300' : 'text-gray-700';
   const textTitle = isWed ? 'text-white' : 'text-gray-900';
-  const inputBg = isWed ? 'bg-slate-800 text-white border-slate-700 placeholder-gray-500' : 'bg-white text-gray-900 border-gray-300 placeholder-gray-400';
+  const inputBg = isWed ? 'bg-slate-800 text-white border-slate-700 placeholder-gray-500' : 'bg-white text-gray-900 border border-gray-300 placeholder-gray-400';
   const bgMain = isWed ? 'bg-slate-950' : 'bg-gray-50';
 
   const inputStyle = `w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 transition-all ${inputBg} ${borderColor}`;
