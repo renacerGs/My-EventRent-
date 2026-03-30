@@ -1,8 +1,12 @@
+// src/app.controller.ts
 import { Controller, Get, Post, Body, Query, Delete, Param, Put } from '@nestjs/common'; 
 import { AppService } from './app.service';
 
 // <--- 1. IMPORT DECORATOR SWAGGER --->
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
+
+// 👇 IMPORT DTO YANG BARU KITA BUAT 👇
+import { BuyTicketDto } from './dto/buy-ticket.dto';
 
 @Controller('api')
 export class AppController {
@@ -76,26 +80,44 @@ export class AppController {
     return await this.appService.getMyLikes(userId);
   }
 
-  // --- TICKETS ---
+ // --- TICKETS ---
   @ApiTags('Tickets')
-  @ApiOperation({ summary: 'Membeli tiket (Checkout)' })
+  @ApiOperation({ summary: 'Membeli tiket (Checkout Public) atau RSVP (Personal Event)' })
   @ApiBody({ 
-    description: 'Data pembelian tiket termasuk jawaban form (Bisa Guest/Tanpa userId)',
-    schema: { 
-      example: { 
-        userId: null, // <-- Dibuat null kalau Guest
-        guestEmail: 'tamu@gmail.com', // <-- Email tamu
-        eventId: 32, 
-        cart: [{ sessionId: 2, quantity: 2, price: 200000 }], 
-        formAnswers: { "2": { "No HP": "08123" } } 
-      } 
-    } 
+    description: 'Bisa menerima format Cart (Public Event) ATAU format RSVP (Personal Event)',
+    type: BuyTicketDto
   })
-  
   @Post('tickets/buy')
-  async buyTicket(@Body() data: { userId?: number; guestEmail?: string; eventId: number; cart: any[]; formAnswers: any }) {
-    // 👇👇👇 TAMBAHIN "|| null" DI DATA.USERID 👇👇👇
-    return await this.appService.buyTicket(data.userId || null, data.eventId, data.cart, data.formAnswers || {}, data.guestEmail);
+  async buyTicket(@Body() data: BuyTicketDto) { 
+    // 1. Ambil data standar
+    let finalCart = data.cart;
+    let finalAnswers = data.formAnswers || {};
+    let email = data.guestEmail || data.guest_email;
+
+    // 2. ADAPTER UNTUK RSVP WEDDING / PERSONAL EVENT
+    if (!finalCart && data.sessionId) {
+      finalCart = [{
+        sessionId: data.sessionId,
+        quantity: typeof data.pax === 'string' ? parseInt(data.pax) : (data.pax || 1),
+        price: 0
+      }];
+      
+      finalAnswers = {
+        ...data.custom_answers,
+        "attendee_name": data.attendee_name,
+        "greeting": data.greeting
+      };
+    }
+
+    // 3. Eksekusi ke Service
+    // 👇 SOLUSINYA DI SINI BRO: Tambahkan || [] di finalCart 👇
+    return await this.appService.buyTicket(
+      data.userId || null, 
+      data.eventId, 
+      finalCart || [], // <--- TypeScript sekarang tahu ini pasti Array, bukan undefined
+      finalAnswers, 
+      email
+    );
   }
 
   @ApiTags('Tickets')
@@ -105,7 +127,6 @@ export class AppController {
     return await this.appService.getMyTickets(userId);
   }
 
-  // 👇👇👇 INI API BARU UNTUK FITUR CEK TIKET (GUEST) 👇👇👇
   @ApiTags('Tickets')
   @ApiOperation({ summary: 'Melacak/Mencari tiket (Guest Checkout) menggunakan Order ID dan Email' })
   @ApiBody({ schema: { example: { ticketId: 46, email: "tamu@gmail.com" } } })
@@ -113,7 +134,6 @@ export class AppController {
   async trackTicket(@Body() data: { ticketId: number; email: string }) {
     return await this.appService.trackTicket(data.ticketId, data.email);
   }
-  // 👆👆👆 ------------------------------------------ 👆👆👆
 
   @ApiTags('Tickets')
   @ApiOperation({ summary: 'Mendapatkan daftar peserta (Dashboard Panitia)' })

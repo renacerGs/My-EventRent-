@@ -3,7 +3,7 @@ import { Pool } from 'pg';
 import * as bcrypt from 'bcrypt'; 
 import * as nodemailer from 'nodemailer';
 import * as dotenv from 'dotenv'; 
-import * as QRCode from 'qrcode'; // 👇 FIX: IMPORT LIBRARY QR CODE DI SINI 👇
+import * as QRCode from 'qrcode';
 
 dotenv.config(); 
 
@@ -34,7 +34,7 @@ export class AppService implements OnModuleInit {
       await this.pool.query('SELECT 1');
       console.log('Berhasil terhubung ke database PostgreSQL EventRent!');
       
-      // Auto-migrate kita sederhanakan
+      // Auto-migrate sederhana
       await this.pool.query(`
         ALTER TABLE tickets 
         ADD COLUMN IF NOT EXISTS is_scanned BOOLEAN DEFAULT FALSE,
@@ -76,11 +76,12 @@ export class AppService implements OnModuleInit {
 
   async getEventById(eventId: number) {
     try {
+      // 👇 FIX: Tambah e.event_details biar kepanggil pas buka undangan 👇
       const eventQuery = `
         SELECT e.id, e.title, e.description, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start, 
                TO_CHAR(e.event_end, 'Dy, DD Mon YYYY') as date_end, e.place, e.name_place, e.city, e.province, e.map_url,
                e.image_url as img, c.name as category, e.phone as contact, u.name as organizer_name,
-               e.is_private
+               e.is_private, e.event_details
         FROM events e
         JOIN categories c ON e.category_id = c.id
         LEFT JOIN users u ON e.created_by = u.id
@@ -160,14 +161,15 @@ export class AppService implements OnModuleInit {
     try {
       await client.query('BEGIN'); 
 
+      // 👇 FIX: Nambahin kolom event_details di query INSERT (Posisi ke-15) 👇
       const eventQuery = `
         INSERT INTO events (
           title, description, event_start, event_end, category_id, 
-          created_by, phone, place, name_place, city, province, map_url, image_url, is_private
+          created_by, phone, place, name_place, city, province, map_url, image_url, is_private, event_details
         )
         VALUES (
           $1, $2, $3, $4, (SELECT id FROM categories WHERE name = $5 LIMIT 1), 
-          $6, $7, $8, $9, $10, $11, $12, $13, $14
+          $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
         )
         RETURNING id
       `;
@@ -177,7 +179,8 @@ export class AppService implements OnModuleInit {
         data.location?.namePlace, data.location?.city, data.location?.province, 
         data.location?.mapUrl || null, 
         data.img || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=1000&q=80',
-        data.isPrivate ? true : false
+        data.isPrivate ? true : false,
+        data.eventDetails ? JSON.stringify(data.eventDetails) : '{}' // Menyimpan JSONB
       ];
       
       const eventRes = await client.query(eventQuery, eventValues);
@@ -228,20 +231,23 @@ export class AppService implements OnModuleInit {
 
   async updateEvent(eventId: number, userId: number, data: any) {
     try {
+      // 👇 FIX: Support update event_details 👇
       const query = `
         UPDATE events 
         SET title = $1, description = $2, event_start = $3, event_end = $4,
             organizer = $5, place = $6, name_place = $7, city = $8, province = $9,
             image_url = COALESCE($10, image_url), 
             category_id = (SELECT id FROM categories WHERE name = $11 LIMIT 1),
-            is_private = $14
+            is_private = $14,
+            event_details = COALESCE($15, event_details)
         WHERE id = $12 AND created_by = $13
         RETURNING *
       `;
       const values = [
         data.title, data.description, data.eventStart, data.eventEnd,
         data.organizer, data.location?.place, data.location?.namePlace, data.location?.city, data.location?.province,
-        data.img, data.category, eventId, userId, data.isPrivate ? true : false
+        data.img, data.category, eventId, userId, data.isPrivate ? true : false,
+        data.eventDetails ? JSON.stringify(data.eventDetails) : null
       ];
       const res = await this.pool.query(query, values);
       if (res.rowCount === 0) throw new InternalServerErrorException('Event not found or unauthorized');
@@ -320,7 +326,8 @@ export class AppService implements OnModuleInit {
 
       for (const item of cart) {
         const sessionId = item.sessionId;
-        const qty = item.qty;
+        
+        const qty = item.qty || item.quantity || 1;
 
         const sessionRes = await client.query('SELECT price, stock FROM event_sessions WHERE id = $1 FOR UPDATE', [sessionId]);
         if (sessionRes.rows.length === 0) throw new BadRequestException('Session tidak ditemukan');
@@ -335,15 +342,16 @@ export class AppService implements OnModuleInit {
 
         for (let i = 0; i < qty; i++) {
           const prefix = `cart-${item.id}-ticket-${i}`;
-          const name = formAnswers[`${prefix}-nama`] || `Peserta ${i + 1}`;
-          const email = formAnswers[`${prefix}-email`] || ``;
           
-          const pax = formAnswers[`${prefix}-pax`] ? parseInt(formAnswers[`${prefix}-pax`]) : 1;
-          const greeting = formAnswers[`${prefix}-greeting`] || null;
+          const name = formAnswers[`${prefix}-nama`] || formAnswers.attendee_name || `Tamu ${i + 1}`;
+          const email = formAnswers[`${prefix}-email`] || targetEmail || ``;
+          
+          const pax = 1; 
+          const greeting = formAnswers[`${prefix}-greeting`] || formAnswers.greeting || null;
           
           const customAnswers: any[] = [];
           for (const q of dbQuestions) {
-             const ans = formAnswers[`${prefix}-q${q.id}`];
+             const ans = formAnswers[`${prefix}-q${q.id}`] || formAnswers[q.id];
              if (ans) {
                 customAnswers.push({ question: q.question_text, answer: ans });
              }
@@ -365,8 +373,7 @@ export class AppService implements OnModuleInit {
 
       await client.query('COMMIT');
 
-      if (targetEmail) {
-        // 👇 FIX: Nambahin param eventId ke dalam fungsi sendEmailReceipt 👇
+      if (targetEmail && boughtTickets.length > 0) {
         this.sendEmailReceipt(targetEmail, eventTitle, boughtTickets, totalTransactionPrice, eventId)
           .catch(e => console.error("Gagal mengirim email struk:", e)); 
       }
@@ -383,13 +390,11 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 👇🔥 FUNGSI EMAIL QR CODE SAKTI (VERSI KEMBAR SIAM DENGAN FRONTEND) 🔥👇
   private async sendEmailReceipt(targetEmail: string, eventTitle: string, ticketIds: number[], totalPrice: number, eventId: number) {
     let qrCodesHtml = '';
     const emailAttachments: any[] = []; 
 
     for (const id of ticketIds) {
-      // 👇 FIX: Format teks QR Code di-set ke JSON biar sama persis sama Frontend Scanner 👇
       const qrPayload = JSON.stringify({ ticketId: id, eventId: eventId });
       
       const qrDataUrl = await QRCode.toDataURL(qrPayload, { errorCorrectionLevel: 'H', margin: 2 });
