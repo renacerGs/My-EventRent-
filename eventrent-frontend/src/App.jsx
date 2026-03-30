@@ -18,12 +18,11 @@ import EventDashboard from "./components/EventDashboard";
 import Checkout from "./pages/Checkout"; 
 import Scanner from './pages/Scanner';
 import TrackTicket from './pages/TrackTicket'; 
-
-// Import Komponen Baru
+import WeddingInvitation from './pages/WeddingInvitation';
 import ChooseEventType from "./components/ChooseEventType"; 
 import CreatePublicEvent from "./components/CreatePublicEvent"; 
 import CreatePersonalEvent from "./components/CreatePersonalEvent"; 
-import Invitation from "./pages/Invitation"; 
+
 
 export default function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -97,13 +96,12 @@ export default function App() {
           <Route path="/create" element={<ProtectedRoute><ChooseEventType /></ProtectedRoute>} />
           <Route path="/create/public" element={<ProtectedRoute><CreatePublicEvent /></ProtectedRoute>} />
           <Route path="/create/personal" element={<ProtectedRoute><CreatePersonalEvent /></ProtectedRoute>} />
-          <Route path="/invitation/:eventId" element={<Invitation />} />
-          
           <Route path="/manage" element={<ProtectedRoute><ManageEvent /></ProtectedRoute>} />
           <Route path="/edit/:id" element={<ProtectedRoute><EditEvent /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/my-tickets" element={<ProtectedRoute><MyTickets /></ProtectedRoute>} />
           <Route path="/manage/event/:id" element={<ProtectedRoute><EventDashboard /></ProtectedRoute>} />
+          <Route path="/invitation/:id" element={<WeddingInvitation />} />
           
           <Route path="*" element={<div className="text-center py-20 font-bold text-gray-400">Halaman tidak ditemukan.</div>} />
         </Routes>
