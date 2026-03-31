@@ -3,7 +3,8 @@ import { useParams, useSearchParams } from 'react-router-dom';
 
 // Import Semua Tema di Sini
 import ThemeElegantGold from '../components/templates/ThemeElegantGold';
-// import ThemeFloralWhite from '../components/templates/ThemeFloralWhite';
+import ThemeFloralWhite from '../components/templates/ThemeFloralWhite';
+import ThemeDarkRomantic from '../components/templates/ThemeDarkRomantic';
 // import ThemeDarkRomantic from '../components/templates/ThemeDarkRomantic';
 
 export default function WeddingInvitation() {
@@ -47,13 +48,11 @@ export default function WeddingInvitation() {
 
   // --- RENDER CONTROLLER ---
   if (selectedTheme === 'floral-white') {
-    // return <ThemeFloralWhite eventData={event} guestName={guestName} isOpen={isOpen} onOpen={() => setIsOpen(true)} />;
-    return <div className="p-20 text-center font-bold text-2xl">🚧 Tema Floral White Sedang Dibuat 🚧</div>;
+    return <ThemeFloralWhite eventData={event} guestName={guestName} isOpen={isOpen} onOpen={() => setIsOpen(true)} />;
   } 
   
   if (selectedTheme === 'dark-romantic') {
-    // return <ThemeDarkRomantic eventData={event} guestName={guestName} isOpen={isOpen} onOpen={() => setIsOpen(true)} />;
-    return <div className="p-20 text-center font-bold text-2xl">🚧 Tema Dark Romantic Sedang Dibuat 🚧</div>;
+    return <ThemeDarkRomantic eventData={event} guestName={guestName} isOpen={isOpen} onOpen={() => setIsOpen(true)} />;
   }
 
   // DEFAULT FALLBACK: Elegant Gold

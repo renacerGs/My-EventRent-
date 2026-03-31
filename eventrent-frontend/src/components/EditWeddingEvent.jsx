@@ -56,7 +56,7 @@ export default function EditWeddingEvent() {
     openingMessage: '', closingMessage: '', quote: '',
     bgMusicUrl: '', 
     oldImgUrl: '', templateId: 'elegant-gold',
-    sessions: [] // 👈 FIX: Balikin state sessions buat nampung data dari DB
+    sessions: [] 
   });
 
   const [profiles, setProfiles] = useState([]);
@@ -94,7 +94,6 @@ export default function EditWeddingEvent() {
 
         const details = found.event_details || {};
         
-        // Data Sesi dari API beda strukturnya, kita benerin formatnya buat di form
         const formattedSessions = (found.sessions || []).map(s => ({
            id: s.id,
            name: s.name,
@@ -127,7 +126,7 @@ export default function EditWeddingEvent() {
           bgMusicUrl: details.bgMusicUrl || '', 
           oldImgUrl: found.img || '',
           templateId: details.templateId || 'elegant-gold',
-          sessions: formattedSessions // 👈 FIX: Masukin ke state
+          sessions: formattedSessions
         });
 
         setImagePreview(found.img);
@@ -185,7 +184,6 @@ export default function EditWeddingEvent() {
     } catch (e) { alert('Gagal memotong gambar!'); }
   };
 
-  // --- 👇 FIX: BALIKIN HANDLER SESSIONS 👇 ---
   const handleSessionLocationChange = (sIndex, field, value) => {
     const updated = JSON.parse(JSON.stringify(formData.sessions));
     if (!updated[sIndex].location) updated[sIndex].location = { namePlace: '', place: '', city: '', province: '', mapUrl: '' };
@@ -223,7 +221,6 @@ export default function EditWeddingEvent() {
   const removeQuestionOption = (sIndex, qIndex, optIndex) => {
     const updated = JSON.parse(JSON.stringify(formData.sessions)); updated[sIndex].questions[qIndex].options.splice(optIndex, 1); setFormData({ ...formData, sessions: updated });
   };
-  // --- 👆 FIX: BALIKIN HANDLER SESSIONS 👆 ---
 
   const uploadToSupabase = async (fileOrBase64, folderPath) => {
     if (!fileOrBase64) return null;
@@ -268,7 +265,7 @@ export default function EditWeddingEvent() {
         eventEnd: formData.eventEnd,     
         img: finalCoverUrl,
         eventDetails: finalEventDetails,
-        sessions: formData.sessions // 👈 FIX: Kirim sesi yang udah diedit ke DB
+        sessions: formData.sessions 
       };
 
       const res = await fetch(`/api/events/${id}?userId=${user.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
@@ -330,9 +327,9 @@ export default function EditWeddingEvent() {
                 <div 
                   key={theme.id}
                   onClick={() => setFormData({...formData, templateId: theme.id})}
-                  className={`cursor-pointer rounded-2xl border-4 p-4 transition-all duration-300 ${formData.templateId === theme.id ? 'border-[#D4AF37] scale-[1.02] shadow-[0_0_20px_rgba(212,175,55,0.2)]' : 'border-transparent hover:border-slate-700'}`}
+                  className={`cursor-pointer rounded-2xl border-4 p-4 transition-all duration-300 ${formData.templateId === theme.id ? 'border-[#D4AF37] scale-[1.02] shadow-[0_0_20px_rgba(212,175,55,0.2)] bg-slate-800/50' : 'border-transparent hover:border-slate-700'}`}
                 >
-                  <div className={`w-full aspect-[4/3] rounded-xl mb-3 flex flex-col items-center justify-center border ${theme.style}`}>
+                  <div className={`w-full aspect-[4/3] rounded-xl mb-3 flex flex-col items-center justify-center border pointer-events-none ${theme.style}`}>
                     <span className="text-3xl mb-2">✨</span>
                     <span className="font-serif italic font-bold">{theme.name}</span>
                   </div>
@@ -403,7 +400,6 @@ export default function EditWeddingEvent() {
             <button type="button" onClick={addProfile} className="w-full py-3 border border-dashed border-[#D4AF37] text-[#D4AF37] rounded-xl font-bold uppercase text-xs hover:bg-[#D4AF37]/10">+ Tambah Profil Lainnya</button>
           </SectionAccordion>
 
-          {/* 👇 FIX: ACCORDION SESI & PERTANYAAN KEMBALI 👇 */}
           <SectionAccordion title="4. Rangkaian Acara (Sesi)" isOpen={openSection === 'sessions'} onToggle={() => toggleSection('sessions')}>
              {formData.sessions.map((session, sIndex) => (
               <div key={session.id} className="p-6 border border-slate-700 bg-slate-800/30 rounded-xl mb-6 relative">
@@ -426,6 +422,8 @@ export default function EditWeddingEvent() {
                        <div><label className={labelStyle}>Kota</label><input type="text" value={session.location?.city || ''} onChange={(e) => handleSessionLocationChange(sIndex, 'city', e.target.value)} className={inputStyle} required /></div>
                     </div>
                     <div className="mt-3"><label className={labelStyle}>Full Alamat</label><textarea value={session.location?.place || ''} onChange={(e) => handleSessionLocationChange(sIndex, 'place', e.target.value)} rows="2" className={inputStyle} required /></div>
+                    
+                    {/* 👇 URL GOOGLE MAPS SUDAH KEMBALI 👇 */}
                     <div className="mt-3"><label className={labelStyle}>URL Google Maps</label><input type="url" value={session.location?.mapUrl || ''} onChange={(e) => handleSessionLocationChange(sIndex, 'mapUrl', e.target.value)} className={inputStyle} /></div>
                   </div>
                   <div className="mt-6 pt-4 border-t border-slate-700">
