@@ -48,7 +48,7 @@ const getCroppedImg = (imageSrc, pixelCrop) => {
   });
 };
 
-export default function CreatePersonalEvent() {
+export default function CreateWeddingEvent() {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user'));
 
@@ -56,14 +56,12 @@ export default function CreatePersonalEvent() {
     if (!user) navigate('/');
   }, [user, navigate]);
 
-  // --- STATE ACCORDION ---
-  const [openSection, setOpenSection] = useState('basic'); // 'basic', 'profiles', 'sessions', 'gallery', 'gifts'
+  const [openSection, setOpenSection] = useState('basic'); 
   
   const toggleSection = (sectionName) => {
     setOpenSection(prev => prev === sectionName ? null : sectionName);
   };
 
-  // --- STATE UTAMA ---
   const [formData, setFormData] = useState({
     title: '', description: '', eventStart: '', eventEnd: '', phone: '', 
     category: 'Wedding', 
@@ -79,7 +77,6 @@ export default function CreatePersonalEvent() {
     ]
   });
 
-  // --- STATE KHUSUS WEDDING (Akan disimpan ke JSONB event_details) ---
   const [eventDetails, setEventDetails] = useState({
     openingMessage: '',
     closingMessage: '',
@@ -93,26 +90,21 @@ export default function CreatePersonalEvent() {
     ]
   });
 
-  // --- STATE GALLERY (Maksimal 5 Foto) ---
-  const [galleryFiles, setGalleryFiles] = useState([]); // Array of { file: File, preview: URL }
-
+  const [galleryFiles, setGalleryFiles] = useState([]); 
   const [imagePreview, setImagePreview] = useState(null);
   const [imageBase64, setImageBase64] = useState(''); 
   const [isLoading, setIsLoading] = useState(false);
 
-  // --- CROPPER STATE ---
   const [showCropModal, setShowCropModal] = useState(false);
   const [rawImageSrc, setRawImageSrc] = useState(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
-  const [cropTarget, setCropTarget] = useState(null); // 'cover' atau profile_id
+  const [cropTarget, setCropTarget] = useState(null); 
 
-  // --- HANDLERS DASAR ---
   const handleEventChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
   const handleDetailsChange = (e) => setEventDetails({ ...eventDetails, [e.target.name]: e.target.value });
 
-  // --- HANDLERS PROFIL MEMPELAI ---
   const handleProfileChange = (id, field, value) => {
     setEventDetails(prev => ({
       ...prev,
@@ -131,7 +123,6 @@ export default function CreatePersonalEvent() {
     setEventDetails(prev => ({ ...prev, profiles: prev.profiles.filter(p => p.id !== id) }));
   };
 
-  // --- HANDLERS DIGITAL GIFT ---
   const handleGiftChange = (id, field, value) => {
     setEventDetails(prev => ({
       ...prev,
@@ -150,7 +141,6 @@ export default function CreatePersonalEvent() {
     setEventDetails(prev => ({ ...prev, digitalGifts: prev.digitalGifts.filter(g => g.id !== id) }));
   };
 
-  // --- HANDLERS GALLERY ---
   const handleGallerySelect = (e) => {
     const files = Array.from(e.target.files);
     if (galleryFiles.length + files.length > 5) {
@@ -161,14 +151,13 @@ export default function CreatePersonalEvent() {
       preview: URL.createObjectURL(file)
     }));
     setGalleryFiles(prev => [...prev, ...newFiles]);
-    e.target.value = null; // Reset input
+    e.target.value = null; 
   };
 
   const removeGalleryImage = (indexToRemove) => {
     setGalleryFiles(prev => prev.filter((_, index) => index !== indexToRemove));
   };
 
-  // --- HANDLERS CROPPER (COVER & PROFILE) ---
   const handleImageChange = (e, target = 'cover') => {
     const file = e.target.files[0];
     if (file) {
@@ -195,7 +184,6 @@ export default function CreatePersonalEvent() {
         setImagePreview(croppedImageBase64); 
         setImageBase64(croppedImageBase64); 
       } else {
-        // Ini untuk foto profil mempelai
         setEventDetails(prev => ({
           ...prev,
           profiles: prev.profiles.map(p => p.id === cropTarget ? { ...p, photoUrl: croppedImageBase64 } : p)
@@ -210,7 +198,6 @@ export default function CreatePersonalEvent() {
     }
   };
 
-  // --- HANDLERS SESSION & LOKASI (Tetap Sama) ---
   const handleSessionLocationChange = (sIndex, field, value) => {
     const updated = JSON.parse(JSON.stringify(formData.sessions));
     if (!updated[sIndex].location) updated[sIndex].location = { namePlace: '', place: '', city: '', province: '', mapUrl: '' };
@@ -239,7 +226,6 @@ export default function CreatePersonalEvent() {
     setFormData({ ...formData, sessions: updatedSessions });
   };
 
-  // --- HANDLERS QUESTION FORM BUILDER (Tetap Sama) ---
   const handleQuestionChange = (sIndex, qIndex, field, value) => {
     const updated = JSON.parse(JSON.stringify(formData.sessions));
     updated[sIndex].questions[qIndex][field] = value;
@@ -276,77 +262,56 @@ export default function CreatePersonalEvent() {
     setFormData({ ...formData, sessions: updated });
   };
 
-  // --- HELPER UNGGAH GAMBAR KE SUPABASE ---
   const uploadImageToSupabase = async (base64OrFile, folderPath) => {
     let fileToUpload;
-    
     if (typeof base64OrFile === 'string' && base64OrFile.startsWith('data:image')) {
-       // Convert Base64 (hasil cropper) ke Blob
        const res = await fetch(base64OrFile);
        fileToUpload = await res.blob();
     } else {
-       // File murni (dari input file biasa, spt galeri)
        fileToUpload = base64OrFile;
     }
-
     const fileExt = fileToUpload.type === 'image/webp' ? 'webp' : fileToUpload.name ? fileToUpload.name.split('.').pop() : 'jpg';
     const fileName = `${folderPath}-${Date.now()}-${Math.floor(Math.random()*1000)}.${fileExt}`;
-    
     const { data, error } = await supabase.storage
       .from('event-posters')
       .upload(fileName, fileToUpload, { contentType: fileToUpload.type || 'image/jpeg', upsert: false });
-
     if (error) throw new Error("Gagal mengunggah gambar ke Supabase.");
-    
     const { data: publicUrlData } = supabase.storage.from('event-posters').getPublicUrl(fileName);
     return publicUrlData.publicUrl;
   };
 
-  // --- SUBMIT UTAMA ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!imageBase64) return alert("Poster/Cover Utama wajib diupload!");
-    
     setIsLoading(true);
     try {
-      // 1. Upload Cover Utama
       const coverUrl = await uploadImageToSupabase(imageBase64, 'cover');
-
-      // 2. Upload Foto Profil (Yang tidak null)
       const uploadedProfiles = await Promise.all(eventDetails.profiles.map(async (prof) => {
          if (prof.photoUrl && prof.photoUrl.startsWith('data:image')) {
             const url = await uploadImageToSupabase(prof.photoUrl, `profile-${prof.id}`);
             return { ...prof, photoUrl: url };
          }
-         return prof; // Tidak diubah jika belum upload/sudah URL
+         return prof;
       }));
-
-      // 3. Upload Gallery Foto
       const uploadedGallery = await Promise.all(galleryFiles.map(async (gf) => {
          return await uploadImageToSupabase(gf.file, `gallery`);
       }));
-
-      // 4. Susun Payload Event Details
       const finalEventDetails = {
          ...eventDetails,
          profiles: uploadedProfiles,
-         galleryImages: uploadedGallery // Simpan array URL galeri
+         galleryImages: uploadedGallery 
       };
-      
-      // 5. Susun Payload Akhir untuk Backend
       const payload = {
           ...formData,
           userId: user.id,
           img: coverUrl,
-          eventDetails: finalEventDetails // Kirim JSONB ke Backend
+          eventDetails: finalEventDetails 
       };
-
       const response = await fetch('/api/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
       });
-
       if (response.ok) {
           navigate('/manage'); 
       } else {
@@ -361,14 +326,12 @@ export default function CreatePersonalEvent() {
     }
   };
 
-  // Tema Input UI
   const inputStyle = `w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 transition-all bg-slate-800 text-white border border-slate-700 placeholder-gray-500 focus:border-[#D4AF37] focus:ring-[#D4AF37]`;
   const labelStyle = `text-xs font-bold mb-1.5 block uppercase tracking-wider text-gray-300`;
 
   return (
     <div className="bg-slate-950 min-h-screen pb-20 font-sans relative transition-colors duration-500">
       
-      {/* MODAL CROPPER */}
       {showCropModal && (
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-[24px] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col">
@@ -377,7 +340,6 @@ export default function CreatePersonalEvent() {
               <button onClick={() => setShowCropModal(false)} className="text-gray-400 hover:text-red-500 font-bold">✕ Batal</button>
             </div>
             <div className="relative w-full h-[50vh] md:h-[60vh] bg-black">
-              {/* Aspek rasio berbeda: Cover (Landscape), Profil (Square/Portrait) */}
               <Cropper 
                 image={rawImageSrc} crop={crop} zoom={zoom} 
                 aspect={cropTarget === 'cover' ? 736 / 436 : 1 / 1} 
@@ -411,9 +373,6 @@ export default function CreatePersonalEvent() {
 
         <form onSubmit={handleSubmit}>
           
-          {/* ========================================================= */}
-          {/* SECTION 1: BASIC INFO & COVER */}
-          {/* ========================================================= */}
           <SectionAccordion title="1. Cover & Informasi Dasar" isOpen={openSection === 'basic'} onToggle={() => toggleSection('basic')}>
             <div className="space-y-5">
               <div>
@@ -462,9 +421,6 @@ export default function CreatePersonalEvent() {
             </div>
           </SectionAccordion>
 
-          {/* ========================================================= */}
-          {/* SECTION 2: PROFIL MEMPELAI / TUAN RUMAH */}
-          {/* ========================================================= */}
           <SectionAccordion title="2. Profil Mempelai" isOpen={openSection === 'profiles'} onToggle={() => toggleSection('profiles')}>
             {eventDetails.profiles.map((prof, index) => (
                <div key={prof.id} className="p-6 border border-slate-700 bg-slate-800/30 rounded-xl mb-6 relative">
@@ -513,9 +469,6 @@ export default function CreatePersonalEvent() {
             </button>
           </SectionAccordion>
 
-          {/* ========================================================= */}
-          {/* SECTION 3: RANGKAIAN ACARA (SESSIONS) */}
-          {/* ========================================================= */}
           <SectionAccordion title="3. Rangkaian Acara (Sesi)" isOpen={openSection === 'sessions'} onToggle={() => toggleSection('sessions')}>
             {formData.sessions.map((session, sIndex) => (
               <div key={session.id} className="p-6 border border-slate-700 bg-slate-800/30 rounded-xl mb-6 relative">
@@ -535,7 +488,6 @@ export default function CreatePersonalEvent() {
                   </div>
                   <div><label className={labelStyle}>Batas Maksimal Tamu</label><input type="text" value={session.stock} onChange={(e) => { const val = e.target.value; if (val === '' || /^\d+$/.test(val)) handleSessionChange(sIndex, 'stock', val); }} className={inputStyle} required /></div>
                   
-                  {/* Lokasi Khusus Sesi */}
                   <div className="mt-4 pt-4 border-t border-slate-700">
                     <p className="text-xs text-[#D4AF37] font-bold mb-3 uppercase">Lokasi Sesi Ini</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -546,16 +498,101 @@ export default function CreatePersonalEvent() {
                     <div className="mt-3"><label className={labelStyle}>URL Google Maps</label><input type="url" value={session.location?.mapUrl || ''} onChange={(e) => handleSessionLocationChange(sIndex, 'mapUrl', e.target.value)} className={inputStyle} /></div>
                   </div>
 
-                  {/* Form Builder Sederhana */}
+                  {/* --- 🔥 FIX: FORM BUILDER DENGAN VISUAL PLACEHOLDER DEFAULT 🔥 --- */}
                   <div className="mt-6 pt-4 border-t border-slate-700">
-                     <p className="text-xs text-white font-bold mb-3 uppercase">Pertanyaan Tambahan RSVP (Opsional)</p>
+                     <div className="mb-6">
+                        <p className="text-[10px] font-black uppercase tracking-widest mb-1 text-[#D4AF37]">Form Registrasi Untuk:</p>
+                        <h2 className="text-xl font-bold text-white">{session.name || `Session ${sIndex + 1}`}</h2>
+                     </div>
+                     
+                     {/* Bawaan Form RSVP (Disabled/Buram) biar pengantin tahu */}
+                     <div className="space-y-4 mb-8 select-none opacity-40">
+                        <div><label className={labelStyle}>Nama Lengkap (Bawaan)</label><input type="text" disabled className={`${inputStyle} cursor-not-allowed`} value="Akan diisi oleh tamu saat RSVP" readOnly/></div>
+                        <div><label className={labelStyle}>Email (Bawaan)</label><input type="text" disabled className={`${inputStyle} cursor-not-allowed`} value="Akan diisi oleh tamu saat RSVP" readOnly/></div>
+                        <div><label className={labelStyle}>Jumlah Rombongan / Pax (Otomatis)</label><input type="text" disabled className={`${inputStyle} cursor-not-allowed`} value="Akan diisi tamu (Maksimal sesuai sisa kuota)" readOnly/></div>
+                        <div><label className={labelStyle}>Ucapan & Doa (Otomatis)</label><textarea disabled className={`${inputStyle} cursor-not-allowed`} rows="2" value="Tamu dapat menuliskan ucapan di sini" readOnly/></div>
+                     </div>
+
+                     <p className="text-xs text-white font-bold mb-3 uppercase">Pertanyaan Tambahan (Opsional)</p>
+                     
                      {session.questions.map((q, qIndex) => (
-                        <div key={q.id} className="flex gap-2 mb-2">
-                           <input type="text" placeholder="Ex: Alamat Kirim Souvenir" value={q.text} onChange={(e) => handleQuestionChange(sIndex, qIndex, 'text', e.target.value)} className={`${inputStyle} flex-1`} />
-                           <button type="button" onClick={() => removeQuestion(sIndex, qIndex)} className="px-4 bg-red-900/30 text-red-400 rounded-xl hover:bg-red-900/50">✕</button>
+                        <div key={q.id} className="border rounded-xl p-5 mb-4 shadow-sm relative border-l-4 border-slate-700 border-l-[#D4AF37] bg-slate-800/30">
+                          <div className="flex flex-col md:flex-row gap-4 mb-3 w-full">
+                            <div className="flex-1 min-w-0">
+                              <input 
+                                type="text" 
+                                placeholder="Ketik pertanyaan tambahan (Ex: Alamat Pengiriman Souvenir)" 
+                                value={q.text} 
+                                onChange={(e) => handleQuestionChange(sIndex, qIndex, 'text', e.target.value)} 
+                                className={`${inputStyle} w-full border-slate-600`} 
+                                required 
+                              />
+                            </div>
+                            <div className="w-full md:w-48 shrink-0">
+                              <select 
+                                value={q.type} 
+                                onChange={(e) => handleQuestionChange(sIndex, qIndex, 'type', e.target.value)} 
+                                className={`${inputStyle} w-full cursor-pointer font-semibold border-slate-600`}
+                              >
+                                <option value="Text">Teks Singkat</option>
+                                <option value="Dropdown">Dropdown</option>
+                                <option value="Checkbox">Checkbox</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {q.type === 'Text' && (
+                            <input type="text" placeholder="Kolom jawaban teks (diisi peserta nanti)" disabled className={`${inputStyle} opacity-60 bg-slate-900 border-slate-700`} />
+                          )}
+
+                          {(q.type === 'Dropdown' || q.type === 'Checkbox') && (
+                            <div className="pl-4 border-l-2 mt-4 space-y-2 border-[#D4AF37]/50">
+                              <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Atur Pilihan Jawaban:</label>
+                              {q.options?.map((opt, optIndex) => (
+                                <div key={optIndex} className="flex items-center gap-3">
+                                  <div className="text-gray-400 shrink-0">
+                                    {q.type === 'Checkbox' ? (
+                                      <div className="w-4 h-4 border-2 border-gray-400 rounded-sm"></div>
+                                    ) : (
+                                      <div className="w-4 h-4 border-2 border-gray-400 rounded-full flex items-center justify-center">
+                                        <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <input 
+                                    type="text" 
+                                    placeholder={`Opsi ${optIndex + 1}`} 
+                                    value={opt} 
+                                    onChange={(e) => updateQuestionOption(sIndex, qIndex, optIndex, e.target.value)} 
+                                    className={`${inputStyle} py-2 flex-1`} 
+                                    required 
+                                  />
+                                  {q.options.length > 1 && (
+                                    <button type="button" onClick={() => removeQuestionOption(sIndex, qIndex, optIndex)} className="w-8 h-8 flex items-center justify-center rounded-lg font-bold transition text-gray-500 hover:text-red-400 hover:bg-slate-800">
+                                      ✕
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                              <button type="button" onClick={() => addQuestionOption(sIndex, qIndex)} className="text-xs font-bold mt-2 px-3 py-1.5 rounded-lg transition-colors text-[#D4AF37] hover:text-[#FFDF73] bg-[#D4AF37]/10">
+                                + Tambah Opsi
+                              </button>
+                            </div>
+                          )}
+
+                          <div className="flex justify-end items-center gap-4 mt-6 pt-4 border-t border-slate-700">
+                            <button type="button" onClick={() => removeQuestion(sIndex, qIndex)} className="text-xs font-bold uppercase tracking-widest transition text-gray-500 hover:text-red-400">Hapus Form</button>
+                            <label className="flex items-center gap-2 text-xs font-bold cursor-pointer uppercase tracking-widest select-none text-gray-300">
+                              Wajib Isi
+                              <input type="checkbox" checked={q.isRequired} onChange={(e) => handleQuestionChange(sIndex, qIndex, 'isRequired', e.target.checked)} className="w-4 h-4 rounded focus:ring-2 text-[#D4AF37] focus:ring-[#D4AF37] bg-slate-800 border-slate-600" />
+                            </label>
+                          </div>
                         </div>
                      ))}
-                     <button type="button" onClick={() => addQuestion(sIndex)} className="text-xs text-[#D4AF37] font-bold mt-2">+ Tambah Pertanyaan</button>
+                     
+                     <button type="button" onClick={() => addQuestion(sIndex)} className="text-sm font-bold flex items-center gap-2 mt-4 transition text-[#D4AF37] hover:text-[#FFDF73]">
+                        <span className="text-xl">⊕</span> Tambah Pertanyaan Ekstra
+                     </button>
                   </div>
 
                 </div>
@@ -566,9 +603,6 @@ export default function CreatePersonalEvent() {
             </button>
           </SectionAccordion>
 
-          {/* ========================================================= */}
-          {/* SECTION 4: GALLERY FOTO */}
-          {/* ========================================================= */}
           <SectionAccordion title={`4. Galeri Foto (${galleryFiles.length}/5)`} isOpen={openSection === 'gallery'} onToggle={() => toggleSection('gallery')}>
              <div className="space-y-4">
                 <p className="text-sm text-gray-400">Pilih maksimal 5 foto terbaik Anda untuk ditampilkan di halaman undangan.</p>
@@ -592,9 +626,6 @@ export default function CreatePersonalEvent() {
              </div>
           </SectionAccordion>
 
-          {/* ========================================================= */}
-          {/* SECTION 5: DIGITAL GIFT / REKENING */}
-          {/* ========================================================= */}
           <SectionAccordion title="5. Amplop Digital / Rekening" isOpen={openSection === 'gifts'} onToggle={() => toggleSection('gifts')}>
             <p className="text-sm text-gray-400 mb-6">Tamu dapat memberikan hadiah secara digital melalui nomor rekening di bawah ini.</p>
             {eventDetails.digitalGifts.map((gift, index) => (
@@ -619,13 +650,12 @@ export default function CreatePersonalEvent() {
             </button>
           </SectionAccordion>
 
-          {/* TOMBOL SUBMIT */}
           <div className="flex justify-between items-center pt-6 mt-10 border-t border-slate-800">
             <button type="button" onClick={() => navigate(-1)} className="px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-xs transition text-gray-400 hover:text-white">
                Batal
             </button>
             <button type="submit" disabled={isLoading} className="px-10 py-4 rounded-xl text-slate-900 font-bold uppercase tracking-widest text-sm shadow-xl transition-all active:scale-95 disabled:opacity-50 bg-[#D4AF37] hover:bg-[#FFDF73]">
-              {isLoading ? '⏳ Menyimpan Undangan...' : '✨ Publish Undangan Digital'}
+              {isLoading ? '⏳ Menyimpan...' : '✨ Publish Undangan Digital'}
             </button>
           </div>
 

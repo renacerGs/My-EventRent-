@@ -34,11 +34,12 @@ export class AppService implements OnModuleInit {
       await this.pool.query('SELECT 1');
       console.log('Berhasil terhubung ke database PostgreSQL EventRent!');
       
-      // Auto-migrate sederhana
+      // Auto-migrate
       await this.pool.query(`
         ALTER TABLE tickets 
         ADD COLUMN IF NOT EXISTS is_scanned BOOLEAN DEFAULT FALSE,
-        ADD COLUMN IF NOT EXISTS scanned_at TIMESTAMP;
+        ADD COLUMN IF NOT EXISTS scanned_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS is_attending BOOLEAN DEFAULT TRUE;
       `);
       console.log('Database Check: OK! 🚀');
 
@@ -76,7 +77,6 @@ export class AppService implements OnModuleInit {
 
   async getEventById(eventId: number) {
     try {
-      // 👇 FIX: Tambah e.event_details biar kepanggil pas buka undangan 👇
       const eventQuery = `
         SELECT e.id, e.title, e.description, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start, 
                TO_CHAR(e.event_end, 'Dy, DD Mon YYYY') as date_end, e.place, e.name_place, e.city, e.province, e.map_url,
@@ -113,6 +113,17 @@ export class AppService implements OnModuleInit {
       }
 
       eventData.sessions = sessions;
+
+      // Narik Data Ucapan (Greeting) dari Tabel Tickets
+      const greetingsQuery = `
+        SELECT attendee_name as name, greeting, TO_CHAR(purchase_date, 'DD Mon YYYY, HH24:MI') as time
+        FROM tickets
+        WHERE event_id = $1 AND greeting IS NOT NULL AND BTRIM(greeting) != ''
+        ORDER BY purchase_date DESC
+      `;
+      const greetingsRes = await this.pool.query(greetingsQuery, [eventId]);
+      eventData.greetings = greetingsRes.rows;
+
       return eventData;
     } catch (err) {
       if (err instanceof BadRequestException) throw err;
@@ -161,7 +172,6 @@ export class AppService implements OnModuleInit {
     try {
       await client.query('BEGIN'); 
 
-      // 👇 FIX: Nambahin kolom event_details di query INSERT (Posisi ke-15) 👇
       const eventQuery = `
         INSERT INTO events (
           title, description, event_start, event_end, category_id, 
@@ -180,7 +190,7 @@ export class AppService implements OnModuleInit {
         data.location?.mapUrl || null, 
         data.img || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=1000&q=80',
         data.isPrivate ? true : false,
-        data.eventDetails ? JSON.stringify(data.eventDetails) : '{}' // Menyimpan JSONB
+        data.eventDetails ? JSON.stringify(data.eventDetails) : '{}' 
       ];
       
       const eventRes = await client.query(eventQuery, eventValues);
@@ -231,7 +241,6 @@ export class AppService implements OnModuleInit {
 
   async updateEvent(eventId: number, userId: number, data: any) {
     try {
-      // 👇 FIX: Support update event_details 👇
       const query = `
         UPDATE events 
         SET title = $1, description = $2, event_start = $3, event_end = $4,
@@ -324,9 +333,29 @@ export class AppService implements OnModuleInit {
         if (uRes.rows.length > 0) targetEmail = uRes.rows[0].email;
       }
 
+      // 👇🔥 LOGIKA BARU: Jika Tidak Hadir (Hanya Kirim Doa) 🔥👇
+      // Jika formAnswers.isAttending adalah false (Tidak Hadir)
+      const isAttending = formAnswers.isAttending !== false; 
+      
+      if (!isAttending) {
+        // Ambil ID sesi pertama sebagai formalitas (karena session_id wajib di tabel)
+        const firstSessionRes = await client.query('SELECT id FROM event_sessions WHERE event_id = $1 LIMIT 1', [eventId]);
+        const dummySessionId = firstSessionRes.rows[0]?.id || null;
+
+        await client.query(
+          `INSERT INTO tickets (event_id, session_id, user_id, price, guest_email, attendee_name, attendee_email, custom_answers, pax, greeting, is_attending) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+          [eventId, dummySessionId, userId, 0, targetEmail || null, formAnswers.attendee_name || 'Tamu', formAnswers.email || targetEmail || '', '[]', 0, formAnswers.greeting, false]
+        );
+        
+        await client.query('COMMIT');
+        return { message: 'Terima kasih atas doa dan ucapan Anda', ticketIds: [] };
+      }
+      // 👆 SELESAI LOGIKA BARU 👆
+
+      // Proses normal jika HADIR
       for (const item of cart) {
         const sessionId = item.sessionId;
-        
         const qty = item.qty || item.quantity || 1;
 
         const sessionRes = await client.query('SELECT price, stock FROM event_sessions WHERE id = $1 FOR UPDATE', [sessionId]);
@@ -340,12 +369,12 @@ export class AppService implements OnModuleInit {
         const qRes = await client.query('SELECT id, question_text FROM session_questions WHERE session_id = $1', [sessionId]);
         const dbQuestions = qRes.rows;
 
+        // Loop sebanyak jumlah Pax/Quantity (Generate Tiket)
         for (let i = 0; i < qty; i++) {
           const prefix = `cart-${item.id}-ticket-${i}`;
           
           const name = formAnswers[`${prefix}-nama`] || formAnswers.attendee_name || `Tamu ${i + 1}`;
-          const email = formAnswers[`${prefix}-email`] || targetEmail || ``;
-          
+          const email = formAnswers[`${prefix}-email`] || formAnswers.email || targetEmail || ``;
           const pax = 1; 
           const greeting = formAnswers[`${prefix}-greeting`] || formAnswers.greeting || null;
           
@@ -361,9 +390,9 @@ export class AppService implements OnModuleInit {
           totalTransactionPrice += Number(singlePrice);
 
           const ticketRes = await client.query(
-            `INSERT INTO tickets (event_id, session_id, user_id, price, guest_email, attendee_name, attendee_email, custom_answers, pax, greeting) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-            [eventId, sessionId, userId, singlePrice, targetEmail || null, name, email, JSON.stringify(customAnswers), pax, greeting]
+            `INSERT INTO tickets (event_id, session_id, user_id, price, guest_email, attendee_name, attendee_email, custom_answers, pax, greeting, is_attending) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+            [eventId, sessionId, userId, singlePrice, targetEmail || null, name, email, JSON.stringify(customAnswers), pax, greeting, true]
           );
           
           const newTicketId = ticketRes.rows[0].id;
@@ -373,12 +402,13 @@ export class AppService implements OnModuleInit {
 
       await client.query('COMMIT');
 
+      // Kirim email QR Code (HANYA UNTUK YANG HADIR)
       if (targetEmail && boughtTickets.length > 0) {
         this.sendEmailReceipt(targetEmail, eventTitle, boughtTickets, totalTransactionPrice, eventId)
           .catch(e => console.error("Gagal mengirim email struk:", e)); 
       }
 
-      return { message: 'Pembelian tiket berhasil', ticketIds: boughtTickets };
+      return { message: 'Pembelian tiket/RSVP berhasil', ticketIds: boughtTickets };
 
     } catch (err) {
       await client.query('ROLLBACK');
@@ -466,7 +496,7 @@ export class AppService implements OnModuleInit {
 
       const query = `
         SELECT t.id as ticket_id, t.purchase_date, t.price, 
-               t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned, t.pax, t.greeting,
+               t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned, t.pax, t.greeting, t.is_attending,
                e.id as event_id, e.title, e.image_url as img, 
                TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date, e.place as location,
                s.name as session_name, TO_CHAR(s.session_date, 'Dy, DD Mon YYYY') as session_date, 
@@ -490,7 +520,7 @@ export class AppService implements OnModuleInit {
     try {
       const query = `
         SELECT t.id as ticket_id, t.purchase_date, t.price, 
-               t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned, t.pax, t.greeting,
+               t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned, t.pax, t.greeting, t.is_attending,
                e.id as event_id, e.title, e.image_url as img, 
                TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date, e.place as location,
                s.name as session_name, TO_CHAR(s.session_date, 'Dy, DD Mon YYYY') as session_date, 
@@ -516,7 +546,7 @@ export class AppService implements OnModuleInit {
 
       const query = `
         SELECT t.id as ticket_id, t.purchase_date, t.price,
-               t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned, t.pax, t.greeting,
+               t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned, t.pax, t.greeting, t.is_attending,
                u.name as buyer_name, COALESCE(u.email, t.guest_email) as buyer_email, u.picture as buyer_pic,
                s.name as session_name
         FROM tickets t
@@ -540,7 +570,7 @@ export class AppService implements OnModuleInit {
       if (eventCheck.rows[0].created_by != userId) throw new UnauthorizedException('Akses ditolak! Kamu bukan panitia event ini.');
 
       const ticketRes = await this.pool.query(`
-        SELECT t.id, t.is_scanned, t.scanned_at, t.price, t.pax, t.greeting,
+        SELECT t.id, t.is_scanned, t.scanned_at, t.price, t.pax, t.greeting, t.is_attending,
                t.attendee_name, t.attendee_email, t.custom_answers,
                u.name as buyer_name, COALESCE(u.email, t.guest_email) as buyer_email, s.name as session_name
         FROM tickets t
@@ -552,6 +582,10 @@ export class AppService implements OnModuleInit {
       if (ticketRes.rows.length === 0) return { valid: false, message: 'TIKET PALSU ATAU SALAH EVENT!' };
 
       const ticket = ticketRes.rows[0];
+
+      if (!ticket.is_attending) {
+        return { valid: false, message: 'TAMU INI TELAH MENGKONFIRMASI TIDAK HADIR.' };
+      }
 
       if (ticket.is_scanned) {
         const scanWaktu = new Date(ticket.scanned_at).toLocaleString('id-ID');

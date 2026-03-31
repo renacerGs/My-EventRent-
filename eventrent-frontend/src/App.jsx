@@ -21,7 +21,8 @@ import TrackTicket from './pages/TrackTicket';
 import WeddingInvitation from './pages/WeddingInvitation';
 import ChooseEventType from "./components/ChooseEventType"; 
 import CreatePublicEvent from "./components/CreatePublicEvent"; 
-import CreatePersonalEvent from "./components/CreatePersonalEvent"; 
+import CreateWeddingEvent from "./components/CreateWeddingEvent"; 
+import WeddingRSVP from './pages/WeddingRSVP';
 
 
 export default function App() {
@@ -92,16 +93,17 @@ export default function App() {
           <Route path="/scanner/:eventId" element={<Scanner />} />
           <Route path="/checkout/:id" element={<Checkout />} />
           <Route path="/cek-tiket" element={<TrackTicket />} />
-          
           <Route path="/create" element={<ProtectedRoute><ChooseEventType /></ProtectedRoute>} />
           <Route path="/create/public" element={<ProtectedRoute><CreatePublicEvent /></ProtectedRoute>} />
-          <Route path="/create/personal" element={<ProtectedRoute><CreatePersonalEvent /></ProtectedRoute>} />
+          <Route path="/create/personal" element={<ProtectedRoute><CreateWeddingEvent /></ProtectedRoute>} />
           <Route path="/manage" element={<ProtectedRoute><ManageEvent /></ProtectedRoute>} />
           <Route path="/edit/:id" element={<ProtectedRoute><EditEvent /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/my-tickets" element={<ProtectedRoute><MyTickets /></ProtectedRoute>} />
           <Route path="/manage/event/:id" element={<ProtectedRoute><EventDashboard /></ProtectedRoute>} />
           <Route path="/invitation/:id" element={<WeddingInvitation />} />
+          <Route path="/rsvp/:id" element={<WeddingRSVP />} />
+          
           
           <Route path="*" element={<div className="text-center py-20 font-bold text-gray-400">Halaman tidak ditemukan.</div>} />
         </Routes>
