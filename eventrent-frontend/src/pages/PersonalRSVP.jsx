@@ -46,6 +46,19 @@ export default function PersonalRSVP() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // 👇 FUNGSI BARU: Nangkep Jawaban Custom (Teks, Dropdown, Checkbox)
+  const handleCustomChange = (qId, value, type, isChecked = false) => {
+    if (type === 'Checkbox') {
+      setFormData(prev => {
+        const currentArr = prev[qId] || [];
+        if (isChecked) return { ...prev, [qId]: [...currentArr, value] };
+        return { ...prev, [qId]: currentArr.filter(v => v !== value) };
+      });
+    } else {
+      setFormData(prev => ({ ...prev, [qId]: value }));
+    }
+  };
+
   const toggleSession = (sessionId) => {
     setSelectedSessions(prev => 
       prev.includes(sessionId) 
@@ -53,6 +66,21 @@ export default function PersonalRSVP() {
         : [...prev, sessionId] 
     );
   };
+
+  // 👇 FUNGSI BARU: Ambil pertanyaan custom berdasarkan sesi yang dicentang
+  const activeQuestions = [];
+  const seenQIds = new Set();
+  if (event && event.sessions) {
+    selectedSessions.forEach(sId => {
+      const session = event.sessions.find(s => s.id === sId);
+      session?.questions?.forEach(q => {
+        if (!seenQIds.has(q.id)) {
+          seenQIds.add(q.id);
+          activeQuestions.push(q);
+        }
+      });
+    });
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -62,6 +90,13 @@ export default function PersonalRSVP() {
       return alert("Pilih minimal 1 sesi acara yang akan dihadiri!");
     }
     
+    // Validasi Custom Checkbox (Wajib Isi)
+    for (const q of activeQuestions) {
+      if (q.is_required && q.answer_type === 'Checkbox' && (!formData[q.id] || formData[q.id].length === 0)) {
+        return alert(`Pertanyaan "${q.question_text}" wajib diisi!`);
+      }
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -78,6 +113,7 @@ export default function PersonalRSVP() {
         guestEmail: formData.email,
         cart: cartPayload,
         formAnswers: {
+          ...formData, // 👈 Masukin semua Custom Answers biar ditangkep Backend
           attendee_name: formData.name,
           greeting: formData.greeting,
           isAttending: formData.isAttending 
@@ -102,7 +138,7 @@ export default function PersonalRSVP() {
       setIsSuccess(true);
       
       setTimeout(() => {
-        navigate(`/party/${id}`); // Kembali ke halaman party
+        navigate(`/party/${id}`); 
       }, 3000);
 
     } catch (error) {
@@ -120,7 +156,6 @@ export default function PersonalRSVP() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans text-gray-800">
       
-      {/* NAVBAR */}
       <div className="bg-white border-b border-gray-100 px-4 py-4 flex items-center sticky top-0 z-50 shadow-sm">
         <button onClick={() => navigate(-1)} className="text-gray-400 p-2 bg-gray-50 rounded-full hover:text-purple-600 hover:bg-purple-50 transition">
           <ChevronLeft className="w-5 h-5" />
@@ -133,7 +168,6 @@ export default function PersonalRSVP() {
       <div className="flex-1 p-4 sm:p-6 flex justify-center items-start pt-8 pb-20">
         <div className="w-full max-w-2xl bg-white border border-gray-100 rounded-[32px] shadow-xl p-6 sm:p-10 relative overflow-hidden">
           
-          {/* DEKORASI BUBBLE UNGU KECIL */}
           <div className="absolute -top-10 -right-10 w-40 h-40 bg-purple-100 rounded-full blur-3xl opacity-50 pointer-events-none"></div>
 
           {isSuccess ? (
@@ -152,7 +186,6 @@ export default function PersonalRSVP() {
           ) : (
             <form onSubmit={handleSubmit} className="space-y-8 relative z-10">
               
-              {/* NAMA & EMAIL */}
               <div className="space-y-5">
                 <div>
                   <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2">Nama Lengkap <span className="text-red-500">*</span></label>
@@ -164,7 +197,6 @@ export default function PersonalRSVP() {
                 </div>
               </div>
 
-              {/* KEHADIRAN */}
               <div>
                 <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-3">Bisa Datang Nggak? <span className="text-red-500">*</span></label>
                 <div className="grid grid-cols-2 gap-4">
@@ -185,7 +217,6 @@ export default function PersonalRSVP() {
                 </div>
               </div>
 
-              {/* JIKA HADIR: SESI & PAX */}
               {formData.isAttending === true && (
                 <div className="space-y-8 p-6 bg-purple-50/50 border border-purple-100 rounded-2xl">
                   
@@ -227,15 +258,51 @@ export default function PersonalRSVP() {
                         className={`py-5 flex flex-col items-center justify-center gap-2 rounded-xl transition-all border-2 bg-white ${formData.pax === 2 ? 'border-purple-500 text-purple-700 shadow-md' : 'border-gray-100 text-gray-400 hover:border-purple-200'}`}
                       >
                         <Users className="w-6 h-6" />
-                        <span className="text-xs font-bold uppercase tracking-widest">+1 (Bawa Temen/Pacar)</span>
+                        <span className="text-xs font-bold uppercase tracking-widest">+1 (Bawa Partner)</span>
                       </button>
                     </div>
                   </div>
 
+                  {/* 👇 BAGIAN RENDER CUSTOM QUESTIONS 👇 */}
+                  {activeQuestions.length > 0 && (
+                    <div className="pt-6 border-t border-purple-100 space-y-6">
+                      <h3 className="text-[11px] font-black text-purple-600 uppercase tracking-widest bg-purple-100/50 inline-block px-3 py-1 rounded-md">Pertanyaan Tambahan</h3>
+                      {activeQuestions.map(q => (
+                        <div key={q.id}>
+                          <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-widest mb-2">
+                            {q.question_text} {q.is_required && <span className="text-red-500">*</span>}
+                          </label>
+                          
+                          {q.answer_type === 'Text' && (
+                            <input type="text" onChange={e => handleCustomChange(q.id, e.target.value, 'Text')} required={q.is_required} className={inputStyle} placeholder="Ketik jawabanmu di sini..." />
+                          )}
+                          
+                          {q.answer_type === 'Dropdown' && (
+                            <select onChange={e => handleCustomChange(q.id, e.target.value, 'Dropdown')} required={q.is_required} className={`${inputStyle} cursor-pointer`}>
+                              <option value="">-- Pilih Jawaban --</option>
+                              {q.options?.map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
+                            </select>
+                          )}
+                          
+                          {q.answer_type === 'Checkbox' && (
+                            <div className="space-y-3 mt-2">
+                              {q.options?.map((opt, i) => (
+                                <label key={i} className="flex items-center gap-3 cursor-pointer group">
+                                  <input type="checkbox" value={opt} onChange={e => handleCustomChange(q.id, opt, 'Checkbox', e.target.checked)} className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500" />
+                                  <span className="text-sm font-medium text-gray-700 group-hover:text-purple-700 transition-colors">{opt}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* 👆 AKHIR RENDER CUSTOM QUESTIONS 👆 */}
+
                 </div>
               )}
 
-              {/* UCAPAN / GREETING */}
               <div>
                 <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2">Ucapan & Doa <span className="text-red-500">*</span></label>
                 <textarea 
@@ -249,7 +316,6 @@ export default function PersonalRSVP() {
                 />
               </div>
 
-              {/* SUBMIT BUTTON */}
               <div className="pt-4 mt-8">
                 <button 
                   type="submit" 

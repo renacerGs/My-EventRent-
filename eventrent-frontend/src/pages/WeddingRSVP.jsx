@@ -46,6 +46,19 @@ export default function WeddingRSVP() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // 👇 FUNGSI BARU: Nangkep Jawaban Custom (Teks, Dropdown, Checkbox)
+  const handleCustomChange = (qId, value, type, isChecked = false) => {
+    if (type === 'Checkbox') {
+      setFormData(prev => {
+        const currentArr = prev[qId] || [];
+        if (isChecked) return { ...prev, [qId]: [...currentArr, value] };
+        return { ...prev, [qId]: currentArr.filter(v => v !== value) };
+      });
+    } else {
+      setFormData(prev => ({ ...prev, [qId]: value }));
+    }
+  };
+
   const toggleSession = (sessionId) => {
     setSelectedSessions(prev => 
       prev.includes(sessionId) 
@@ -53,6 +66,21 @@ export default function WeddingRSVP() {
         : [...prev, sessionId] 
     );
   };
+
+  // 👇 FUNGSI BARU: Ambil pertanyaan custom berdasarkan sesi yang dicentang
+  const activeQuestions = [];
+  const seenQIds = new Set();
+  if (event && event.sessions) {
+    selectedSessions.forEach(sId => {
+      const session = event.sessions.find(s => s.id === sId);
+      session?.questions?.forEach(q => {
+        if (!seenQIds.has(q.id)) {
+          seenQIds.add(q.id);
+          activeQuestions.push(q);
+        }
+      });
+    });
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -62,14 +90,21 @@ export default function WeddingRSVP() {
       return alert("Pilih minimal 1 sesi acara yang akan dihadiri!");
     }
     
+    // Validasi Custom Checkbox (Wajib Isi)
+    for (const q of activeQuestions) {
+      if (q.is_required && q.answer_type === 'Checkbox' && (!formData[q.id] || formData[q.id].length === 0)) {
+        return alert(`Pertanyaan "${q.question_text}" wajib diisi!`);
+      }
+    }
+
     setIsSubmitting(true);
 
     try {
       const cartPayload = formData.isAttending 
       ? selectedSessions.map(sId => ({ 
           sessionId: sId, 
-          qty: 1, // QTY tiket yang dicetak tetap 1 lembar (QR Code)
-          pax: Number(formData.pax) // Tapi 1 QR Code berlaku untuk sekian orang (Pax)
+          qty: 1, 
+          pax: Number(formData.pax) 
         })) 
       : [];
 
@@ -78,9 +113,10 @@ export default function WeddingRSVP() {
         guestEmail: formData.email,
         cart: cartPayload,
         formAnswers: {
+          ...formData, // 👈 Masukin semua Custom Answers biar ditangkep Backend
           attendee_name: formData.name,
           greeting: formData.greeting,
-          isAttending: formData.isAttending // 👈 Diselipkan di sini buat Backend
+          isAttending: formData.isAttending 
         }
       };
 
@@ -115,6 +151,8 @@ export default function WeddingRSVP() {
   if (isLoading) return <div className="min-h-screen bg-slate-950 flex items-center justify-center"><div className="animate-spin w-10 h-10 border-4 border-[#D4AF37] border-t-transparent rounded-full"></div></div>;
   if (!event) return <div className="text-center mt-20 text-white">Event tidak valid.</div>;
 
+  const inputStyle = `w-full bg-slate-950 text-white border border-slate-800 rounded-xl px-5 py-4 focus:border-[#D4AF37] outline-none transition text-sm placeholder:text-slate-600`;
+
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col font-sans text-slate-200">
       <div className="bg-slate-900 border-b border-slate-800 px-4 py-4 flex items-center sticky top-0 z-50">
@@ -126,7 +164,7 @@ export default function WeddingRSVP() {
         </h1>
       </div>
 
-      <div className="flex-1 p-4 sm:p-6 flex justify-center items-start pt-8">
+      <div className="flex-1 p-4 sm:p-6 flex justify-center items-start pt-8 pb-20">
         <div className="w-full max-w-2xl bg-slate-900/80 border border-slate-800 rounded-[32px] shadow-2xl p-6 sm:p-10">
           
           {isSuccess ? (
@@ -146,11 +184,11 @@ export default function WeddingRSVP() {
               <div className="space-y-5">
                 <div>
                   <label className="block text-[11px] font-bold text-[#D4AF37] uppercase tracking-widest mb-2">Nama Lengkap <span className="text-red-500">*</span></label>
-                  <input type="text" name="name" value={formData.name} onChange={handleChange} required placeholder="Ketik nama Anda di sini..." className="w-full bg-slate-950 text-white border border-slate-800 rounded-xl px-5 py-4 focus:border-[#D4AF37] outline-none transition text-sm" />
+                  <input type="text" name="name" value={formData.name} onChange={handleChange} required placeholder="Ketik nama Anda di sini..." className={inputStyle} />
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-[#D4AF37] uppercase tracking-widest mb-2">Email <span className="text-red-500">*</span></label>
-                  <input type="email" name="email" value={formData.email} onChange={handleChange} required placeholder="Untuk pengiriman E-Ticket (QR Code)" className="w-full bg-slate-950 text-white border border-slate-800 rounded-xl px-5 py-4 focus:border-[#D4AF37] outline-none transition text-sm placeholder:text-slate-600" />
+                  <input type="email" name="email" value={formData.email} onChange={handleChange} required placeholder="Untuk pengiriman E-Ticket (QR Code)" className={inputStyle} />
                 </div>
               </div>
 
@@ -183,7 +221,7 @@ export default function WeddingRSVP() {
                       {event.sessions?.map(s => (
                         <label 
                           key={s.id} 
-                          onClick={() => toggleSession(s.id)} // 👈 FIX BUG ONCLICK ADA DI SINI
+                          onClick={() => toggleSession(s.id)} 
                           className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedSessions.includes(s.id) ? 'border-[#D4AF37] bg-[#D4AF37]/5' : 'border-slate-800 bg-slate-950 hover:border-slate-700'}`}
                         >
                           <div className={`w-5 h-5 rounded flex items-center justify-center border-2 ${selectedSessions.includes(s.id) ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-slate-600'}`}>
@@ -220,6 +258,43 @@ export default function WeddingRSVP() {
                     </div>
                   </div>
 
+                  {/* 👇 BAGIAN RENDER CUSTOM QUESTIONS UNTUK WEDDING 👇 */}
+                  {activeQuestions.length > 0 && (
+                    <div className="pt-6 border-t border-slate-800 space-y-6">
+                      <h3 className="text-[11px] font-black text-[#D4AF37] uppercase tracking-widest bg-[#D4AF37]/10 inline-block px-3 py-1 rounded-md border border-[#D4AF37]/20">Pertanyaan Tambahan</h3>
+                      {activeQuestions.map(q => (
+                        <div key={q.id}>
+                          <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                            {q.question_text} {q.is_required && <span className="text-red-500">*</span>}
+                          </label>
+                          
+                          {q.answer_type === 'Text' && (
+                            <input type="text" onChange={e => handleCustomChange(q.id, e.target.value, 'Text')} required={q.is_required} className={inputStyle} placeholder="Ketik jawaban di sini..." />
+                          )}
+                          
+                          {q.answer_type === 'Dropdown' && (
+                            <select onChange={e => handleCustomChange(q.id, e.target.value, 'Dropdown')} required={q.is_required} className={`${inputStyle} cursor-pointer`}>
+                              <option value="">-- Pilih Jawaban --</option>
+                              {q.options?.map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
+                            </select>
+                          )}
+                          
+                          {q.answer_type === 'Checkbox' && (
+                            <div className="space-y-3 mt-2">
+                              {q.options?.map((opt, i) => (
+                                <label key={i} className="flex items-center gap-3 cursor-pointer group">
+                                  <input type="checkbox" value={opt} onChange={e => handleCustomChange(q.id, opt, 'Checkbox', e.target.checked)} className="w-5 h-5 text-[#D4AF37] border-slate-700 bg-slate-900 rounded focus:ring-[#D4AF37]" />
+                                  <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">{opt}</span>
+                                </label>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* 👆 AKHIR RENDER CUSTOM QUESTIONS 👆 */}
+
                 </div>
               )}
 
@@ -232,7 +307,7 @@ export default function WeddingRSVP() {
                   required 
                   placeholder={formData.isAttending === false ? "Berikan doa dan alasan ketidakhadiran Anda..." : "Semoga langgeng dan bisa menjadi pasangan sehidup semati..."}
                   rows="4" 
-                  className="w-full bg-slate-950 text-white border border-slate-800 rounded-xl px-5 py-4 focus:border-[#D4AF37] outline-none transition resize-none text-sm placeholder:text-slate-600" 
+                  className={`${inputStyle} resize-none`} 
                 />
               </div>
 
