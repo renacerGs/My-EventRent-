@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-// 👇 1. IMPORT USELOCATION DI SINI
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
-// Import Komponen Lama
+// Import Komponen
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import Footer from './components/Footer';
@@ -11,18 +10,29 @@ import EventList from './components/EventList';
 import EventDetail from './pages/EventDetail';
 import Likes from './pages/Likes'; 
 import ManageEvent from "./components/ManageEvent"; 
-import EditEvent from "./components/EditEvent"; 
 import Profile from "./components/Profile"; 
 import MyTickets from "./components/MyTickets"; 
 import EventDashboard from "./components/EventDashboard";
 import Checkout from "./pages/Checkout"; 
 import Scanner from './pages/Scanner';
 import TrackTicket from './pages/TrackTicket'; 
-import WeddingInvitation from './pages/WeddingInvitation';
+
+// --- ROUTE KHUSUS PEMBUATAN EVENT ---
 import ChooseEventType from "./components/ChooseEventType"; 
 import CreatePublicEvent from "./components/CreatePublicEvent"; 
 import CreateWeddingEvent from "./components/CreateWeddingEvent"; 
+import CreatePersonalEvent from "./components/CreatePersonalEvent"; 
+
+// --- ROUTE KHUSUS EDIT EVENT ---
+import EditPublicEvent from "./components/EditPublicEvent"; 
+import EditWeddingEvent from "./components/EditWeddingEvent"; 
+// import EditPersonalEvent from "./components/EditPersonalEvent"; // (Tinggal di-uncomment nanti kalau udah dibikin)
+
+// --- ROUTE KHUSUS WEDDING/PERSONAL ---
+import WeddingInvitation from './pages/WeddingInvitation';
 import WeddingRSVP from './pages/WeddingRSVP';
+import PersonalInvitation from './pages/PersonalInvitation';
+import PersonalRSVP from './pages/PersonalRSVP';
 
 
 export default function App() {
@@ -35,9 +45,13 @@ export default function App() {
     return storedUser ? JSON.parse(storedUser) : null;
   });
 
-  // 👇 2. INISIALISASI LOKASI UNTUK CEK HALAMAN SAAT INI
   const location = useLocation();
-  const isInvitationPage = location.pathname.startsWith('/invitation');
+  // 👇 FIX: Sembunyikan Navbar/Footer di Halaman Undangan DAN Form RSVP
+  const isInvitationPage = 
+    location.pathname.startsWith('/invitation') || 
+    location.pathname.startsWith('/party') || 
+    location.pathname.startsWith('/rsvp') || 
+    location.pathname.startsWith('/party-rsvp');
 
   useEffect(() => {
     fetch('/api/events')
@@ -62,7 +76,6 @@ export default function App() {
   return (
     <div className="bg-white min-h-screen font-sans flex flex-col">
       
-      {/* 👇 3. SEMBUNYIKAN NAVBAR JIKA DI HALAMAN UNDANGAN 👇 */}
       {!isInvitationPage && (
         <Navbar 
           user={user} 
@@ -79,6 +92,7 @@ export default function App() {
 
       <main className="flex-grow">
         <Routes>
+          {/* --- HALAMAN PUBLIK --- */}
           <Route path="/" element={
             <>
               <Hero />
@@ -87,24 +101,38 @@ export default function App() {
               </div>
             </>
           } />
-          
-          <Route path="/likes" element={<Likes />} />
           <Route path="/event/:id" element={<EventDetail events={events} />} />
-          <Route path="/scanner/:eventId" element={<Scanner />} />
           <Route path="/checkout/:id" element={<Checkout />} />
           <Route path="/cek-tiket" element={<TrackTicket />} />
-          <Route path="/create" element={<ProtectedRoute><ChooseEventType /></ProtectedRoute>} />
-          <Route path="/create/public" element={<ProtectedRoute><CreatePublicEvent /></ProtectedRoute>} />
-          <Route path="/create/personal" element={<ProtectedRoute><CreateWeddingEvent /></ProtectedRoute>} />
-          <Route path="/manage" element={<ProtectedRoute><ManageEvent /></ProtectedRoute>} />
-          <Route path="/edit/:id" element={<ProtectedRoute><EditEvent /></ProtectedRoute>} />
+          
+          {/* --- HALAMAN UNDANGAN KHUSUS --- */}
+          <Route path="/invitation/:id" element={<WeddingInvitation />} />
+          <Route path="/party/:id" element={<PersonalInvitation />} /> {/* 👇 ROUTE BARU */}
+          <Route path="/rsvp/:id" element={<WeddingRSVP />} />
+          <Route path="/party-rsvp/:id" element={<PersonalRSVP />} />
+          
+          {/* --- HALAMAN PROTECTED (BUTUH LOGIN) --- */}
+          <Route path="/likes" element={<ProtectedRoute><Likes /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/my-tickets" element={<ProtectedRoute><MyTickets /></ProtectedRoute>} />
+          
+          {/* --- MANAJEMEN EVENT & DASHBOARD --- */}
+          <Route path="/manage" element={<ProtectedRoute><ManageEvent /></ProtectedRoute>} />
           <Route path="/manage/event/:id" element={<ProtectedRoute><EventDashboard /></ProtectedRoute>} />
-          <Route path="/invitation/:id" element={<WeddingInvitation />} />
-          <Route path="/rsvp/:id" element={<WeddingRSVP />} />
+          <Route path="/scanner/:eventId" element={<ProtectedRoute><Scanner /></ProtectedRoute>} />
           
+          {/* --- PEMBUATAN EVENT --- */}
+          <Route path="/create" element={<ProtectedRoute><ChooseEventType /></ProtectedRoute>} />
+          <Route path="/create/public" element={<ProtectedRoute><CreatePublicEvent /></ProtectedRoute>} />
+          <Route path="/create/wedding" element={<ProtectedRoute><CreateWeddingEvent /></ProtectedRoute>} />
+          <Route path="/create/personal" element={<ProtectedRoute><CreatePersonalEvent /></ProtectedRoute>} />
+
+          {/* --- EDIT EVENT (DIPISAH BERDASARKAN TIPE) --- */}
+          <Route path="/edit/public/:id" element={<ProtectedRoute><EditPublicEvent /></ProtectedRoute>} />
+          <Route path="/edit/wedding/:id" element={<ProtectedRoute><EditWeddingEvent /></ProtectedRoute>} />
+          {/* <Route path="/edit/personal/:id" element={<ProtectedRoute><EditPersonalEvent /></ProtectedRoute>} /> */}
           
+          {/* HALAMAN 404 FALLBACK */}
           <Route path="*" element={<div className="text-center py-20 font-bold text-gray-400">Halaman tidak ditemukan.</div>} />
         </Routes>
       </main>
@@ -123,7 +151,6 @@ export default function App() {
         }}
       />
 
-      {/* 👇 4. SEMBUNYIKAN FOOTER JIKA DI HALAMAN UNDANGAN 👇 */}
       {!isInvitationPage && <Footer />}
     </div>
   );

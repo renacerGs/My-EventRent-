@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { createClient } from '@supabase/supabase-js';
 
-// Fungsi untuk convert format "Mon, 12 Jan 2026" kembali jadi "YYYY-MM-DD" buat form HTML
+// Setup Supabase (Sesuai dengan arsitektur kita sekarang)
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Fungsi untuk convert format tanggal "Mon, 12 Jan 2026" kembali jadi "YYYY-MM-DD"
 const formatDateForInput = (dateStr) => {
   if (!dateStr || dateStr.includes('TBA') || dateStr.includes('-')) return '';
   try {
@@ -16,7 +22,7 @@ const formatDateForInput = (dateStr) => {
   }
 };
 
-export default function EditEvent() {
+export default function EditPublicEvent() {
   const { id } = useParams();
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user'));
@@ -32,15 +38,17 @@ export default function EditEvent() {
     province: '',
     mapUrl: '',
     eventStart: '',
-    eventEnd: ''
+    eventEnd: '',
+    oldImgUrl: '' // Menyimpan URL gambar lama
   });
   
   const [imagePreview, setImagePreview] = useState(null);
-  const [imageBase64, setImageBase64] = useState(null); 
+  const [imageFile, setImageFile] = useState(null); // Menyimpan file asli untuk diupload
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  const categories = ['Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports'];
+  const categories = ['Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports', 'Seminar', 'Workshop'];
 
   useEffect(() => {
     if (!user) { navigate('/'); return; }
@@ -51,6 +59,13 @@ export default function EditEvent() {
         return res.json();
       })
       .then(found => {
+        // 🔥 PENGAMAN: Tendang kalau ini event Wedding / Personal 🔥
+        if (found.category === 'Wedding' || found.category === 'Personal' || found.is_private) {
+          alert("Ini adalah Private Event. Silakan edit melalui menu yang sesuai.");
+          navigate('/manage');
+          return;
+        }
+
         setFormData({
           title: found.title || '',
           phone: found.contact || '',
@@ -62,7 +77,8 @@ export default function EditEvent() {
           province: found.province || '',
           mapUrl: found.map_url || '',
           eventStart: formatDateForInput(found.date_start), 
-          eventEnd: formatDateForInput(found.date_end)
+          eventEnd: formatDateForInput(found.date_end),
+          oldImgUrl: found.img || ''
         });
         setImagePreview(found.img);
         setIsLoading(false);
@@ -72,7 +88,7 @@ export default function EditEvent() {
         alert("Gagal memuat data edit");
         navigate('/manage');
       });
-  }, [id, navigate]);
+  }, [id, navigate, user]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -83,15 +99,32 @@ export default function EditEvent() {
     const file = e.target.files[0];
     if (file) {
       setImagePreview(URL.createObjectURL(file));
-      const reader = new FileReader();
-      reader.onloadend = () => setImageBase64(reader.result);
-      reader.readAsDataURL(file);
+      setImageFile(file); // Simpan file untuk di-upload ke Supabase nanti
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSaving(true);
+    
     try {
+      let finalImageUrl = formData.oldImgUrl;
+
+      // Jika user memilih gambar baru, upload ke Supabase Storage
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `cover-public-${Date.now()}-${Math.floor(Math.random()*1000)}.${fileExt}`;
+        
+        const { data, error } = await supabase.storage
+          .from('event-posters')
+          .upload(fileName, imageFile, { contentType: imageFile.type, upsert: false });
+
+        if (error) throw new Error("Gagal mengunggah gambar baru ke Supabase.");
+        
+        const { data: publicUrlData } = supabase.storage.from('event-posters').getPublicUrl(fileName);
+        finalImageUrl = publicUrlData.publicUrl;
+      }
+
       const payload = { 
         title: formData.title,
         description: formData.description,
@@ -106,7 +139,8 @@ export default function EditEvent() {
           province: formData.province,
           mapUrl: formData.mapUrl
         },
-        img: imageBase64 
+        img: finalImageUrl, // Kirim URL Supabase yang bersih
+        isPrivate: false 
       };
 
       const res = await fetch(`/api/events/${id}?userId=${user.id}`, {
@@ -119,12 +153,15 @@ export default function EditEvent() {
         setShowSuccessModal(true);
         setTimeout(() => {
           navigate('/manage');
-        }, 1000); 
+        }, 1500); 
       } else {
         alert("Gagal update event. Pastikan kamu pembuat event ini.");
       }
     } catch (err) {
       console.error(err);
+      alert(err.message || "Terjadi kesalahan saat menyimpan data.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -139,11 +176,11 @@ export default function EditEvent() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6">
         
         <div className="flex items-center justify-between mb-6">
-           <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tight">Edit Event</h1>
+           <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tight">Edit Public Event</h1>
            <button onClick={() => navigate('/manage')} className="text-gray-400 hover:text-red-500 font-bold text-xs uppercase tracking-widest transition-colors">Batal</button>
         </div>
 
-        {/* --- BANNER PERINGATAN (BARU) --- */}
+        {/* --- BANNER PERINGATAN --- */}
         <div className="bg-[#FFF5F0] border-l-[6px] border-[#FF6B35] p-5 mb-8 rounded-r-2xl shadow-sm flex items-start gap-4">
            <div className="bg-[#FF6B35] bg-opacity-10 p-2 rounded-full shrink-0">
               <svg className="w-5 h-5 text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
@@ -151,7 +188,7 @@ export default function EditEvent() {
            <div>
              <h3 className="text-sm font-black text-[#FF6B35] mb-1 uppercase tracking-wider">Perhatian Buat Organizer</h3>
              <p className="text-xs text-gray-600 leading-relaxed font-medium">
-               Untuk menjaga validitas dan keamanan data transaksi peserta yang sudah membeli tiket, <strong className="text-gray-900 font-bold">Sesi Tiket, Harga, Kuota, dan Custom Form TIDAK DAPAT DIUBAH</strong> setelah event dibuat. Anda hanya dapat memperbarui informasi dasar di bawah ini. Harap teliti sebelum menyimpan perubahan.
+               Untuk menjaga validitas dan keamanan data transaksi peserta yang sudah membeli tiket, <strong className="text-gray-900 font-bold">Sesi Tiket, Harga, Kuota, dan Custom Form TIDAK DAPAT DIUBAH</strong> setelah event dibuat. Anda hanya dapat memperbarui informasi dasar di bawah ini.
              </p>
            </div>
         </div>
@@ -232,7 +269,7 @@ export default function EditEvent() {
           <div className={sectionStyle}>
             <h2 className="text-xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4">Event Banner</h2>
             <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
-              <div className="w-full md:w-80 aspect-video bg-gray-100 rounded-2xl overflow-hidden border-2 border-dashed border-gray-200 relative group flex-shrink-0">
+              <div className="w-full md:w-80 aspect-video bg-gray-100 rounded-2xl overflow-hidden border-2 border-dashed border-gray-200 relative flex-shrink-0">
                  {imagePreview ? (
                    <img src={imagePreview} className="w-full h-full object-cover" alt="Preview" />
                  ) : (
@@ -251,17 +288,17 @@ export default function EditEvent() {
           </div>
 
           <div className="flex justify-end pt-4">
-            <button type="submit" className="w-full md:w-auto bg-[#FF6B35] text-white px-12 py-4 rounded-xl font-bold text-sm uppercase tracking-widest shadow-xl shadow-orange-100 hover:bg-[#E85526] hover:-translate-y-1 transition-all duration-300">
-              Simpan Perubahan
+            <button type="submit" disabled={isSaving} className="w-full md:w-auto bg-[#FF6B35] text-white px-12 py-4 rounded-xl font-bold text-sm uppercase tracking-widest shadow-xl shadow-orange-100 hover:bg-[#E85526] hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
+              {isSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
             </button>
           </div>
         </form>
       </div>
 
-      {/* MODAL SUCCESS KILAT */}
+      {/* MODAL SUCCESS */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-[32px] p-8 max-w-sm w-full shadow-2xl transform transition-all text-center relative overflow-hidden">
+          <div className="bg-white rounded-[32px] p-8 max-w-sm w-full shadow-2xl transform transition-all text-center">
             <div className="w-20 h-20 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6 border-[6px] border-green-100">
               <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -269,7 +306,7 @@ export default function EditEvent() {
             </div>
             <h3 className="text-2xl font-black text-gray-900 mb-2 uppercase tracking-tight">Sukses!</h3>
             <p className="text-gray-500 text-sm font-medium mb-2">
-              Detail event berhasil diperbarui.
+              Detail event publik berhasil diperbarui.
             </p>
           </div>
         </div>

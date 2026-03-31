@@ -29,25 +29,35 @@ export default function EventDashboard() {
 
       const groupedMap = new Map();
       dataAttendees.forEach(t => {
+        // Grouping berdasarkan Waktu Beli + Email Pembeli
         const key = `${t.purchase_date}_${t.buyer_email || 'guest'}`;
         if (!groupedMap.has(key)) {
           groupedMap.set(key, {
             order_id: t.ticket_id, 
-            buyer_name: t.buyer_name || 'Guest Checkout',
-            buyer_email: t.buyer_email,
-            session_name: t.session_name,
+            buyer_name: t.attendee_name || t.buyer_name || 'Guest', 
+            buyer_email: t.attendee_email || t.buyer_email,
+            // Kita simpan array nama sesi unik yang dibeli dalam 1 transaksi ini
+            session_names: new Set(), 
             total_qty: 0,
             scanned_qty: 0,
-            tickets: [] 
+            tickets: [],
+            is_attending_all: true 
           });
         }
         const group = groupedMap.get(key);
         group.total_qty += 1;
+        group.session_names.add(t.session_name); // Tambah nama sesi ke daftar
+        
         if (t.is_scanned) group.scanned_qty += 1;
+        if (t.is_attending === false) group.is_attending_all = false; 
         group.tickets.push(t);
       });
 
-      const finalAttendees = Array.from(groupedMap.values());
+      // Konversi Map ke Array dan ubah Set session_names jadi string yang dibatasi koma
+      const finalAttendees = Array.from(groupedMap.values()).map(g => ({
+        ...g,
+        session_name: Array.from(g.session_names).join(' & ') // Contoh output: "Akad Nikah & Resepsi"
+      }));
 
       setEvent(prev => JSON.stringify(prev) === JSON.stringify(eventData) ? prev : eventData);
       setGroupedAttendees(prev => JSON.stringify(prev) === JSON.stringify(finalAttendees) ? prev : finalAttendees);
@@ -99,18 +109,19 @@ export default function EventDashboard() {
     }
   };
 
-  const isWed = event?.is_private || event?.category === 'Wedding';
+  const isWed = event?.is_private || event?.category === 'Wedding' || event?.category === 'Personal';
 
   const handleExportCSV = () => {
     let csvHeader = isWed 
-      ? "Order ID;Ticket ID;Status Kehadiran;Session;Pembeli;Email Pembeli;Nama Tamu;Email Tamu;Jumlah Pax;Ucapan Doa;Jawaban Custom\n"
+      ? "Order ID;Ticket ID;Konfirmasi;Status Scan;Session;Nama Tamu;Email Tamu;Jumlah Pax;Ucapan Doa;Jawaban Custom\n"
       : "Order ID;Ticket ID;Status Kehadiran;Session;Pembeli;Email Pembeli;Nama Peserta;Email Peserta;Jawaban Custom\n";
     
     let csvContent = csvHeader;
     
     groupedAttendees.forEach(order => {
       order.tickets.forEach(t => {
-        const statusKehadiran = t.is_scanned ? "Telah Hadir" : "Belum Hadir";
+        const statusScan = t.is_scanned ? "Telah Hadir" : "Belum Hadir";
+        const konfirmasi = t.is_attending === false ? "Tidak Hadir" : "Hadir";
 
         let customAnsText = "";
         if (t.custom_answers && t.custom_answers.length > 0) {
@@ -120,8 +131,8 @@ export default function EventDashboard() {
         const cleanGreeting = t.greeting ? t.greeting.replace(/(\r\n|\n|\r)/gm, " ") : "";
         
         let row = isWed
-          ? `"${order.order_id}";"${t.ticket_id}";"${statusKehadiran}";"${t.session_name}";"${order.buyer_name}";"${order.buyer_email}";"${t.attendee_name || ''}";"${t.attendee_email || ''}";"${t.pax || 1}";"${cleanGreeting}";"${customAnsText}"`
-          : `"${order.order_id}";"${t.ticket_id}";"${statusKehadiran}";"${t.session_name}";"${order.buyer_name}";"${order.buyer_email}";"${t.attendee_name || ''}";"${t.attendee_email || ''}";"${customAnsText}"`;
+          ? `"${order.order_id}";"${t.ticket_id}";"${konfirmasi}";"${statusScan}";"${t.session_name}";"${t.attendee_name || order.buyer_name}";"${t.attendee_email || order.buyer_email}";"${t.pax || 1}";"${cleanGreeting}";"${customAnsText}"`
+          : `"${order.order_id}";"${t.ticket_id}";"${statusScan}";"${t.session_name}";"${order.buyer_name}";"${order.buyer_email}";"${t.attendee_name || ''}";"${t.attendee_email || ''}";"${customAnsText}"`;
         
         csvContent += row + "\n";
       });
@@ -140,14 +151,15 @@ export default function EventDashboard() {
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(`${window.location.origin}/event/${id}`);
-    setPopup({ show: true, message: "Link Dashboard berhasil disalin!", type: 'success' }); 
+    navigator.clipboard.writeText(`${window.location.origin}/invitation/${id}`);
+    setPopup({ show: true, message: "Link Undangan/Event berhasil disalin!", type: 'success' }); 
   };
 
   const filteredOrders = groupedAttendees.filter(order => {
     if (!searchQuery) return true;
     return order.tickets.some(t => 
       t.attendee_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      order.buyer_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (t.greeting && t.greeting.toLowerCase().includes(searchQuery.toLowerCase())) 
     );
   });
@@ -159,13 +171,20 @@ export default function EventDashboard() {
     </div>
   );
 
-  let totalSold = 0;
+  let totalSold = 0; 
   let totalCheckedIn = 0;
   let totalRevenue = 0;
+  let totalPaxExpected = 0; 
+
   groupedAttendees.forEach(o => {
     totalSold += o.total_qty;
     totalCheckedIn += o.scanned_qty;
-    o.tickets.forEach(t => totalRevenue += Number(t.price)); 
+    o.tickets.forEach(t => {
+      totalRevenue += Number(t.price);
+      if (t.is_attending !== false) {
+        totalPaxExpected += Number(t.pax || 1);
+      }
+    }); 
   });
 
   return (
@@ -196,7 +215,7 @@ export default function EventDashboard() {
               <svg className="w-8 h-8 md:w-10 md:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </div>
             <h3 className="text-lg md:text-xl font-black text-gray-900 mb-2">Konfirmasi Kehadiran</h3>
-            <p className="text-xs md:text-sm font-bold text-gray-500 mb-6 md:mb-8">Apakah Anda yakin tiket ini sudah hadir dan ingin melakukan Check-In manual?</p>
+            <p className="text-xs md:text-sm font-bold text-gray-500 mb-6 md:mb-8">Apakah Anda yakin tamu/peserta ini sudah hadir dan ingin melakukan Check-In manual?</p>
             <div className="flex gap-3">
               <button onClick={() => setConfirmDialog({ show: false, ticketId: null })} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 md:py-3.5 rounded-xl md:rounded-2xl hover:bg-gray-200 transition-colors uppercase tracking-widest text-[10px] md:text-xs">Batal</button>
               <button onClick={confirmManualCheckIn} className="flex-1 bg-[#FF6B35] text-white font-bold py-3 md:py-3.5 rounded-xl md:rounded-2xl hover:bg-orange-600 transition-colors uppercase tracking-widest text-[10px] md:text-xs">Ya, Check-In</button>
@@ -238,9 +257,12 @@ export default function EventDashboard() {
         {/* KOTAK STATISTIK */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 mb-6 md:mb-10">
           <div className="bg-white p-5 md:p-8 rounded-[20px] md:rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden flex flex-col justify-center">
-            <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-3">{isWed ? 'Undangan Terkirim' : 'Tickets Sold'}</p>
+            <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 md:mb-3">{isWed ? 'Data RSVP Masuk' : 'Tickets Sold'}</p>
             <h3 className="text-2xl md:text-4xl font-black text-gray-900 mb-1">{totalSold}</h3>
-            {!isWed && (
+            
+            {isWed ? (
+              <p className="text-[9px] md:text-xs font-bold text-[#D4AF37] mt-1 md:mt-3 bg-[#D4AF37]/10 w-max px-2 py-0.5 md:px-3 md:py-1 rounded-md">Total Pax/Orang: {totalPaxExpected}</p>
+            ) : (
               <p className="text-[9px] md:text-xs font-bold text-[#27AE60] mt-1 md:mt-3 bg-[#E7F9F1] w-max px-2 py-0.5 md:px-3 md:py-1 rounded-md truncate max-w-full">Rp {(totalRevenue/1000)}K</p>
             )}
           </div>
@@ -249,8 +271,8 @@ export default function EventDashboard() {
             <p className="text-[9px] md:text-[10px] font-black text-[#27AE60] uppercase tracking-widest mb-1 md:mb-3 flex items-center gap-1.5 md:gap-2">
               <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-[#27AE60] rounded-full animate-ping"></span> Live Presence
             </p>
-            <h3 className="text-2xl md:text-4xl font-black text-gray-900 mb-1">{totalCheckedIn} <span className="text-sm md:text-xl text-gray-300">/ {totalSold}</span></h3>
-            <p className="text-[9px] md:text-xs font-bold text-gray-500 mt-1 md:mt-3">Telah Hadir</p>
+            <h3 className="text-2xl md:text-4xl font-black text-gray-900 mb-1">{totalCheckedIn} <span className="text-sm md:text-xl text-gray-300">/ {isWed ? totalPaxExpected : totalSold}</span></h3>
+            <p className="text-[9px] md:text-xs font-bold text-gray-500 mt-1 md:mt-3">Telah Hadir (Scan)</p>
           </div>
 
           <div className="bg-white p-5 md:p-8 rounded-[20px] md:rounded-[32px] border border-gray-100 shadow-sm relative overflow-hidden col-span-2 md:col-span-1 flex flex-col justify-center items-center md:items-start text-center md:text-left">
@@ -262,12 +284,12 @@ export default function EventDashboard() {
         {/* TABEL DATA PENGUNJUNG */}
         <div className="bg-white rounded-[24px] md:rounded-[32px] shadow-sm border border-gray-200 overflow-hidden">
           <div className="px-5 py-5 md:px-8 md:py-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <h3 className="text-lg md:text-xl font-bold text-gray-900">{isWed ? 'Daftar Kehadiran Tamu' : 'Peserta Event'}</h3>
+            <h3 className="text-lg md:text-xl font-bold text-gray-900">{isWed ? 'Buku Tamu & RSVP' : 'Peserta Event'}</h3>
             <div className="flex flex-row items-center gap-2 md:gap-3 w-full md:w-auto">
               <div className="relative flex-1 sm:w-64">
                 <input 
                   type="text" 
-                  placeholder={isWed ? "Cari tamu atau ucapan..." : "Cari peserta..."} 
+                  placeholder={isWed ? "Cari tamu atau doa..." : "Cari peserta..."} 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-9 pr-3 md:pl-10 md:pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs md:text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/20 focus:border-[#FF6B35] transition-all"
@@ -287,9 +309,9 @@ export default function EventDashboard() {
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-widest">
                   <th className="px-8 py-5">ID</th>
-                  <th className="px-8 py-5">{isWed ? 'Nama Pengirim' : 'Buyer Account'}</th>
-                  <th className="px-8 py-5">Session</th>
-                  <th className="px-8 py-5 text-center">Qty</th>
+                  <th className="px-8 py-5">{isWed ? 'Nama Tamu' : 'Buyer Account'}</th>
+                  <th className="px-8 py-5 max-w-[200px]">Session(s)</th>
+                  <th className="px-8 py-5 text-center">{isWed ? 'Pax' : 'Qty'}</th>
                   <th className="px-8 py-5">Status</th> 
                   <th className="px-8 py-5 text-right">Action</th>
                 </tr>
@@ -301,15 +323,22 @@ export default function EventDashboard() {
                     <tr className="hover:bg-gray-50/30 transition-colors">
                       <td className="px-8 py-5 text-xs font-bold text-gray-400">#{order.order_id}</td>
                       <td className="px-8 py-5 font-bold text-sm">{order.buyer_name} <br/><span className="text-xs font-normal text-gray-400">{order.buyer_email}</span></td>
-                      <td className="px-8 py-5"><span className="px-3 py-1 bg-gray-100 rounded-lg text-[10px] font-bold uppercase">{order.session_name}</span></td>
-                      <td className="px-8 py-5 text-center font-black">{order.total_qty}</td>
+                      {/* Tampilkan Semua Sesi yang Dibeli */}
+                      <td className="px-8 py-5 max-w-[200px] truncate" title={order.session_name}>
+                        <span className="px-3 py-1 bg-gray-100 rounded-lg text-[10px] font-bold uppercase truncate inline-block max-w-full">
+                          {order.session_name}
+                        </span>
+                      </td>
+                      <td className="px-8 py-5 text-center font-black">{isWed ? (order.tickets[0]?.pax || 1) : order.total_qty}</td>
                       <td className="px-8 py-5">
-                        {order.scanned_qty === order.total_qty ? (
+                        {order.is_attending_all === false ? (
+                          <span className="px-3 py-1 bg-red-50 text-red-500 rounded-full text-[10px] font-black uppercase tracking-widest border border-red-100">Tidak Hadir</span>
+                        ) : order.scanned_qty === order.total_qty ? (
                           <span className="px-3 py-1 bg-[#E7F9F1] text-[#27AE60] rounded-full text-[10px] font-black uppercase tracking-widest border border-green-100">All Checked-In</span>
                         ) : order.scanned_qty > 0 ? (
                           <span className="px-3 py-1 bg-orange-50 text-[#FF6B35] rounded-full text-[10px] font-black uppercase tracking-widest border border-orange-100">Partial ({order.scanned_qty}/{order.total_qty})</span>
                         ) : (
-                          <span className="px-3 py-1 bg-gray-50 text-gray-400 rounded-full text-[10px] font-bold uppercase tracking-widest">Pending</span>
+                          <span className="px-3 py-1 bg-gray-50 text-gray-400 rounded-full text-[10px] font-bold uppercase tracking-widest">Belum Hadir</span>
                         )}
                       </td>
                       <td className="px-8 py-5 text-right">
@@ -319,13 +348,14 @@ export default function EventDashboard() {
                       </td>
                     </tr>
                     
+                    {/* 👇 BAGIAN DETAIL KARTU TIKET 👇 */}
                     {expandedRow === order.order_id && (
                       <tr className="bg-orange-50/30">
                         <td colSpan="6" className="px-8 py-6 border-l-4 border-[#FF6B35]">
                           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">
-                            {isWed ? 'Detail Undangan & Ucapan' : 'Daftar Tiket Individual'}
+                            {isWed ? 'Detail Undangan & Ucapan Doa' : 'Daftar Tiket Individual'}
                           </p>
-                          <div className={`grid gap-4 ${isWed ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                          <div className={`grid gap-4 ${isWed ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-3'}`}>
                             {order.tickets.map((t, idx) => {
                               const isMatch = searchQuery && (t.attendee_name?.toLowerCase().includes(searchQuery.toLowerCase()) || t.greeting?.toLowerCase().includes(searchQuery.toLowerCase()));
                               return (
@@ -333,20 +363,30 @@ export default function EventDashboard() {
                                   {isMatch && <div className="absolute top-0 right-0 bg-[#FF6B35] text-white text-[8px] font-black uppercase px-2 py-1 rounded-bl-lg">MATCH</div>}
                                   
                                   <div>
-                                    <div className="flex justify-between items-center mb-2">
-                                      <p className={`text-[10px] font-black uppercase ${isWed ? 'text-[#D4AF37]' : 'text-[#FF6B35]'}`}>
-                                        {isWed ? 'Tamu VIP' : `Tiket #${t.ticket_id}`}
-                                      </p>
-                                      {t.is_scanned && <span className="text-[8px] font-black bg-green-100 text-green-600 px-2 py-0.5 rounded-full uppercase">Hadir</span>}
+                                    <div className="flex justify-between items-start mb-2">
+                                      <div>
+                                        <p className={`text-[10px] font-black uppercase mb-1 ${isWed ? 'text-[#D4AF37]' : 'text-[#FF6B35]'}`}>
+                                          {isWed ? 'Data Tamu' : `Tiket #${t.ticket_id}`}
+                                        </p>
+                                        {/* 🔥 FIX: Menampilkan Nama Sesi Spesifik untuk Tiket Ini 🔥 */}
+                                        <span className="bg-gray-100 text-gray-600 text-[8px] px-2 py-0.5 rounded uppercase font-bold tracking-wider inline-block">
+                                          {t.session_name}
+                                        </span>
+                                      </div>
+
+                                      {t.is_attending === false ? (
+                                        <span className="text-[8px] font-black bg-red-100 text-red-600 px-2 py-0.5 rounded-full uppercase mt-1">Tidak Hadir</span>
+                                      ) : t.is_scanned ? (
+                                        <span className="text-[8px] font-black bg-green-100 text-green-600 px-2 py-0.5 rounded-full uppercase mt-1">Hadir</span>
+                                      ) : null}
                                     </div>
-                                    <h4 className="font-black text-gray-900 text-lg truncate">{t.attendee_name || `Peserta ${idx + 1}`}</h4>
+                                    <h4 className="font-black text-gray-900 text-lg truncate mt-2">{t.attendee_name || `Peserta ${idx + 1}`}</h4>
                                     <p className={`text-xs text-gray-500 truncate ${isWed ? 'mb-1' : 'mb-3'}`}>{t.attendee_email || '-'}</p>
                                     
-                                    {/* 👇 TAMBAHAN PAX & UCAPAN KHUSUS WEDDING DI LAPTOP (UKURAN RAPI & KECIL) 👇 */}
                                     {isWed && (
-                                      <div className="mt-2 space-y-1">
+                                      <div className="mt-3 bg-gray-50 p-3 rounded-xl border border-gray-100 space-y-1">
                                         <p className="text-xs text-gray-600"><span className="font-bold text-gray-800">Pax:</span> {t.pax || 1} Orang</p>
-                                        <p className="text-xs text-gray-600 italic line-clamp-2 hover:line-clamp-none" title={t.greeting}><span className="font-bold text-gray-800 not-italic">Ucapan:</span> "{t.greeting || '-'}"</p>
+                                        <p className="text-xs text-gray-600 italic line-clamp-3"><span className="font-bold text-gray-800 not-italic">Ucapan:</span> "{t.greeting || '-'}"</p>
                                       </div>
                                     )}
 
@@ -360,7 +400,7 @@ export default function EventDashboard() {
                                       </div>
                                     )}
                                   </div>
-                                  {!t.is_scanned && (
+                                  {!t.is_scanned && t.is_attending !== false && (
                                     <button onClick={() => initiateManualCheckIn(t.ticket_id)} className={`w-full mt-4 text-[10px] font-black text-white py-2.5 rounded-xl uppercase tracking-widest shadow-sm transition-colors ${isWed ? 'bg-slate-900 hover:bg-black' : 'bg-[#FF6B35] hover:bg-orange-600'}`}>
                                       Manual Check-In
                                     </button>
@@ -380,7 +420,7 @@ export default function EventDashboard() {
                     <td colSpan="6" className="px-8 py-10 text-center text-gray-400 font-bold text-sm">
                       <div className="flex flex-col items-center justify-center">
                         <svg className="w-12 h-12 mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        Tidak ada data peserta yang cocok.
+                        Tidak ada data yang cocok.
                       </div>
                     </td>
                   </tr>
@@ -394,29 +434,34 @@ export default function EventDashboard() {
                 filteredOrders.map((order) => (
                   <div key={`mobile-${order.order_id}`} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
                     <div className="flex justify-between items-start mb-3 border-b border-gray-50 pb-3">
-                      <div>
+                      <div className="max-w-[60%]">
                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">#{order.order_id}</p>
                         <p className="text-sm font-bold text-gray-900 leading-tight">{order.buyer_name}</p>
                         <p className="text-[10px] text-gray-500 truncate w-40">{order.buyer_email}</p>
                       </div>
-                      <div className="text-right">
-                        <span className="px-2 py-0.5 bg-gray-100 rounded-md text-[9px] font-bold uppercase mb-1.5 inline-block">{order.session_name}</span>
-                        <div className="text-[10px] font-bold">Qty: <span className="font-black text-[#FF6B35]">{order.total_qty}</span></div>
+                      <div className="text-right max-w-[40%]">
+                        {/* Menampilkan Semua Session yang dibeli di Header Card HP */}
+                        <span className="px-2 py-0.5 bg-gray-100 rounded-md text-[8px] font-bold uppercase mb-1.5 inline-block truncate max-w-full">
+                          {order.session_name}
+                        </span>
+                        <div className="text-[10px] font-bold">{isWed ? 'Pax' : 'Qty'}: <span className="font-black text-[#FF6B35]">{isWed ? (order.tickets[0]?.pax || 1) : order.total_qty}</span></div>
                       </div>
                     </div>
                     
                     <div className="flex justify-between items-center mt-3">
                       <div>
-                        {order.scanned_qty === order.total_qty ? (
+                        {order.is_attending_all === false ? (
+                          <span className="px-2.5 py-1 bg-red-50 text-red-500 rounded-full text-[9px] font-black uppercase tracking-widest border border-red-100">Tidak Hadir</span>
+                        ) : order.scanned_qty === order.total_qty ? (
                           <span className="px-2.5 py-1 bg-[#E7F9F1] text-[#27AE60] rounded-full text-[9px] font-black uppercase tracking-widest border border-green-100">All Hadir</span>
                         ) : order.scanned_qty > 0 ? (
                           <span className="px-2.5 py-1 bg-orange-50 text-[#FF6B35] rounded-full text-[9px] font-black uppercase tracking-widest border border-orange-100">Sebagian ({order.scanned_qty}/{order.total_qty})</span>
                         ) : (
-                          <span className="px-2.5 py-1 bg-gray-50 text-gray-400 rounded-full text-[9px] font-bold uppercase tracking-widest">Pending</span>
+                          <span className="px-2.5 py-1 bg-gray-50 text-gray-400 rounded-full text-[9px] font-bold uppercase tracking-widest">Belum Hadir</span>
                         )}
                       </div>
                       <button onClick={() => toggleExpand(order.order_id)} className="text-[10px] font-black text-[#FF6B35] uppercase tracking-wider flex items-center gap-1 bg-orange-50 px-3 py-1.5 rounded-lg active:scale-95 transition-all">
-                        {expandedRow === order.order_id ? 'Tutup' : 'Lihat Tiket'}
+                        {expandedRow === order.order_id ? 'Tutup' : 'Lihat Data'}
                         <svg className={`w-3 h-3 transition-transform ${expandedRow === order.order_id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7-7-7-7"></path></svg>
                       </button>
                     </div>
@@ -426,23 +471,32 @@ export default function EventDashboard() {
                         {order.tickets.map((t, idx) => {
                           const isMatch = searchQuery && (t.attendee_name?.toLowerCase().includes(searchQuery.toLowerCase()) || t.greeting?.toLowerCase().includes(searchQuery.toLowerCase()));
                           return (
-                            <div key={t.ticket_id} className={`p-4 rounded-xl border relative shadow-sm ${t.is_scanned ? 'bg-green-50/30 border-green-100' : 'bg-white border-gray-200'}`}>
+                            <div key={t.ticket_id} className={`p-4 rounded-xl border relative shadow-sm ${t.is_attending === false ? 'bg-red-50/20 border-red-100' : t.is_scanned ? 'bg-green-50/30 border-green-100' : 'bg-white border-gray-200'}`}>
                               {isMatch && <div className="absolute top-0 right-0 bg-[#FF6B35] text-white text-[8px] font-black uppercase px-2 py-0.5 rounded-bl-lg rounded-tr-xl">MATCH</div>}
                               
-                              <div className="flex justify-between items-center mb-2">
-                                <p className={`text-[9px] font-black uppercase ${isWed ? 'text-[#D4AF37]' : 'text-gray-500'}`}>
-                                  {isWed ? 'Tamu VIP' : `TIKET #${t.ticket_id.toString().slice(-5)}`}
-                                </p>
-                                {t.is_scanned && <span className="text-[8px] font-black bg-green-100 text-green-600 px-2 py-0.5 rounded-full uppercase">Telah Hadir</span>}
+                              <div className="flex justify-between items-start mb-2">
+                                <div>
+                                  <p className={`text-[9px] font-black uppercase mb-1 ${isWed ? 'text-[#D4AF37]' : 'text-gray-500'}`}>
+                                    {isWed ? 'Data Tamu' : `TIKET #${t.ticket_id.toString().slice(-5)}`}
+                                  </p>
+                                  {/* 🔥 FIX: Nama sesi spesifik di HP 🔥 */}
+                                  <span className="bg-gray-100 text-gray-600 text-[8px] px-2 py-0.5 rounded uppercase font-bold tracking-wider inline-block">
+                                    {t.session_name}
+                                  </span>
+                                </div>
+                                {t.is_attending === false ? (
+                                  <span className="text-[8px] font-black bg-red-100 text-red-600 px-2 py-0.5 rounded-full uppercase mt-1">Tidak Hadir</span>
+                                ) : t.is_scanned ? (
+                                  <span className="text-[8px] font-black bg-green-100 text-green-600 px-2 py-0.5 rounded-full uppercase mt-1">Hadir</span>
+                                ) : null}
                               </div>
-                              <p className="font-black text-gray-900 text-base truncate">{t.attendee_name || `Peserta ${idx + 1}`}</p>
+                              <p className="font-black text-gray-900 text-base truncate mt-2">{t.attendee_name || `Peserta ${idx + 1}`}</p>
                               <p className={`text-[10px] text-gray-500 truncate ${isWed ? 'mb-1' : 'mb-2'}`}>{t.attendee_email || '-'}</p>
                               
-                              {/* 👇 TAMBAHAN PAX & UCAPAN KHUSUS WEDDING DI HP (UKURAN KECIL RAPI) 👇 */}
                               {isWed && (
-                                <div className="mt-1 space-y-0.5 border-t border-gray-100 pt-2">
+                                <div className="mt-2 bg-gray-50 p-2.5 rounded-lg border border-gray-100 space-y-1">
                                   <p className="text-[10px] text-gray-600"><span className="font-bold text-gray-800">Pax:</span> {t.pax || 1} Orang</p>
-                                  <p className="text-[10px] text-gray-600 italic line-clamp-2"><span className="font-bold text-gray-800 not-italic">Ucapan:</span> "{t.greeting || '-'}"</p>
+                                  <p className="text-[10px] text-gray-600 italic line-clamp-3"><span className="font-bold text-gray-800 not-italic">Ucapan:</span> "{t.greeting || '-'}"</p>
                                 </div>
                               )}
 
@@ -456,7 +510,7 @@ export default function EventDashboard() {
                                 </div>
                               )}
 
-                              {!t.is_scanned && (
+                              {!t.is_scanned && t.is_attending !== false && (
                                 <button onClick={() => initiateManualCheckIn(t.ticket_id)} className={`w-full mt-3 text-[10px] font-black text-white py-2.5 rounded-lg uppercase tracking-widest shadow-sm active:scale-95 transition-all ${isWed ? 'bg-slate-900' : 'bg-[#FF6B35]'}`}>
                                   Check-In Manual
                                 </button>
@@ -473,7 +527,7 @@ export default function EventDashboard() {
                   <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-3">
                     <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                   </div>
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Peserta tidak ditemukan</p>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">Data tidak ditemukan</p>
                 </div>
               )}
             </div>

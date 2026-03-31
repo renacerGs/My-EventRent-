@@ -114,11 +114,17 @@ export class AppService implements OnModuleInit {
 
       eventData.sessions = sessions;
 
-      // Narik Data Ucapan (Greeting) dari Tabel Tickets
+      // Narik Data Ucapan (Greeting) dari Tabel Tickets - Anti Duplikat
       const greetingsQuery = `
-        SELECT attendee_name as name, greeting, TO_CHAR(purchase_date, 'DD Mon YYYY, HH24:MI') as time
-        FROM tickets
-        WHERE event_id = $1 AND greeting IS NOT NULL AND BTRIM(greeting) != ''
+        SELECT name, greeting, time FROM (
+          SELECT DISTINCT ON (attendee_email, greeting) 
+                attendee_name as name, 
+                greeting, 
+                TO_CHAR(purchase_date, 'DD Mon YYYY, HH24:MI') as time, 
+                purchase_date
+          FROM tickets
+          WHERE event_id = $1 AND greeting IS NOT NULL AND BTRIM(greeting) != ''
+        ) sub
         ORDER BY purchase_date DESC
       `;
       const greetingsRes = await this.pool.query(greetingsQuery, [eventId]);
@@ -333,12 +339,10 @@ export class AppService implements OnModuleInit {
         if (uRes.rows.length > 0) targetEmail = uRes.rows[0].email;
       }
 
-      // 👇🔥 LOGIKA BARU: Jika Tidak Hadir (Hanya Kirim Doa) 🔥👇
-      // Jika formAnswers.isAttending adalah false (Tidak Hadir)
+      // Logika Jika Tidak Hadir (Hanya Kirim Doa)
       const isAttending = formAnswers.isAttending !== false; 
       
       if (!isAttending) {
-        // Ambil ID sesi pertama sebagai formalitas (karena session_id wajib di tabel)
         const firstSessionRes = await client.query('SELECT id FROM event_sessions WHERE event_id = $1 LIMIT 1', [eventId]);
         const dummySessionId = firstSessionRes.rows[0]?.id || null;
 
@@ -351,31 +355,38 @@ export class AppService implements OnModuleInit {
         await client.query('COMMIT');
         return { message: 'Terima kasih atas doa dan ucapan Anda', ticketIds: [] };
       }
-      // 👆 SELESAI LOGIKA BARU 👆
 
       // Proses normal jika HADIR
       for (const item of cart) {
         const sessionId = item.sessionId;
-        const qty = item.qty || item.quantity || 1;
+        const qty = item.qty || item.quantity || 1; // Jumlah QRCode/Tiket yang di generate
+        
+        // 🔥 FIX PAX: Ambil dari item cart, formAnswers pax umum, atau default 1
+        const paxPerTicket = Number(item.pax || formAnswers.pax || 1);
+        
+        // 🔥 FIX STOCK: Total kursi yang berkurang = jumlah tiket x pax per tiket
+        const totalStockNeeded = qty * paxPerTicket;
 
         const sessionRes = await client.query('SELECT price, stock FROM event_sessions WHERE id = $1 FOR UPDATE', [sessionId]);
         if (sessionRes.rows.length === 0) throw new BadRequestException('Session tidak ditemukan');
         
         const session = sessionRes.rows[0];
-        if (session.stock < qty) throw new BadRequestException(`Stok tiket tidak cukup untuk session ini!`);
+        if (session.stock < totalStockNeeded) throw new BadRequestException(`Stok tiket tidak cukup untuk session ini! (Dibutuhkan: ${totalStockNeeded})`);
 
-        await client.query('UPDATE event_sessions SET stock = stock - $1 WHERE id = $2', [qty, sessionId]);
+        await client.query('UPDATE event_sessions SET stock = stock - $1 WHERE id = $2', [totalStockNeeded, sessionId]);
 
         const qRes = await client.query('SELECT id, question_text FROM session_questions WHERE session_id = $1', [sessionId]);
         const dbQuestions = qRes.rows;
 
-        // Loop sebanyak jumlah Pax/Quantity (Generate Tiket)
+        // Generate Tiket
         for (let i = 0; i < qty; i++) {
           const prefix = `cart-${item.id}-ticket-${i}`;
           
           const name = formAnswers[`${prefix}-nama`] || formAnswers.attendee_name || `Tamu ${i + 1}`;
           const email = formAnswers[`${prefix}-email`] || formAnswers.email || targetEmail || ``;
-          const pax = 1; 
+          
+          // 🔥 Terapkan pax dinamis ke masing-masing tiket 🔥
+          const pax = paxPerTicket; 
           const greeting = formAnswers[`${prefix}-greeting`] || formAnswers.greeting || null;
           
           const customAnswers: any[] = [];
@@ -402,7 +413,7 @@ export class AppService implements OnModuleInit {
 
       await client.query('COMMIT');
 
-      // Kirim email QR Code (HANYA UNTUK YANG HADIR)
+      // Kirim email QR Code
       if (targetEmail && boughtTickets.length > 0) {
         this.sendEmailReceipt(targetEmail, eventTitle, boughtTickets, totalTransactionPrice, eventId)
           .catch(e => console.error("Gagal mengirim email struk:", e)); 

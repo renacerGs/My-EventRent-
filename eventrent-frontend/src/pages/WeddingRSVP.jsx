@@ -66,8 +66,12 @@ export default function WeddingRSVP() {
 
     try {
       const cartPayload = formData.isAttending 
-        ? selectedSessions.map(sId => ({ sessionId: sId, qty: formData.pax })) 
-        : [];
+      ? selectedSessions.map(sId => ({ 
+          sessionId: sId, 
+          qty: 1, // QTY tiket yang dicetak tetap 1 lembar (QR Code)
+          pax: Number(formData.pax) // Tapi 1 QR Code berlaku untuk sekian orang (Pax)
+        })) 
+      : [];
 
       const payload = {
         eventId: Number(id),

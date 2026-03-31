@@ -75,16 +75,34 @@ export default function ManageEvent() {
 
   const handleCardClick = (id) => navigate(`/manage/event/${id}`);
 
-  const handleView = (e, id) => {
+  // 👇 FIX: Smart Routing buat tombol View
+  const handleView = (e, event) => {
     e.stopPropagation(); 
-    navigate(`/event/${id}`);
     setActiveMenuId(null);
+    
+    // Arahkan ke URL yang tepat sesuai kategori
+    if (event.category === 'Personal') {
+      navigate(`/party/${event.id}`);
+    } else if (event.category === 'Wedding' || event.is_private === true || event.is_private === 'true') {
+      navigate(`/invitation/${event.id}`);
+    } else {
+      navigate(`/event/${event.id}`);
+    }
   };
 
+  // 👇 FIX: Smart Routing buat tombol Edit
   const handleEdit = (e, event) => {
     e.stopPropagation();
-    navigate(`/edit/${event.id}`); 
     setActiveMenuId(null);
+    if (event.category === 'Wedding') {
+      navigate(`/edit/wedding/${event.id}`);
+    } else if (event.category === 'Personal') {
+      navigate(`/edit/personal/${event.id}`); // Ganti ini nanti kalau file edit personal udah ada
+    } else if (event.is_private === true || event.is_private === 'true') {
+      navigate(`/edit/wedding/${event.id}`); 
+    } else {
+      navigate(`/edit/public/${event.id}`);
+    }
   };
 
   const triggerDelete = (e, id) => {
@@ -137,8 +155,7 @@ export default function ManageEvent() {
                 const isPast = isEventPassed(event.date_start);
                 const isMenuActive = activeMenuId === event.id;
                 
-                // 👇 FIX: Pengecekan KETAT biar nggak gampang ketipu 👇
-                const isWed = event.is_private === true || event.is_private === 'true' || event.isPrivate === true; 
+                const isWed = event.category === 'Wedding' || event.category === 'Personal' || event.is_private === true || event.is_private === 'true'; 
 
                 return (
                   <div 
@@ -156,7 +173,7 @@ export default function ManageEvent() {
                           {event.title}
                           {isWed && (
                             <span className="bg-[#D4AF37]/10 text-[#D4AF37] px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest border border-[#D4AF37]/20 shrink-0">
-                              Private
+                              {event.category === 'Personal' ? 'Personal' : 'Wedding'}
                             </span>
                           )}
                         </h3>
@@ -177,7 +194,6 @@ export default function ManageEvent() {
                         {event.stock > 0 ? `${event.stock} Left` : 'Sold Out'}
                       </span>
                       <span className={`ml-auto text-xs font-bold ${isWed ? 'text-[#D4AF37]' : 'text-gray-900'}`}>
-                        {/* 👇 FIX TAMPILAN HARGA HP 👇 */}
                         {Number(event.price) === 0 ? (isWed ? 'Free RSVP' : 'Free') : `Rp ${parseInt(event.price).toLocaleString()}`}
                       </span>
                     </div>
@@ -196,7 +212,6 @@ export default function ManageEvent() {
                       </span>
                     </div>
                     <div className={`hidden md:block md:col-span-2 text-center text-sm font-bold ${isWed ? 'text-[#D4AF37]' : 'text-gray-900'}`}>
-                       {/* 👇 FIX TAMPILAN HARGA DESKTOP 👇 */}
                        {Number(event.price) === 0 ? (isWed ? 'Free RSVP' : 'Free') : `Rp ${parseInt(event.price).toLocaleString()}`}
                     </div>
 
@@ -215,7 +230,7 @@ export default function ManageEvent() {
                       {isMenuActive && (
                         <div ref={menuRef} className="absolute right-0 top-10 w-48 bg-white rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)] border border-gray-100 z-[100] overflow-hidden animate-fadeIn origin-top-right">
                           <div className="py-1">
-                            <button onClick={(e) => handleView(e, event.id)} className="w-full text-left px-4 py-3 md:py-2.5 text-xs md:text-sm font-bold text-gray-700 hover:bg-gray-50 hover:text-[#FF6B35] flex items-center gap-2">View Event Page</button>
+                            <button onClick={(e) => handleView(e, event)} className="w-full text-left px-4 py-3 md:py-2.5 text-xs md:text-sm font-bold text-gray-700 hover:bg-gray-50 hover:text-[#FF6B35] flex items-center gap-2">View Event Page</button>
                             <button onClick={(e) => handleEdit(e, event)} className="w-full text-left px-4 py-3 md:py-2.5 text-xs md:text-sm font-bold text-gray-700 hover:bg-gray-50 hover:text-[#FF6B35] flex items-center gap-2">Edit Event</button>
                             <div className="border-t border-gray-100 mt-1">
                               <button onClick={(e) => triggerDelete(e, event.id)} className="w-full text-left px-4 py-3 md:py-2.5 text-xs md:text-sm text-red-500 hover:bg-red-50 font-bold flex items-center gap-2">Delete Event</button>
