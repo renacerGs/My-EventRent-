@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
 
-// Setup Supabase (Sesuai dengan arsitektur kita sekarang)
+// 🔥 IMPORT KOMPONEN DARI FOLDER SHARED
+import CustomDatePicker from './shared/CustomDatePicker';
+
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Fungsi untuk convert format tanggal "Mon, 12 Jan 2026" kembali jadi "YYYY-MM-DD"
 const formatDateForInput = (dateStr) => {
   if (!dateStr || dateStr.includes('TBA') || dateStr.includes('-')) return '';
   try {
@@ -28,22 +29,12 @@ export default function EditPublicEvent() {
   const user = JSON.parse(localStorage.getItem('user'));
 
   const [formData, setFormData] = useState({
-    title: '',
-    phone: '', 
-    category: '',
-    description: '',
-    place: '',
-    namePlace: '',
-    city: '',
-    province: '',
-    mapUrl: '',
-    eventStart: '',
-    eventEnd: '',
-    oldImgUrl: '' // Menyimpan URL gambar lama
+    title: '', phone: '', category: '', description: '', place: '',
+    namePlace: '', city: '', province: '', mapUrl: '', eventStart: '', eventEnd: '', oldImgUrl: ''
   });
   
   const [imagePreview, setImagePreview] = useState(null);
-  const [imageFile, setImageFile] = useState(null); // Menyimpan file asli untuk diupload
+  const [imageFile, setImageFile] = useState(null); 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -59,7 +50,6 @@ export default function EditPublicEvent() {
         return res.json();
       })
       .then(found => {
-        // 🔥 PENGAMAN: Tendang kalau ini event Wedding / Personal 🔥
         if (found.category === 'Wedding' || found.category === 'Personal' || found.is_private) {
           alert("Ini adalah Private Event. Silakan edit melalui menu yang sesuai.");
           navigate('/manage');
@@ -99,7 +89,7 @@ export default function EditPublicEvent() {
     const file = e.target.files[0];
     if (file) {
       setImagePreview(URL.createObjectURL(file));
-      setImageFile(file); // Simpan file untuk di-upload ke Supabase nanti
+      setImageFile(file); 
     }
   };
 
@@ -110,7 +100,6 @@ export default function EditPublicEvent() {
     try {
       let finalImageUrl = formData.oldImgUrl;
 
-      // Jika user memilih gambar baru, upload ke Supabase Storage
       if (imageFile) {
         const fileExt = imageFile.name.split('.').pop();
         const fileName = `cover-public-${Date.now()}-${Math.floor(Math.random()*1000)}.${fileExt}`;
@@ -126,20 +115,10 @@ export default function EditPublicEvent() {
       }
 
       const payload = { 
-        title: formData.title,
-        description: formData.description,
-        category: formData.category,
-        phone: formData.phone,
-        eventStart: formData.eventStart, 
-        eventEnd: formData.eventEnd,     
-        location: {
-          place: formData.place,
-          namePlace: formData.namePlace,
-          city: formData.city,
-          province: formData.province,
-          mapUrl: formData.mapUrl
-        },
-        img: finalImageUrl, // Kirim URL Supabase yang bersih
+        title: formData.title, description: formData.description, category: formData.category, phone: formData.phone,
+        eventStart: formData.eventStart, eventEnd: formData.eventEnd,      
+        location: { place: formData.place, namePlace: formData.namePlace, city: formData.city, province: formData.province, mapUrl: formData.mapUrl },
+        img: finalImageUrl, 
         isPrivate: false 
       };
 
@@ -151,9 +130,7 @@ export default function EditPublicEvent() {
 
       if (res.ok) {
         setShowSuccessModal(true);
-        setTimeout(() => {
-          navigate('/manage');
-        }, 1500); 
+        setTimeout(() => { navigate('/manage'); }, 1500); 
       } else {
         alert("Gagal update event. Pastikan kamu pembuat event ini.");
       }
@@ -180,7 +157,6 @@ export default function EditPublicEvent() {
            <button onClick={() => navigate('/manage')} className="text-gray-400 hover:text-red-500 font-bold text-xs uppercase tracking-widest transition-colors">Batal</button>
         </div>
 
-        {/* --- BANNER PERINGATAN --- */}
         <div className="bg-[#FFF5F0] border-l-[6px] border-[#FF6B35] p-5 mb-8 rounded-r-2xl shadow-sm flex items-start gap-4">
            <div className="bg-[#FF6B35] bg-opacity-10 p-2 rounded-full shrink-0">
               <svg className="w-5 h-5 text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
@@ -195,7 +171,6 @@ export default function EditPublicEvent() {
 
         <form onSubmit={handleSubmit}>
           
-          {/* SECTION 1: OVERVIEW */}
           <div className={sectionStyle}>
             <h2 className="text-xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4">Event Overview</h2>
             
@@ -223,18 +198,28 @@ export default function EditPublicEvent() {
             </div>
           </div>
 
-          {/* SECTION 2: DATE & LOCATION */}
           <div className={sectionStyle}>
             <h2 className="text-xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4">Date & Location</h2>
             
+            {/* 🔥 TANGGAL EVENT (Pake CustomDatePicker Tema Public/Orange) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label className={labelStyle}>Tanggal Mulai</label>
-                <input type="date" name="eventStart" value={formData.eventStart} onChange={handleChange} required className={inputStyle} />
+                <CustomDatePicker 
+                  theme="public"
+                  value={formData.eventStart} 
+                  onChange={(newDate) => handleChange({ target: { name: 'eventStart', value: newDate }})} 
+                  placeholder="Pilih Tanggal Mulai"
+                />
               </div>
               <div>
                 <label className={labelStyle}>Tanggal Selesai</label>
-                <input type="date" name="eventEnd" value={formData.eventEnd} onChange={handleChange} className={inputStyle} />
+                <CustomDatePicker 
+                  theme="public"
+                  value={formData.eventEnd} 
+                  onChange={(newDate) => handleChange({ target: { name: 'eventEnd', value: newDate }})} 
+                  placeholder="Pilih Tanggal Selesai"
+                />
               </div>
             </div>
 
@@ -265,7 +250,6 @@ export default function EditPublicEvent() {
             </div>
           </div>
 
-          {/* SECTION 3: IMAGE */}
           <div className={sectionStyle}>
             <h2 className="text-xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4">Event Banner</h2>
             <div className="flex flex-col md:flex-row items-center md:items-start gap-8">

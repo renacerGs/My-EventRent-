@@ -26,14 +26,13 @@ import CreatePersonalEvent from "./components/CreatePersonalEvent";
 // --- ROUTE KHUSUS EDIT EVENT ---
 import EditPublicEvent from "./components/EditPublicEvent"; 
 import EditWeddingEvent from "./components/EditWeddingEvent"; 
-// import EditPersonalEvent from "./components/EditPersonalEvent"; // (Tinggal di-uncomment nanti kalau udah dibikin)
+import EditPersonalEvent from "./components/EditPersonalEvent"; // 🔥 UDAH DI-UNCOMMENT!
 
 // --- ROUTE KHUSUS WEDDING/PERSONAL ---
 import WeddingInvitation from './pages/WeddingInvitation';
 import WeddingRSVP from './pages/WeddingRSVP';
 import PersonalInvitation from './pages/PersonalInvitation';
 import PersonalRSVP from './pages/PersonalRSVP';
-
 
 export default function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -107,7 +106,7 @@ export default function App() {
           
           {/* --- HALAMAN UNDANGAN KHUSUS --- */}
           <Route path="/invitation/:id" element={<WeddingInvitation />} />
-          <Route path="/party/:id" element={<PersonalInvitation />} /> {/* 👇 ROUTE BARU */}
+          <Route path="/party/:id" element={<PersonalInvitation />} /> 
           <Route path="/rsvp/:id" element={<WeddingRSVP />} />
           <Route path="/party-rsvp/:id" element={<PersonalRSVP />} />
           
@@ -130,7 +129,9 @@ export default function App() {
           {/* --- EDIT EVENT (DIPISAH BERDASARKAN TIPE) --- */}
           <Route path="/edit/public/:id" element={<ProtectedRoute><EditPublicEvent /></ProtectedRoute>} />
           <Route path="/edit/wedding/:id" element={<ProtectedRoute><EditWeddingEvent /></ProtectedRoute>} />
-          {/* <Route path="/edit/personal/:id" element={<ProtectedRoute><EditPersonalEvent /></ProtectedRoute>} /> */}
+          
+          {/* 🔥 ROUTE EDIT PERSONAL EVENT UDAH AKTIF! 🔥 */}
+          <Route path="/edit/personal/:id" element={<ProtectedRoute><EditPersonalEvent /></ProtectedRoute>} />
           
           {/* HALAMAN 404 FALLBACK */}
           <Route path="*" element={<div className="text-center py-20 font-bold text-gray-400">Halaman tidak ditemukan.</div>} />

@@ -3,6 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import { createClient } from '@supabase/supabase-js';
 
+// 🔥 IMPORT KOMPONEN DARI FOLDER SHARED
+import CustomDatePicker from './shared/CustomDatePicker';
+import CustomTimePicker from './shared/CustomTimePicker';
+
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -364,10 +368,28 @@ export default function EditWeddingEvent() {
                 <p className="text-[10px] text-slate-500 mt-1.5 font-bold tracking-wide">Kosongkan jika ingin menggunakan lagu romantis default dari kami.</p>
               </div>
 
+              {/* 🔥 TANGGAL EVENT (Tema Wedding/Gold) */}
               <div className="grid grid-cols-2 gap-4">
-                <div><label className={labelStyle}>Tanggal Mulai Acara</label><input type="date" name="eventStart" value={formData.eventStart} onChange={handleChange} className={inputStyle} required /></div>
-                <div><label className={labelStyle}>Tanggal Selesai Acara</label><input type="date" name="eventEnd" value={formData.eventEnd} onChange={handleChange} className={inputStyle} required /></div>
+                <div>
+                  <label className={labelStyle}>Tanggal Mulai Acara</label>
+                  <CustomDatePicker 
+                    theme="wedding"
+                    value={formData.eventStart} 
+                    onChange={(val) => handleChange({target: {name: 'eventStart', value: val}})} 
+                    placeholder="Pilih Tanggal Mulai"
+                  />
+                </div>
+                <div>
+                  <label className={labelStyle}>Tanggal Selesai Acara</label>
+                  <CustomDatePicker 
+                    theme="wedding"
+                    value={formData.eventEnd} 
+                    onChange={(val) => handleChange({target: {name: 'eventEnd', value: val}})} 
+                    placeholder="Pilih Tanggal Selesai"
+                  />
+                </div>
               </div>
+
               <div><label className={labelStyle}>Kata Pengantar (Cover)</label><textarea name="openingMessage" value={formData.openingMessage} onChange={handleChange} rows="3" className={inputStyle} /></div>
               <div><label className={labelStyle}>Kata Penutup</label><textarea name="closingMessage" value={formData.closingMessage} onChange={handleChange} rows="3" className={inputStyle} /></div>
               <div><label className={labelStyle}>Quotes Romantis</label><textarea name="quote" value={formData.quote} onChange={handleChange} rows="2" className={inputStyle} /></div>
@@ -409,11 +431,38 @@ export default function EditWeddingEvent() {
                 </div>
                 <div className="space-y-4">
                   <div><label className={labelStyle}>Nama Acara</label><input type="text" value={session.name} onChange={(e) => handleSessionChange(sIndex, 'name', e.target.value)} className={inputStyle} required /></div>
+                  
+                  {/* 🔥 TANGGAL SESI & JAM (Tema Wedding/Gold) */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div><label className={labelStyle}>Tanggal</label><input type="date" value={session.date} onChange={(e) => handleSessionChange(sIndex, 'date', e.target.value)} className={inputStyle} required /></div>
-                    <div><label className={labelStyle}>Jam Mulai</label><input type="time" value={session.startTime} onChange={(e) => handleSessionChange(sIndex, 'startTime', e.target.value)} className={inputStyle} required /></div>
-                    <div><label className={labelStyle}>Jam Selesai</label><input type="time" value={session.endTime} onChange={(e) => handleSessionChange(sIndex, 'endTime', e.target.value)} className={inputStyle} required /></div>
+                    <div>
+                      <label className={labelStyle}>Tanggal</label>
+                      <CustomDatePicker 
+                        theme="wedding"
+                        value={session.date} 
+                        onChange={(val) => handleSessionChange(sIndex, 'date', val)} 
+                        placeholder="Pilih Tanggal Sesi"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelStyle}>Jam Mulai</label>
+                      <CustomTimePicker 
+                        theme="wedding"
+                        value={session.startTime} 
+                        onChange={(val) => handleSessionChange(sIndex, 'startTime', val)} 
+                        placeholder="08:00"
+                      />
+                    </div>
+                    <div>
+                      <label className={labelStyle}>Jam Selesai</label>
+                      <CustomTimePicker 
+                        theme="wedding"
+                        value={session.endTime} 
+                        onChange={(val) => handleSessionChange(sIndex, 'endTime', val)} 
+                        placeholder="10:00"
+                      />
+                    </div>
                   </div>
+
                   <div><label className={labelStyle}>Batas Maksimal Tamu</label><input type="text" value={session.stock} onChange={(e) => { const val = e.target.value; if (val === '' || /^\d+$/.test(val)) handleSessionChange(sIndex, 'stock', val); }} className={inputStyle} required /></div>
                   <div className="mt-4 pt-4 border-t border-slate-700">
                     <p className="text-xs text-[#D4AF37] font-bold mb-3 uppercase">Lokasi Sesi Ini</p>
@@ -423,7 +472,6 @@ export default function EditWeddingEvent() {
                     </div>
                     <div className="mt-3"><label className={labelStyle}>Full Alamat</label><textarea value={session.location?.place || ''} onChange={(e) => handleSessionLocationChange(sIndex, 'place', e.target.value)} rows="2" className={inputStyle} required /></div>
                     
-                    {/* 👇 URL GOOGLE MAPS SUDAH KEMBALI 👇 */}
                     <div className="mt-3"><label className={labelStyle}>URL Google Maps</label><input type="url" value={session.location?.mapUrl || ''} onChange={(e) => handleSessionLocationChange(sIndex, 'mapUrl', e.target.value)} className={inputStyle} /></div>
                   </div>
                   <div className="mt-6 pt-4 border-t border-slate-700">

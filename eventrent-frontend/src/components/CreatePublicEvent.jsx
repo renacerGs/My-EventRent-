@@ -3,6 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import { createClient } from '@supabase/supabase-js';
 
+// 🔥 IMPORT KOMPONEN DARI FOLDER SHARED
+import CustomDatePicker from './shared/CustomDatePicker';
+import CustomTimePicker from './shared/CustomTimePicker';
+
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -25,7 +29,6 @@ const getCroppedImg = (imageSrc, pixelCrop) => {
         pixelCrop.height,
         0, 0, 736, 436
       );
-      // 👇 SUDAH BENAR WEBP
       resolve(canvas.toDataURL('image/webp', 0.6));
     };
     image.onerror = (error) => reject(error);
@@ -42,10 +45,9 @@ export default function CreatePublicEvent() {
 
   const categoriesList = ['Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports'];
 
-  // Default data untuk PUBLIC EVENT
   const [formData, setFormData] = useState({
     title: '', description: '', eventStart: '', eventEnd: '', phone: '', category: '',
-    isPrivate: false, // PASTI FALSE
+    isPrivate: false, 
     location: { namePlace: '', place: '', city: '', province: '', mapUrl: '' },
     sessions: [
       {
@@ -171,18 +173,17 @@ export default function CreatePublicEvent() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!imageBase64) return alert("Poster/Gambar wajib diupload!");
+    if (!formData.eventStart || !formData.eventEnd) return alert("Harap isi Tanggal Mulai dan Selesai Event!");
     
     setIsLoading(true);
     try {
       const resBase64 = await fetch(imageBase64);
       const imageBlob = await resBase64.blob();
       
-      // 👇 FIX EKSTENSI WEBP 👇
       const fileName = `poster-${Date.now()}.webp`;
       
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('event-posters')
-        // 👇 FIX CONTENT-TYPE WEBP 👇
         .upload(fileName, imageBlob, { contentType: 'image/webp', upsert: false });
 
       if (uploadError) throw new Error("Gagal mengunggah gambar ke Supabase.");
@@ -214,7 +215,6 @@ export default function CreatePublicEvent() {
     }
   };
 
-  // Tema Public
   const inputStyle = `w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 transition-all bg-white text-gray-900 border border-gray-300 placeholder-gray-400 focus:border-orange-500 focus:ring-orange-500`;
   const labelStyle = `text-xs font-bold mb-1.5 block uppercase tracking-wider text-gray-700`;
 
@@ -226,7 +226,7 @@ export default function CreatePublicEvent() {
           <div className="bg-white rounded-[24px] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col">
             <div className="p-5 border-b border-gray-100 flex justify-between items-center">
               <h3 className="text-lg font-black uppercase tracking-widest text-gray-900">Sesuaikan Gambar</h3>
-              <button onClick={() => setShowCropModal(false)} className="text-gray-400 hover:text-red-500 font-bold">✕ Batal</button>
+              <button type="button" onClick={() => setShowCropModal(false)} className="text-gray-400 hover:text-red-500 font-bold">✕ Batal</button>
             </div>
             <div className="relative w-full h-[50vh] md:h-[60vh] bg-gray-900">
               <Cropper image={rawImageSrc} crop={crop} zoom={zoom} aspect={736 / 436} onCropChange={setCrop} onCropComplete={onCropComplete} onZoomChange={setZoom} />
@@ -236,7 +236,7 @@ export default function CreatePublicEvent() {
                 <span className="text-xs font-bold text-gray-400 uppercase">Zoom:</span>
                 <input type="range" min={1} max={3} step={0.1} value={zoom} onChange={(e) => setZoom(e.target.value)} className="w-full accent-[#FF6B35]" />
               </div>
-              <button onClick={handleSaveCrop} className="w-full sm:w-auto px-8 py-3 bg-[#FF6B35] text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-lg active:scale-95">
+              <button type="button" onClick={handleSaveCrop} className="w-full sm:w-auto px-8 py-3 bg-[#FF6B35] text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-lg active:scale-95">
                 ✔ Potong & Simpan
               </button>
             </div>
@@ -245,7 +245,7 @@ export default function CreatePublicEvent() {
       )}
 
       <div className="pt-8 px-6 max-w-4xl mx-auto flex items-center gap-4">
-        <button onClick={() => navigate(-1)} className="text-sm font-bold flex items-center gap-2 text-[#FF6B35] hover:opacity-80">
+        <button type="button" onClick={() => navigate(-1)} className="text-sm font-bold flex items-center gap-2 text-[#FF6B35] hover:opacity-80">
             ← Kembali
         </button>
       </div>
@@ -287,14 +287,26 @@ export default function CreatePublicEvent() {
                 <label className={labelStyle}>Deskripsi</label>
                 <textarea name="description" value={formData.description} onChange={handleEventChange} rows="4" className={inputStyle} required />
               </div>
+              
+              {/* 🔥 TANGGAL EVENT (Tema Public/Orange) */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelStyle}>Event Start</label>
-                  <input type="date" name="eventStart" value={formData.eventStart} onChange={handleEventChange} className={inputStyle} required />
+                  <CustomDatePicker 
+                    theme="public"
+                    value={formData.eventStart} 
+                    onChange={(newDate) => handleEventChange({ target: { name: 'eventStart', value: newDate }})} 
+                    placeholder="Pilih Tanggal Mulai"
+                  />
                 </div>
                 <div>
                   <label className={labelStyle}>Event End</label>
-                  <input type="date" name="eventEnd" value={formData.eventEnd} onChange={handleEventChange} className={inputStyle} required />
+                  <CustomDatePicker 
+                    theme="public"
+                    value={formData.eventEnd} 
+                    onChange={(newDate) => handleEventChange({ target: { name: 'eventEnd', value: newDate }})} 
+                    placeholder="Pilih Tanggal Selesai"
+                  />
                 </div>
               </div>
               
@@ -364,18 +376,37 @@ export default function CreatePublicEvent() {
                   <label className={labelStyle}>Deskripsi</label>
                   <textarea value={session.description} onChange={(e) => handleSessionChange(sIndex, 'description', e.target.value)} rows="3" className={inputStyle} />
                 </div>
+                
+                {/* 🔥 TANGGAL SESI */}
                 <div>
                   <label className={labelStyle}>Tanggal</label>
-                  <input type="date" value={session.date} onChange={(e) => handleSessionChange(sIndex, 'date', e.target.value)} className={inputStyle} required />
+                  <CustomDatePicker 
+                    theme="public"
+                    value={session.date} 
+                    onChange={(newDate) => handleSessionChange(sIndex, 'date', newDate)} 
+                    placeholder="Pilih Tanggal Sesi"
+                  />
                 </div>
+                
+                {/* 🔥 JAM MULAI & SELESAI */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className={labelStyle}>Jam Mulai</label>
-                    <input type="time" value={session.startTime} onChange={(e) => handleSessionChange(sIndex, 'startTime', e.target.value)} className={inputStyle} required />
+                    <CustomTimePicker 
+                      theme="public"
+                      value={session.startTime} 
+                      onChange={(newTime) => handleSessionChange(sIndex, 'startTime', newTime)} 
+                      placeholder="08:00"
+                    />
                   </div>
                   <div>
                     <label className={labelStyle}>Jam Selesai</label>
-                    <input type="time" value={session.endTime} onChange={(e) => handleSessionChange(sIndex, 'endTime', e.target.value)} className={inputStyle} required />
+                    <CustomTimePicker 
+                      theme="public"
+                      value={session.endTime} 
+                      onChange={(newTime) => handleSessionChange(sIndex, 'endTime', newTime)} 
+                      placeholder="10:00"
+                    />
                   </div>
                 </div>
 
