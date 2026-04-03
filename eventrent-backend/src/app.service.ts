@@ -33,19 +33,20 @@ export class AppService implements OnModuleInit {
     try {
       await this.pool.query('SELECT 1');
       console.log('Berhasil terhubung ke database PostgreSQL EventRent!');
-      
-      // Auto-migrate
-      await this.pool.query(`
-        ALTER TABLE tickets 
-        ADD COLUMN IF NOT EXISTS is_scanned BOOLEAN DEFAULT FALSE,
-        ADD COLUMN IF NOT EXISTS scanned_at TIMESTAMP,
-        ADD COLUMN IF NOT EXISTS is_attending BOOLEAN DEFAULT TRUE;
-      `);
-      console.log('Database Check: OK! 🚀');
-
+      console.log('Database Check: OK! 🚀 (Alphanumeric Ticket Code Ready)');
     } catch (error) {
       console.error('Gagal terhubung ke database:', error);
     }
+  }
+
+  // 👇 FUNGSI BARU: GENERATOR KODE TIKET ALPHANUMERIC
+  private generateTicketCode(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return `TKT-${code}`; // Hasil: TKT-A9X2B1
   }
 
   // --- EVENTS ---
@@ -97,8 +98,8 @@ export class AppService implements OnModuleInit {
 
       const sessionQuery = `
         SELECT id, name, description, TO_CHAR(session_date, 'Dy, DD Mon YYYY') as date, 
-              start_time, end_time, contact_person, event_type, price, stock,
-              name_place, place, city, province, map_url 
+               start_time, end_time, contact_person, event_type, price, stock,
+               name_place, place, city, province, map_url 
         FROM event_sessions
         WHERE event_id = $1
         ORDER BY session_date ASC, start_time ASC
@@ -114,14 +115,13 @@ export class AppService implements OnModuleInit {
 
       eventData.sessions = sessions;
 
-      // Narik Data Ucapan (Greeting) dari Tabel Tickets - Anti Duplikat
       const greetingsQuery = `
         SELECT name, greeting, time FROM (
           SELECT DISTINCT ON (attendee_email, greeting) 
-                attendee_name as name, 
-                greeting, 
-                TO_CHAR(purchase_date, 'DD Mon YYYY, HH24:MI') as time, 
-                purchase_date
+                 attendee_name as name, 
+                 greeting, 
+                 TO_CHAR(purchase_date, 'DD Mon YYYY, HH24:MI') as time, 
+                 purchase_date
           FROM tickets
           WHERE event_id = $1 AND greeting IS NOT NULL AND BTRIM(greeting) != ''
         ) sub
@@ -327,7 +327,7 @@ export class AppService implements OnModuleInit {
     try {
       await client.query('BEGIN'); 
 
-      const boughtTickets: number[] = [];
+      const boughtTickets: string[] = []; // 👈 FIX: Diubah jadi array of strings (TKT-XXX)
       let totalTransactionPrice = 0;
 
       const evRes = await client.query('SELECT title FROM events WHERE id = $1', [eventId]);
@@ -339,17 +339,18 @@ export class AppService implements OnModuleInit {
         if (uRes.rows.length > 0) targetEmail = uRes.rows[0].email;
       }
 
-      // Logika Jika Tidak Hadir (Hanya Kirim Doa)
       const isAttending = formAnswers.isAttending !== false; 
       
       if (!isAttending) {
         const firstSessionRes = await client.query('SELECT id FROM event_sessions WHERE event_id = $1 LIMIT 1', [eventId]);
         const dummySessionId = firstSessionRes.rows[0]?.id || null;
+        
+        const ticketCode = this.generateTicketCode(); // Generate code
 
         await client.query(
-          `INSERT INTO tickets (event_id, session_id, user_id, price, guest_email, attendee_name, attendee_email, custom_answers, pax, greeting, is_attending) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-          [eventId, dummySessionId, userId, 0, targetEmail || null, formAnswers.attendee_name || 'Tamu', formAnswers.email || targetEmail || '', '[]', 0, formAnswers.greeting, false]
+          `INSERT INTO tickets (event_id, session_id, user_id, price, guest_email, attendee_name, attendee_email, custom_answers, pax, greeting, is_attending, ticket_code) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+          [eventId, dummySessionId, userId, 0, targetEmail || null, formAnswers.attendee_name || 'Tamu', formAnswers.email || targetEmail || '', '[]', 0, formAnswers.greeting, false, ticketCode]
         );
         
         await client.query('COMMIT');
@@ -359,12 +360,8 @@ export class AppService implements OnModuleInit {
       // Proses normal jika HADIR
       for (const item of cart) {
         const sessionId = item.sessionId;
-        const qty = item.qty || item.quantity || 1; // Jumlah QRCode/Tiket yang di generate
-        
-        // 🔥 FIX PAX: Ambil dari item cart, formAnswers pax umum, atau default 1
+        const qty = item.qty || item.quantity || 1; 
         const paxPerTicket = Number(item.pax || formAnswers.pax || 1);
-        
-        // 🔥 FIX STOCK: Total kursi yang berkurang = jumlah tiket x pax per tiket
         const totalStockNeeded = qty * paxPerTicket;
 
         const sessionRes = await client.query('SELECT price, stock FROM event_sessions WHERE id = $1 FOR UPDATE', [sessionId]);
@@ -378,16 +375,16 @@ export class AppService implements OnModuleInit {
         const qRes = await client.query('SELECT id, question_text FROM session_questions WHERE session_id = $1', [sessionId]);
         const dbQuestions = qRes.rows;
 
-        // Generate Tiket
+        // Generate Tiket Beserta TICKET CODE
         for (let i = 0; i < qty; i++) {
           const prefix = `cart-${item.id}-ticket-${i}`;
           
           const name = formAnswers[`${prefix}-nama`] || formAnswers.attendee_name || `Tamu ${i + 1}`;
           const email = formAnswers[`${prefix}-email`] || formAnswers.email || targetEmail || ``;
-          
-          // 🔥 Terapkan pax dinamis ke masing-masing tiket 🔥
           const pax = paxPerTicket; 
           const greeting = formAnswers[`${prefix}-greeting`] || formAnswers.greeting || null;
+          
+          const ticketCode = this.generateTicketCode(); // 👈 FIX: Generate kode acak di sini!
           
           const customAnswers: any[] = [];
           for (const q of dbQuestions) {
@@ -400,20 +397,21 @@ export class AppService implements OnModuleInit {
           const singlePrice = session.price;
           totalTransactionPrice += Number(singlePrice);
 
+          // 👈 FIX: Masukin ticket_code ke query INSERT
           const ticketRes = await client.query(
-            `INSERT INTO tickets (event_id, session_id, user_id, price, guest_email, attendee_name, attendee_email, custom_answers, pax, greeting, is_attending) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-            [eventId, sessionId, userId, singlePrice, targetEmail || null, name, email, JSON.stringify(customAnswers), pax, greeting, true]
+            `INSERT INTO tickets (event_id, session_id, user_id, price, guest_email, attendee_name, attendee_email, custom_answers, pax, greeting, is_attending, ticket_code) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING ticket_code`,
+            [eventId, sessionId, userId, singlePrice, targetEmail || null, name, email, JSON.stringify(customAnswers), pax, greeting, true, ticketCode]
           );
           
-          const newTicketId = ticketRes.rows[0].id;
-          boughtTickets.push(newTicketId);
+          const newTicketCode = ticketRes.rows[0].ticket_code;
+          boughtTickets.push(newTicketCode);
         }
       }
 
       await client.query('COMMIT');
 
-      // Kirim email QR Code
+      // Kirim email QR Code pakai Array Kode (TKT-XXX)
       if (targetEmail && boughtTickets.length > 0) {
         this.sendEmailReceipt(targetEmail, eventTitle, boughtTickets, totalTransactionPrice, eventId)
           .catch(e => console.error("Gagal mengirim email struk:", e)); 
@@ -431,27 +429,55 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  private async sendEmailReceipt(targetEmail: string, eventTitle: string, ticketIds: number[], totalPrice: number, eventId: number) {
+  // 👇 GANTI WARNA JADI OREN (#FF6B35) 👇
+  private async sendEmailReceipt(targetEmail: string, eventTitle: string, ticketCodes: string[], totalPrice: number, eventId: number) {
     let qrCodesHtml = '';
     const emailAttachments: any[] = []; 
 
-    for (const id of ticketIds) {
-      const qrPayload = JSON.stringify({ ticketId: id, eventId: eventId });
-      
-      const qrDataUrl = await QRCode.toDataURL(qrPayload, { errorCorrectionLevel: 'H', margin: 2 });
-      
-      const uniqueCid = `qr-ticket-${id}@eventrent.com`;
+    for (const code of ticketCodes) {
+      const qrPayload = JSON.stringify({ ticketId: code, eventId: eventId });
+      const qrDataUrl = await QRCode.toDataURL(qrPayload, { errorCorrectionLevel: 'H', margin: 2, color: { dark: '#000000', light: '#ffffff' } });
+      const uniqueCid = `qr-ticket-${code}@eventrent.com`;
 
+      // 🔥 DESAIN TIKET HORIZONTAL ALA KONSER (TEMA OREN) 🔥
       qrCodesHtml += `
-        <div style="text-align: center; margin: 20px auto; padding: 20px; border: 2px dashed #ccc; border-radius: 12px; background-color: #fafafa; max-width: 250px;">
-          <p style="margin: 0; font-size: 12px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: 1px;">Tunjukkan Saat Check-In</p>
-          <img src="cid:${uniqueCid}" alt="QR Code Tiket ${id}" style="width: 200px; height: 200px; margin: 15px 0;" />
-          <p style="margin: 0; font-size: 20px; font-weight: 900; letter-spacing: 3px; color: #333;">ID: ${id}</p>
-        </div>
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 650px; margin: 20px auto; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.15); border-collapse: collapse; border: 1px solid #e2e8f0;">
+          <tr>
+            <td width="65%" style="padding: 30px; vertical-align: middle;">
+              <h4 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 2px;">Admit One</h4>
+              <h2 style="color: #0f172a; margin: 0 0 15px 0; font-size: 26px; line-height: 1.2; font-weight: 900;">${eventTitle}</h2>
+              
+              <p style="color: #64748b; font-size: 13px; margin: 0 0 25px 0; line-height: 1.5;">
+                Tunjukkan QR Code di pintu masuk.<br/>Tiket ini bersifat rahasia dan hanya berlaku 1 kali scan.
+              </p>
+
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td>
+                    <p style="color: #94a3b8; font-size: 11px; margin: 0; text-transform: uppercase; letter-spacing: 1px;">Status</p>
+                    <h3 style="color: #10b981; font-size: 18px; margin: 5px 0 0 0; text-transform: uppercase;">PAID / LUNAS</h3>
+                  </td>
+                </tr>
+              </table>
+            </td>
+            
+            <td width="35%" style="background-color: #FF6B35; padding: 25px 20px; text-align: center; vertical-align: middle; border-left: 2px dashed rgba(255,255,255,0.4);">
+              <h3 style="color: #ffffff; margin: 0 0 15px 0; font-size: 14px; letter-spacing: 2px; text-transform: uppercase;">Entry Pass</h3>
+              
+              <div style="background-color: #ffffff; padding: 10px; border-radius: 8px; display: inline-block; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+                <img src="cid:${uniqueCid}" alt="QR Code" style="width: 110px; height: 110px; display: block;" />
+              </div>
+              
+              <p style="color: #ffffff; margin: 0; font-family: 'Courier New', Courier, monospace; font-size: 16px; letter-spacing: 1.5px; font-weight: bold; background-color: rgba(0,0,0,0.2); padding: 5px 10px; border-radius: 4px; display: inline-block;">
+                ${code}
+              </p>
+            </td>
+          </tr>
+        </table>
       `;
 
       emailAttachments.push({
-        filename: `qr-ticket-${id}.png`,
+        filename: `qr-ticket-${code}.png`,
         path: qrDataUrl, 
         cid: uniqueCid 
       });
@@ -460,28 +486,25 @@ export class AppService implements OnModuleInit {
     const mailOptions = {
       from: '"EventRent System" <noreply@eventrent.com>',
       to: targetEmail,
-      subject: `🎟️ E-Ticket Resmi: ${eventTitle}`,
+      subject: `🎟️ E-Ticket Anda: ${eventTitle}`,
       attachments: emailAttachments, 
       html: `
-        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 30px; border: 1px solid #eaeaea; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); background-color: #ffffff;">
+        <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; background-color: #f8fafc;">
           
-          <div style="text-align: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 20px; margin-bottom: 25px;">
-             <h1 style="color: #FF6B35; margin: 0; font-size: 28px; font-weight: 900;">🎟️ E-TICKET</h1>
-             <p style="color: #666; font-size: 16px; margin-top: 8px;">Acara: <strong style="color: #222;">${eventTitle}</strong></p>
+          <div style="text-align: center; padding: 20px 0;">
+             <h1 style="color: #0f172a; margin: 0; font-size: 24px; font-weight: 900; letter-spacing: 1px;">YOUR EVENT TICKETS</h1>
+             <p style="color: #64748b; font-size: 14px; margin-top: 5px;">Terima kasih telah melakukan pemesanan!</p>
           </div>
-          
-          <p style="font-size: 15px; color: #444; margin-top: 10px;">Halo!</p>
-          <p style="font-size: 15px; color: #444; line-height: 1.6;">Terima kasih telah melakukan reservasi/pembelian tiket untuk acara <strong>${eventTitle}</strong>. Berikut adalah E-Ticket resmi Anda.</p>
           
           ${qrCodesHtml}
           
-          <div style="margin-top: 35px; padding: 20px; background-color: #FFF5F0; border-left: 5px solid #FF6B35; border-radius: 8px;">
-            <p style="margin: 0; font-size: 16px; color: #333;"><strong>Total Pembayaran: Rp ${totalPrice.toLocaleString('id-ID')}</strong></p>
+          <div style="text-align: center; margin-top: 30px; padding: 20px; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
+            <p style="margin: 0; font-size: 15px; color: #334155;">Total Pembayaran Keseluruhan:</p>
+            <h2 style="margin: 5px 0 0 0; color: #FF6B35; font-size: 24px;">Rp ${totalPrice.toLocaleString('id-ID')}</h2>
           </div>
           
-          <p style="font-size: 11px; color: #aaa; text-align: center; margin-top: 40px; line-height: 1.5;">
-            Simpan email ini baik-baik atau Screenshot bagian QR Code.<br/>
-            QR Code bersifat rahasia dan hanya berlaku untuk 1 (satu) kali scan di pintu masuk.<br/>
+          <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 30px; line-height: 1.6;">
+            Email ini dikirim secara otomatis oleh sistem.<br/>
             <strong>Powered by EventRent</strong>
           </p>
         </div>
@@ -491,22 +514,23 @@ export class AppService implements OnModuleInit {
     await this.transporter.sendMail(mailOptions);
   }
 
-  async trackTicket(ticketId: number, email: string) {
+  // 👇 FIX: Di query trackTicket, getMyTickets, getEventAttendees kita alias ticket_code AS ticket_id 👇
+  async trackTicket(ticketCode: string, email: string) {
     try {
       const checkQuery = `
         SELECT t.event_id, t.purchase_date::text as exact_time
         FROM tickets t
         LEFT JOIN users u ON t.user_id = u.id
-        WHERE t.id = $1 AND (t.guest_email = $2 OR u.email = $2)
+        WHERE t.ticket_code = $1 AND (t.guest_email = $2 OR u.email = $2)
       `;
-      const checkRes = await this.pool.query(checkQuery, [ticketId, email]);
+      const checkRes = await this.pool.query(checkQuery, [ticketCode, email]);
       
       if (checkRes.rows.length === 0) throw new NotFoundException('Tiket tidak ditemukan. Pastikan Order ID dan Email sudah benar.');
 
       const { event_id, exact_time } = checkRes.rows[0];
 
       const query = `
-        SELECT t.id as ticket_id, t.purchase_date, t.price, 
+        SELECT t.ticket_code as ticket_id, t.purchase_date, t.price, 
                t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned, t.pax, t.greeting, t.is_attending,
                e.id as event_id, e.title, e.image_url as img, 
                TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date, e.place as location,
@@ -530,7 +554,7 @@ export class AppService implements OnModuleInit {
   async getMyTickets(userId: number) {
     try {
       const query = `
-        SELECT t.id as ticket_id, t.purchase_date, t.price, 
+        SELECT t.ticket_code as ticket_id, t.purchase_date, t.price, 
                t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned, t.pax, t.greeting, t.is_attending,
                e.id as event_id, e.title, e.image_url as img, 
                TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date, e.place as location,
@@ -556,7 +580,7 @@ export class AppService implements OnModuleInit {
       if (eventCheck.rows[0].created_by != userId) throw new UnauthorizedException('Bukan pemilik event!');
 
       const query = `
-        SELECT t.id as ticket_id, t.purchase_date, t.price,
+        SELECT t.ticket_code as ticket_id, t.purchase_date, t.price,
                t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned, t.pax, t.greeting, t.is_attending,
                u.name as buyer_name, COALESCE(u.email, t.guest_email) as buyer_email, u.picture as buyer_pic,
                s.name as session_name
@@ -574,7 +598,8 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  async scanTicket(ticketId: number, eventId: number, userId: number) {
+  // 👇 FIX: Pakai ticketCode untuk validasi scan 👇
+  async scanTicket(ticketCode: string, eventId: number, userId: number) {
     try {
       const eventCheck = await this.pool.query('SELECT created_by FROM events WHERE id = $1', [eventId]);
       if (eventCheck.rows.length === 0) throw new BadRequestException('Event tidak ditemukan');
@@ -582,13 +607,13 @@ export class AppService implements OnModuleInit {
 
       const ticketRes = await this.pool.query(`
         SELECT t.id, t.is_scanned, t.scanned_at, t.price, t.pax, t.greeting, t.is_attending,
-               t.attendee_name, t.attendee_email, t.custom_answers,
+               t.attendee_name, t.attendee_email, t.custom_answers, t.ticket_code,
                u.name as buyer_name, COALESCE(u.email, t.guest_email) as buyer_email, s.name as session_name
         FROM tickets t
         LEFT JOIN users u ON t.user_id = u.id
         JOIN event_sessions s ON t.session_id = s.id
-        WHERE t.id = $1 AND t.event_id = $2
-      `, [ticketId, eventId]);
+        WHERE t.ticket_code = $1 AND t.event_id = $2
+      `, [ticketCode, eventId]);
 
       if (ticketRes.rows.length === 0) return { valid: false, message: 'TIKET PALSU ATAU SALAH EVENT!' };
 
@@ -603,7 +628,7 @@ export class AppService implements OnModuleInit {
         return { valid: false, message: `TIKET SUDAH DIGUNAKAN pada ${scanWaktu}!`, data: ticket };
       }
 
-      await this.pool.query('UPDATE tickets SET is_scanned = TRUE, scanned_at = NOW() WHERE id = $1', [ticketId]);
+      await this.pool.query('UPDATE tickets SET is_scanned = TRUE, scanned_at = NOW() WHERE ticket_code = $1', [ticketCode]);
       return { valid: true, message: 'SCAN SUKSES! Tiket Valid.', data: ticket };
     } catch (err) {
       if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;

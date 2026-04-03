@@ -24,8 +24,9 @@ export default function TrackTicket() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ticketId: parseInt(formData.ticketId),
-          email: formData.email
+          // 👇 FIX: Nggak pakai parseInt lagi, langsung kirim string utuh
+          ticketId: formData.ticketId.trim(),
+          email: formData.email.trim()
         })
       });
 
@@ -56,10 +57,11 @@ export default function TrackTicket() {
             <label className="block text-xs font-black text-gray-900 uppercase tracking-widest mb-2">Order ID</label>
             <input 
               type="text" 
-              inputMode="numeric"
-              placeholder="Contoh: 46" 
+              // 👇 FIX: Hapus inputMode="numeric" dan update placeholder
+              placeholder="Contoh: TKT-A9X2B1" 
               value={formData.ticketId} 
-              onChange={(e) => setFormData({...formData, ticketId: e.target.value})} 
+              // 👇 Bikin hurufnya otomatis UPPERCASE biar rapi
+              onChange={(e) => setFormData({...formData, ticketId: e.target.value.toUpperCase()})} 
               className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm font-bold rounded-2xl px-5 py-4 outline-none focus:ring-2 focus:ring-[#FF6B35]/20 focus:border-[#FF6B35] transition-all" 
             />
           </div>
@@ -129,16 +131,17 @@ export default function TrackTicket() {
                   <div className="pt-6 border-t border-dashed border-gray-200">
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Detail Peserta</p>
                     <div className="flex justify-between items-center bg-gray-50 px-4 py-2.5 rounded-xl border border-gray-100">
-                      {/* UPDATE: Langsung panggil attendee_name */}
                       <span className="text-sm font-black text-gray-900">{ticket.attendee_name || 'Peserta'}</span>
                     </div>
                   </div>
                 </div>
                 <div className="w-full md:w-auto shrink-0 flex flex-col items-center gap-3 pl-0 md:pl-8 md:border-l border-dashed border-gray-200">
                   <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100">
-                    <QRCode value={JSON.stringify({ ticketId: ticket.ticket_id, eventId: ticket.event_id })} size={120} />
+                    {/* QR Code Payload udah aman, dia bakal ngirim ticket.ticket_id (TKT-XXXX) */}
+                    <QRCode value={JSON.stringify({ ticketId: ticket.ticket_id, eventId: ticket.event_id })} size={120} level="H" />
                   </div>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Order ID: #{ticket.ticket_id}</p>
+                  {/* 👇 FIX: Hapus tanda '#' biar gak bingung baca ID-nya */}
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Order ID: {ticket.ticket_id}</p>
                 </div>
               </div>
             </div>

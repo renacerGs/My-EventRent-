@@ -11,7 +11,6 @@ const getFirstDayOfMonth = (year, month) => {
   return day === 0 ? 6 : day - 1; 
 };
 
-// 🔥 KONFIGURASI WARNA TEMA
 const themeStyles = {
   public: {
     bg: "bg-[#FF6B35]",
@@ -48,7 +47,6 @@ export default function CustomDatePicker({ value, onChange, placeholder = "Pilih
   const [showMonthDropdown, setShowMonthDropdown] = useState(false);
   const [showYearDropdown, setShowYearDropdown] = useState(false);
 
-  // Ambil warna berdasarkan tema (default: public)
   const colors = themeStyles[theme] || themeStyles.public;
 
   const formatOutput = (date) => {
@@ -82,7 +80,9 @@ export default function CustomDatePicker({ value, onChange, placeholder = "Pilih
     calendarDays.push({ day: i, isCurrentMonth: false, date: new Date(year, month + 1, i) });
   }
 
-  const handleConfirm = () => {
+  // 👇 FIX UTAMA: Kasih preventDefault biar ga submit form / nge-refresh state
+  const handleConfirm = (e) => {
+    e.preventDefault();
     if (selectedDate) onChange(formatOutput(selectedDate));
     setIsOpen(false);
   };
@@ -92,12 +92,17 @@ export default function CustomDatePicker({ value, onChange, placeholder = "Pilih
 
   return (
     <div className="relative w-full">
-      <div onClick={() => setIsOpen(true)} className={`w-full rounded-xl px-4 py-3 text-sm transition-all bg-white text-gray-900 border border-gray-300 ${colors.borderHover} cursor-pointer flex items-center justify-between`}>
+      {/* 👇 FIX: Ganti dari onClick biasa jadi button type="button" */}
+      <button 
+        type="button" 
+        onClick={(e) => { e.preventDefault(); setIsOpen(true); }} 
+        className={`w-full rounded-xl px-4 py-3 text-sm transition-all bg-white text-gray-900 border border-gray-300 ${colors.borderHover} cursor-pointer flex items-center justify-between`}
+      >
         <span className={selectedDate ? "text-gray-900 font-bold" : "text-gray-400"}>
           {selectedDate ? formatDisplay(selectedDate) : placeholder}
         </span>
         <CalendarDays className={`w-5 h-5 ${colors.text}`} />
-      </div>
+      </button>
 
       <AnimatePresence>
         {isOpen && (
@@ -105,31 +110,29 @@ export default function CustomDatePicker({ value, onChange, placeholder = "Pilih
             <motion.div initial={{ opacity: 0, scale: 0.9, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 10 }} ref={modalRef} className={`${colors.bg} p-2 rounded-[2rem] w-full max-w-[320px] shadow-2xl`}>
               <div className="bg-white rounded-[1.5rem] p-5 w-full relative">
                 <div className="flex justify-between items-center mb-6 px-1 relative">
-                  <button type="button" onClick={() => { setViewDate(new Date(year, month - 1, 1)); setShowMonthDropdown(false); setShowYearDropdown(false); }} className="p-1 hover:bg-gray-100 rounded-full transition text-gray-600"><ChevronLeft className="w-5 h-5" /></button>
+                  <button type="button" onClick={(e) => { e.preventDefault(); setViewDate(new Date(year, month - 1, 1)); setShowMonthDropdown(false); setShowYearDropdown(false); }} className="p-1 hover:bg-gray-100 rounded-full transition text-gray-600"><ChevronLeft className="w-5 h-5" /></button>
                   <div className="flex gap-2 font-bold text-gray-800">
                     
-                    {/* DROPDOWN BULAN */}
                     <div className="relative">
-                      <span onClick={() => { setShowMonthDropdown(!showMonthDropdown); setShowYearDropdown(false); }} className="cursor-pointer px-2 py-1.5 hover:bg-gray-100 rounded-lg select-none flex items-center gap-1.5 text-sm transition-colors">{MONTHS[month]} <ChevronDown className="w-3.5 h-3.5 text-gray-400" /></span>
+                      <button type="button" onClick={(e) => { e.preventDefault(); setShowMonthDropdown(!showMonthDropdown); setShowYearDropdown(false); }} className="cursor-pointer px-2 py-1.5 hover:bg-gray-100 rounded-lg select-none flex items-center gap-1.5 text-sm transition-colors">{MONTHS[month]} <ChevronDown className="w-3.5 h-3.5 text-gray-400" /></button>
                       {showMonthDropdown && (
                         <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 w-[180px] bg-white border border-gray-100 shadow-xl rounded-2xl p-2 grid grid-cols-3 gap-1 z-[300]">
-                          {MONTHS.map((m, idx) => (<button key={m} type="button" onClick={() => { setViewDate(new Date(year, idx, 1)); setShowMonthDropdown(false); }} className={`py-2 text-xs font-bold rounded-xl transition-all ${idx === month ? `${colors.bg} text-white shadow-md` : `${colors.lightBgHover} text-gray-600 ${colors.hoverText}`}`}>{m}</button>))}
+                          {MONTHS.map((m, idx) => (<button key={m} type="button" onClick={(e) => { e.preventDefault(); setViewDate(new Date(year, idx, 1)); setShowMonthDropdown(false); }} className={`py-2 text-xs font-bold rounded-xl transition-all ${idx === month ? `${colors.bg} text-white shadow-md` : `${colors.lightBgHover} text-gray-600 ${colors.hoverText}`}`}>{m}</button>))}
                         </div>
                       )}
                     </div>
                     
-                    {/* DROPDOWN TAHUN */}
                     <div className="relative">
-                      <span onClick={() => { setShowYearDropdown(!showYearDropdown); setShowMonthDropdown(false); }} className="cursor-pointer px-2 py-1.5 hover:bg-gray-100 rounded-lg select-none flex items-center gap-1.5 text-sm transition-colors">{year} <ChevronDown className="w-3.5 h-3.5 text-gray-400" /></span>
+                      <button type="button" onClick={(e) => { e.preventDefault(); setShowYearDropdown(!showYearDropdown); setShowMonthDropdown(false); }} className="cursor-pointer px-2 py-1.5 hover:bg-gray-100 rounded-lg select-none flex items-center gap-1.5 text-sm transition-colors">{year} <ChevronDown className="w-3.5 h-3.5 text-gray-400" /></button>
                       {showYearDropdown && (
                         <div className="absolute top-full right-0 mt-1 w-[90px] max-h-[220px] overflow-y-auto bg-white border border-gray-100 shadow-xl rounded-2xl p-1.5 flex flex-col gap-1 z-[300] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                          {yearList.map(y => (<button key={y} type="button" onClick={() => { setViewDate(new Date(y, month, 1)); setShowYearDropdown(false); }} className={`py-2 text-xs font-bold rounded-xl transition-all shrink-0 ${y === year ? `${colors.bg} text-white shadow-md` : `${colors.lightBgHover} text-gray-600 ${colors.hoverText}`}`}>{y}</button>))}
+                          {yearList.map(y => (<button key={y} type="button" onClick={(e) => { e.preventDefault(); setViewDate(new Date(y, month, 1)); setShowYearDropdown(false); }} className={`py-2 text-xs font-bold rounded-xl transition-all shrink-0 ${y === year ? `${colors.bg} text-white shadow-md` : `${colors.lightBgHover} text-gray-600 ${colors.hoverText}`}`}>{y}</button>))}
                         </div>
                       )}
                     </div>
 
                   </div>
-                  <button type="button" onClick={() => { setViewDate(new Date(year, month + 1, 1)); setShowMonthDropdown(false); setShowYearDropdown(false); }} className="p-1 hover:bg-gray-100 rounded-full transition text-gray-600"><ChevronRight className="w-5 h-5" /></button>
+                  <button type="button" onClick={(e) => { e.preventDefault(); setViewDate(new Date(year, month + 1, 1)); setShowMonthDropdown(false); setShowYearDropdown(false); }} className="p-1 hover:bg-gray-100 rounded-full transition text-gray-600"><ChevronRight className="w-5 h-5" /></button>
                 </div>
                 
                 <div className="grid grid-cols-7 mb-3 text-center">
@@ -139,13 +142,13 @@ export default function CustomDatePicker({ value, onChange, placeholder = "Pilih
                 <div className="grid grid-cols-7 gap-y-2 gap-x-1 text-center mb-6">
                   {calendarDays.map((d, i) => {
                     const isSelected = selectedDate && d.date.toDateString() === selectedDate.toDateString();
-                    return (<button type="button" key={i} onClick={() => { if(d.isCurrentMonth) setSelectedDate(d.date); }} disabled={!d.isCurrentMonth} className={`w-8 h-8 mx-auto flex items-center justify-center rounded-full text-xs font-bold transition-all ${!d.isCurrentMonth ? 'text-gray-300 cursor-not-allowed' : isSelected ? `${colors.bg} text-white shadow-md scale-110` : `text-gray-700 ${colors.lightBgHover} ${colors.hoverText}`}`}>{d.day}</button>);
+                    return (<button type="button" key={i} onClick={(e) => { e.preventDefault(); if(d.isCurrentMonth) setSelectedDate(d.date); }} disabled={!d.isCurrentMonth} className={`w-8 h-8 mx-auto flex items-center justify-center rounded-full text-xs font-bold transition-all ${!d.isCurrentMonth ? 'text-gray-300 cursor-not-allowed' : isSelected ? `${colors.bg} text-white shadow-md scale-110` : `text-gray-700 ${colors.lightBgHover} ${colors.hoverText}`}`}>{d.day}</button>);
                   })}
                 </div>
                 
                 <div className="flex items-center gap-3">
                   <button type="button" onClick={handleConfirm} className={`flex-1 ${colors.bg} hover:opacity-90 text-white py-3.5 rounded-[1rem] font-black uppercase tracking-widest text-[10px] shadow-lg ${colors.shadow} transition-all active:scale-95`}>Confirm</button>
-                  <button type="button" onClick={() => setIsOpen(false)} className="flex-1 text-gray-500 hover:bg-gray-50 py-3.5 rounded-[1rem] font-bold uppercase tracking-widest text-[10px] transition-all active:scale-95 border border-gray-100">Cancel</button>
+                  <button type="button" onClick={(e) => { e.preventDefault(); setIsOpen(false); }} className="flex-1 text-gray-500 hover:bg-gray-50 py-3.5 rounded-[1rem] font-bold uppercase tracking-widest text-[10px] transition-all active:scale-95 border border-gray-100">Cancel</button>
                 </div>
               </div>
             </motion.div>

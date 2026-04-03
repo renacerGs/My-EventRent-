@@ -12,12 +12,14 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const SectionAccordion = ({ title, isOpen, onToggle, children }) => (
-  <div className="bg-slate-900 border border-slate-800 rounded-[24px] shadow-sm overflow-hidden mb-6 transition-all duration-300">
+  <div className="bg-slate-900 border border-slate-800 rounded-[24px] shadow-sm overflow-hidden mb-6 transition-all duration-300 hover:border-slate-700">
     <button type="button" onClick={onToggle} className="w-full px-8 py-6 flex justify-between items-center bg-slate-800/50 hover:bg-slate-800 transition-colors">
       <h2 className="text-xl font-black uppercase tracking-widest text-white">{title}</h2>
       <span className={`text-[#D4AF37] text-2xl transform transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>▼</span>
     </button>
-    {isOpen && <div className="p-8 border-t border-slate-800">{children}</div>}
+    <div className={`transition-all duration-500 ease-in-out ${isOpen ? 'max-h-[5000px] opacity-100 p-8 border-t border-slate-800' : 'max-h-0 opacity-0 overflow-hidden'}`}>
+        {children}
+    </div>
   </div>
 );
 
@@ -51,6 +53,7 @@ export default function EditWeddingEvent() {
   const { id } = useParams();
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user'));
+  const userId = user?.id; 
 
   const [openSection, setOpenSection] = useState('template'); 
   const toggleSection = (sectionName) => setOpenSection(prev => prev === sectionName ? null : sectionName);
@@ -73,6 +76,7 @@ export default function EditWeddingEvent() {
   const [newCoverBase64, setNewCoverBase64] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false); 
 
   const [showCropModal, setShowCropModal] = useState(false);
   const [rawImageSrc, setRawImageSrc] = useState(null);
@@ -82,7 +86,7 @@ export default function EditWeddingEvent() {
   const [cropTarget, setCropTarget] = useState(null); 
 
   useEffect(() => {
-    if (!user) { navigate('/'); return; }
+    if (!userId) { navigate('/'); return; }
 
     fetch(`/api/events/${id}`)
       .then(res => {
@@ -102,20 +106,20 @@ export default function EditWeddingEvent() {
            id: s.id,
            name: s.name,
            date: formatDateForInput(s.date),
-           startTime: s.start_time,
-           endTime: s.end_time,
-           stock: s.stock,
+           startTime: s.start_time || '',
+           endTime: s.end_time || '',
+           stock: s.stock || '',
            location: {
-              namePlace: s.name_place,
-              city: s.city,
-              place: s.place,
+              namePlace: s.name_place || '',
+              city: s.city || '',
+              place: s.place || '',
               mapUrl: s.map_url || ''
            },
            questions: (s.questions || []).map(q => ({
               id: q.id,
-              text: q.question_text,
-              type: q.answer_type,
-              isRequired: q.is_required,
+              text: q.question_text || '',
+              type: q.answer_type || 'Text',
+              isRequired: q.is_required !== undefined ? q.is_required : true,
               options: q.options || ['']
            }))
         }));
@@ -145,9 +149,16 @@ export default function EditWeddingEvent() {
         alert("Gagal memuat data edit");
         navigate('/manage');
       });
-  }, [id, navigate, user]);
+  }, [id, navigate, userId]);
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    if (e && e.target) {
+      const { name, value } = e.target;
+      setFormData(prev => ({ ...prev, [name]: value }));
+    } else if (e && e.name && e.value !== undefined) {
+      setFormData(prev => ({ ...prev, [e.name]: e.value }));
+    }
+  };
 
   const handleProfileChange = (profId, field, value) => { setProfiles(prev => prev.map(p => p.id === profId ? { ...p, [field]: value } : p)); };
   const addProfile = () => setProfiles(prev => [...prev, { id: crypto.randomUUID(), fullName: '', nickName: '', role: '', parentsInfo: '', address: '', photoUrl: null }]);
@@ -189,41 +200,84 @@ export default function EditWeddingEvent() {
   };
 
   const handleSessionLocationChange = (sIndex, field, value) => {
-    const updated = JSON.parse(JSON.stringify(formData.sessions));
-    if (!updated[sIndex].location) updated[sIndex].location = { namePlace: '', place: '', city: '', province: '', mapUrl: '' };
-    updated[sIndex].location[field] = value; setFormData({ ...formData, sessions: updated });
+    setFormData(prev => {
+      const updated = JSON.parse(JSON.stringify(prev.sessions));
+      if (!updated[sIndex].location) updated[sIndex].location = { namePlace: '', place: '', city: '', province: '', mapUrl: '' };
+      updated[sIndex].location[field] = value; 
+      return { ...prev, sessions: updated };
+    });
   };
+
   const handleSessionChange = (index, field, value) => {
-    const updated = JSON.parse(JSON.stringify(formData.sessions));
-    updated[index][field] = value; setFormData({ ...formData, sessions: updated });
+    setFormData(prev => {
+      const updated = JSON.parse(JSON.stringify(prev.sessions));
+      updated[index][field] = value; 
+      return { ...prev, sessions: updated };
+    });
   };
+
   const addSession = () => {
     setFormData(prev => ({ ...prev, sessions: [...prev.sessions, { id: crypto.randomUUID(), name: '', description: '', date: '', startTime: '', endTime: '', contactPerson: '', typeEvent: 'Free', price: '0', stock: '', ticketDesc: '', location: { namePlace: '', place: '', city: '', province: '', mapUrl: '' }, questions: [{ id: crypto.randomUUID(), text: '', type: 'Text', isRequired: true, options: [''] }] }] }));
   };
+
   const removeSession = (indexToRemove) => {
-    if (formData.sessions.length <= 1) return alert("Minimal harus ada 1 session untuk event ini!");
-    const updatedSessions = formData.sessions.filter((_, index) => index !== indexToRemove); setFormData({ ...formData, sessions: updatedSessions });
+    setFormData(prev => {
+      if (prev.sessions.length <= 1) { alert("Minimal harus ada 1 session untuk event ini!"); return prev; }
+      return { ...prev, sessions: prev.sessions.filter((_, index) => index !== indexToRemove) };
+    });
   };
+
   const handleQuestionChange = (sIndex, qIndex, field, value) => {
-    const updated = JSON.parse(JSON.stringify(formData.sessions));
-    updated[sIndex].questions[qIndex][field] = value;
-    if (field === 'type' && (value === 'Dropdown' || value === 'Checkbox')) { if (!updated[sIndex].questions[qIndex].options || updated[sIndex].questions[qIndex].options.length === 0) { updated[sIndex].questions[qIndex].options = ['']; } }
-    setFormData({ ...formData, sessions: updated });
+    setFormData(prev => {
+      const updated = JSON.parse(JSON.stringify(prev.sessions));
+      updated[sIndex].questions[qIndex][field] = value;
+      if (field === 'type' && (value === 'Dropdown' || value === 'Checkbox')) { 
+        if (!updated[sIndex].questions[qIndex].options || updated[sIndex].questions[qIndex].options.length === 0) { 
+          updated[sIndex].questions[qIndex].options = ['']; 
+        } 
+      }
+      return { ...prev, sessions: updated };
+    });
   };
+
   const addQuestion = (sIndex) => {
-    const updated = JSON.parse(JSON.stringify(formData.sessions)); updated[sIndex].questions.push({ id: crypto.randomUUID(), text: '', type: 'Text', isRequired: true, options: [''] }); setFormData({ ...formData, sessions: updated });
+    setFormData(prev => {
+      const updated = JSON.parse(JSON.stringify(prev.sessions)); 
+      updated[sIndex].questions.push({ id: crypto.randomUUID(), text: '', type: 'Text', isRequired: true, options: [''] }); 
+      return { ...prev, sessions: updated };
+    });
   };
+
   const removeQuestion = (sIndex, qIndex) => {
-    const updated = JSON.parse(JSON.stringify(formData.sessions)); updated[sIndex].questions = updated[sIndex].questions.filter((_, i) => i !== qIndex); setFormData({ ...formData, sessions: updated });
+    setFormData(prev => {
+      const updated = JSON.parse(JSON.stringify(prev.sessions)); 
+      updated[sIndex].questions = updated[sIndex].questions.filter((_, i) => i !== qIndex); 
+      return { ...prev, sessions: updated };
+    });
   };
+
   const addQuestionOption = (sIndex, qIndex) => {
-    const updated = JSON.parse(JSON.stringify(formData.sessions)); updated[sIndex].questions[qIndex].options.push(''); setFormData({ ...formData, sessions: updated });
+    setFormData(prev => {
+      const updated = JSON.parse(JSON.stringify(prev.sessions)); 
+      updated[sIndex].questions[qIndex].options.push(''); 
+      return { ...prev, sessions: updated };
+    });
   };
+
   const updateQuestionOption = (sIndex, qIndex, optIndex, value) => {
-    const updated = JSON.parse(JSON.stringify(formData.sessions)); updated[sIndex].questions[qIndex].options[optIndex] = value; setFormData({ ...formData, sessions: updated });
+    setFormData(prev => {
+      const updated = JSON.parse(JSON.stringify(prev.sessions)); 
+      updated[sIndex].questions[qIndex].options[optIndex] = value; 
+      return { ...prev, sessions: updated };
+    });
   };
+
   const removeQuestionOption = (sIndex, qIndex, optIndex) => {
-    const updated = JSON.parse(JSON.stringify(formData.sessions)); updated[sIndex].questions[qIndex].options.splice(optIndex, 1); setFormData({ ...formData, sessions: updated });
+    setFormData(prev => {
+      const updated = JSON.parse(JSON.stringify(prev.sessions)); 
+      updated[sIndex].questions[qIndex].options.splice(optIndex, 1); 
+      return { ...prev, sessions: updated };
+    });
   };
 
   const uploadToSupabase = async (fileOrBase64, folderPath) => {
@@ -269,13 +323,19 @@ export default function EditWeddingEvent() {
         eventEnd: formData.eventEnd,     
         img: finalCoverUrl,
         eventDetails: finalEventDetails,
-        sessions: formData.sessions 
+        sessions: formData.sessions,
+        category: 'Wedding', 
+        isPrivate: true      
       };
 
-      const res = await fetch(`/api/events/${id}?userId=${user.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await fetch(`/api/events/${id}?userId=${userId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 
-      if (res.ok) { alert("Wedding Event berhasil diperbarui! ✨"); navigate('/manage'); } 
-      else { alert("Gagal update. Pastikan kamu pembuat event ini."); }
+      if (res.ok) { 
+        setShowSuccessModal(true);
+        setTimeout(() => { navigate('/manage'); }, 1500); 
+      } else { 
+        alert("Gagal update. Pastikan kamu pembuat event ini."); 
+      }
     } catch (err) { console.error(err); alert(err.message || "Terjadi kesalahan."); } 
     finally { setIsSaving(false); }
   };
@@ -330,7 +390,7 @@ export default function EditWeddingEvent() {
               {TEMPLATES.map(theme => (
                 <div 
                   key={theme.id}
-                  onClick={() => setFormData({...formData, templateId: theme.id})}
+                  onClick={() => setFormData(prev => ({...prev, templateId: theme.id}))}
                   className={`cursor-pointer rounded-2xl border-4 p-4 transition-all duration-300 ${formData.templateId === theme.id ? 'border-[#D4AF37] scale-[1.02] shadow-[0_0_20px_rgba(212,175,55,0.2)] bg-slate-800/50' : 'border-transparent hover:border-slate-700'}`}
                 >
                   <div className={`w-full aspect-[4/3] rounded-xl mb-3 flex flex-col items-center justify-center border pointer-events-none ${theme.style}`}>
@@ -368,14 +428,13 @@ export default function EditWeddingEvent() {
                 <p className="text-[10px] text-slate-500 mt-1.5 font-bold tracking-wide">Kosongkan jika ingin menggunakan lagu romantis default dari kami.</p>
               </div>
 
-              {/* 🔥 TANGGAL EVENT (Tema Wedding/Gold) */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelStyle}>Tanggal Mulai Acara</label>
                   <CustomDatePicker 
                     theme="wedding"
                     value={formData.eventStart} 
-                    onChange={(val) => handleChange({target: {name: 'eventStart', value: val}})} 
+                    onChange={(val) => handleChange({ name: 'eventStart', value: val })} 
                     placeholder="Pilih Tanggal Mulai"
                   />
                 </div>
@@ -384,7 +443,7 @@ export default function EditWeddingEvent() {
                   <CustomDatePicker 
                     theme="wedding"
                     value={formData.eventEnd} 
-                    onChange={(val) => handleChange({target: {name: 'eventEnd', value: val}})} 
+                    onChange={(val) => handleChange({ name: 'eventEnd', value: val })} 
                     placeholder="Pilih Tanggal Selesai"
                   />
                 </div>
@@ -424,7 +483,7 @@ export default function EditWeddingEvent() {
 
           <SectionAccordion title="4. Rangkaian Acara (Sesi)" isOpen={openSection === 'sessions'} onToggle={() => toggleSection('sessions')}>
              {formData.sessions.map((session, sIndex) => (
-              <div key={session.id} className="p-6 border border-slate-700 bg-slate-800/30 rounded-xl mb-6 relative">
+              <div key={session.id || sIndex} className="p-6 border border-slate-700 bg-slate-800/30 rounded-xl mb-6 relative">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-[#D4AF37] font-bold uppercase tracking-widest text-sm">Sesi {sIndex + 1}</h3>
                   {formData.sessions.length > 1 && <button type="button" onClick={() => removeSession(sIndex)} className="text-red-400 text-xs font-bold uppercase">Hapus Sesi</button>}
@@ -432,7 +491,6 @@ export default function EditWeddingEvent() {
                 <div className="space-y-4">
                   <div><label className={labelStyle}>Nama Acara</label><input type="text" value={session.name} onChange={(e) => handleSessionChange(sIndex, 'name', e.target.value)} className={inputStyle} required /></div>
                   
-                  {/* 🔥 TANGGAL SESI & JAM (Tema Wedding/Gold) */}
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className={labelStyle}>Tanggal</label>
@@ -476,8 +534,8 @@ export default function EditWeddingEvent() {
                   </div>
                   <div className="mt-6 pt-4 border-t border-slate-700">
                      <p className="text-[10px] font-black uppercase tracking-widest mb-1 text-[#D4AF37]">Pertanyaan Custom (Opsional)</p>
-                     {session.questions.map((q, qIndex) => (
-                        <div key={q.id} className="border rounded-xl p-5 mb-4 shadow-sm border-l-4 border-slate-700 border-l-[#D4AF37] bg-slate-800/30">
+                     {session.questions?.map((q, qIndex) => (
+                        <div key={q.id || qIndex} className="border rounded-xl p-5 mb-4 shadow-sm border-l-4 border-slate-700 border-l-[#D4AF37] bg-slate-800/30">
                           <div className="flex flex-col md:flex-row gap-4 mb-3 w-full">
                             <div className="flex-1 min-w-0">
                               <input type="text" placeholder="Ketik pertanyaan tambahan" value={q.text} onChange={(e) => handleQuestionChange(sIndex, qIndex, 'text', e.target.value)} className={`${inputStyle} w-full`} required />
@@ -495,7 +553,7 @@ export default function EditWeddingEvent() {
                               {q.options?.map((opt, optIndex) => (
                                 <div key={optIndex} className="flex items-center gap-3">
                                   <input type="text" value={opt} onChange={(e) => updateQuestionOption(sIndex, qIndex, optIndex, e.target.value)} className={`${inputStyle} py-2 flex-1`} required />
-                                  {q.options.length > 1 && <button type="button" onClick={() => removeQuestionOption(sIndex, qIndex, optIndex)} className="text-gray-400 hover:text-red-500">✕</button>}
+                                  {q.options.length > 1 && <button type="button" onClick={() => removeQuestionOption(sIndex, qIndex, optIndex)} className="text-gray-400 hover:text-red-500 font-bold">✕</button>}
                                 </div>
                               ))}
                               <button type="button" onClick={() => addQuestionOption(sIndex, qIndex)} className="text-xs text-[#D4AF37]">+ Tambah Opsi</button>
@@ -551,7 +609,7 @@ export default function EditWeddingEvent() {
             <button type="button" onClick={addGift} className="w-full py-3 border border-dashed border-[#D4AF37] text-[#D4AF37] rounded-xl font-bold uppercase text-xs">+ Tambah Rekening Lain</button>
           </SectionAccordion>
 
-          <div className="pt-6 mt-8 mb-10">
+          <div className="pt-6 mt-8 mb-10 flex gap-4">
             <button type="submit" disabled={isSaving} className="w-full py-4 rounded-xl text-slate-900 font-bold uppercase tracking-widest text-sm shadow-xl transition-all active:scale-95 disabled:opacity-50 bg-[#D4AF37] hover:bg-[#FFDF73]">
               {isSaving ? '⏳ Menyimpan Perubahan...' : '✨ Update Wedding Event'}
             </button>
@@ -559,6 +617,23 @@ export default function EditWeddingEvent() {
 
         </form>
       </main>
+
+      {/* MODAL SUCCESS (TEMA DARK GOLD) */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-[32px] p-8 max-w-sm w-full shadow-2xl transform transition-all text-center">
+            <div className="w-20 h-20 bg-[#D4AF37]/10 text-[#D4AF37] rounded-full flex items-center justify-center mx-auto mb-6 border-[6px] border-[#D4AF37]/20">
+              <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Sukses!</h3>
+            <p className="text-gray-400 text-sm font-medium mb-2">
+              Wedding Event berhasil diperbarui ✨
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

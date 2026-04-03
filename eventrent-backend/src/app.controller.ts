@@ -5,7 +5,6 @@ import { AppService } from './app.service';
 // <--- 1. IMPORT DECORATOR SWAGGER --->
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
 
-// 👇 IMPORT DTO YANG BARU KITA BUAT 👇
 import { BuyTicketDto } from './dto/buy-ticket.dto';
 
 @Controller('api')
@@ -110,11 +109,10 @@ export class AppController {
     }
 
     // 3. Eksekusi ke Service
-    // 👇 SOLUSINYA DI SINI BRO: Tambahkan || [] di finalCart 👇
     return await this.appService.buyTicket(
       data.userId || null, 
       data.eventId, 
-      finalCart || [], // <--- TypeScript sekarang tahu ini pasti Array, bukan undefined
+      finalCart || [], 
       finalAnswers, 
       email
     );
@@ -129,9 +127,10 @@ export class AppController {
 
   @ApiTags('Tickets')
   @ApiOperation({ summary: 'Melacak/Mencari tiket (Guest Checkout) menggunakan Order ID dan Email' })
-  @ApiBody({ schema: { example: { ticketId: 46, email: "tamu@gmail.com" } } })
+  // 👇 FIX: Update example Swagger ke format String Alphanumeric
+  @ApiBody({ schema: { example: { ticketId: "TKT-A9X2B1", email: "tamu@gmail.com" } } })
   @Post('tickets/track')
-  async trackTicket(@Body() data: { ticketId: number; email: string }) {
+  async trackTicket(@Body() data: { ticketId: string; email: string }) { // ✅ Ini udah bener string
     return await this.appService.trackTicket(data.ticketId, data.email);
   }
 
@@ -144,9 +143,11 @@ export class AppController {
 
   @ApiTags('Tickets')
   @ApiOperation({ summary: 'Melakukan validasi/scan kehadiran tiket' })
-  @ApiBody({ schema: { example: { ticketId: 39, eventId: 32, userId: 1 } } })
+  // 👇 FIX: Update example Swagger ke format String
+  @ApiBody({ schema: { example: { ticketId: "TKT-A9X2B1", eventId: 32, userId: 1 } } })
   @Post('tickets/scan')
-  async scanTicket(@Body() body: { ticketId: number, eventId: number, userId: number }) {
+  // 👇 FIX: Ubah ticketId dari number jadi STRING 👇
+  async scanTicket(@Body() body: { ticketId: string, eventId: number, userId: number }) {
     return this.appService.scanTicket(body.ticketId, body.eventId, body.userId);
   }
   

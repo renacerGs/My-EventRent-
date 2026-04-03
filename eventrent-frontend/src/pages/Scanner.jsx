@@ -22,10 +22,13 @@ export default function Scanner() {
   const processTicket = async (ticketIdStr) => {
     setScanResult('processing');
     
-    const ticketId = parseInt(ticketIdStr);
-    if (isNaN(ticketId)) {
+    // 👇 FIX 1: GAK PAKAI parseInt LAGI! Langsung ambil string-nya
+    const ticketId = ticketIdStr;
+    
+    // 👇 FIX 2: Validasi cuma ngecek kosong atau nggak
+    if (!ticketId) {
       setScanResult('error');
-      setMessage("QR Code Tidak Valid! Bukan tiket EventRent.");
+      setMessage("QR Code Tidak Valid! Format kosong.");
       return;
     }
 
@@ -87,10 +90,8 @@ export default function Scanner() {
     navigate(-1); 
   };
 
-  // 👇👇👇 INI YANG UDAH DIPERBAIKI (JAUH LEBIH SIMPLE!) 👇👇👇
   const getAttendeeName = () => {
     if (!ticketData) return 'Peserta';
-    // Langsung tembak ke attendee_name yang baru, kalau kosong lari ke buyer_name
     return ticketData.attendee_name || ticketData.buyer_name || 'Guest/Tamu';
   };
 

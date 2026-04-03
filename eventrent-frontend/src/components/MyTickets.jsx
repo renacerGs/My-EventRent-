@@ -16,7 +16,6 @@ const formatPrettyDate = (dateString) => {
     }
     const dateObj = new Date(rawDate);
     if (isNaN(dateObj.getTime())) return dateString;
-    // Format hari ala TIX ID
     const options = { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' };
     const formattedDate = new Intl.DateTimeFormat('id-ID', options).format(dateObj);
     return `${formattedDate}${timePart}`;
@@ -55,7 +54,6 @@ export default function MyTickets() {
   const [loading, setLoading] = useState(true);
   const [expandedOrderId, setExpandedOrderId] = useState(null);
 
-  // STATE TABS (aktif / riwayat)
   const [activeTab, setActiveTab] = useState('aktif');
 
   const [selectedQR, setSelectedQR] = useState(null); 
@@ -112,7 +110,6 @@ export default function MyTickets() {
   const activeEvents = groupedOrders.filter(order => !isEventPassed(order.event_date));
   const pastEvents = groupedOrders.filter(order => isEventPassed(order.event_date));
   
-  // Filter data berdasarkan Tab yang aktif
   const displayedEvents = activeTab === 'aktif' ? activeEvents : pastEvents;
 
   const toggleExpand = (id) => {
@@ -131,19 +128,13 @@ export default function MyTickets() {
     setShowQR(true);
   };
 
-  // 👇 FUNGSI DOWNLOAD AJAIB (ANTI KEPOTONG FINAL LEVEL DEWA) 👇
   const handleDownloadImage = async () => {
     const ticketElement = document.getElementById('ticket-download-area');
     if (!ticketElement) return;
 
     setIsDownloading(true);
-
-    // 1. Simpan posisi scroll layar lu saat ini
     const currentScroll = window.scrollY;
-    // 2. Paksa layar scroll ke paling atas! Ini trik rahasia buat ngakalin bug html2canvas di Pop-Up
     window.scrollTo(0, 0);
-
-    // 3. Kasih napas ke browser 100 milidetik buat nyesuain posisi kordinat sebelum dijepret
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     try {
@@ -151,7 +142,6 @@ export default function MyTickets() {
         scale: 2, 
         useCORS: true, 
         backgroundColor: '#ffffff',
-        // Paksa html2canvas ngikutin tinggi dan lebar murni dari kotaknya!
         width: ticketElement.offsetWidth,
         height: ticketElement.offsetHeight
       });
@@ -161,7 +151,8 @@ export default function MyTickets() {
       const link = document.createElement('a');
       link.href = image;
       const cleanName = selectedQR.attendeeName.replace(/[^a-zA-Z0-9]/g, '_');
-      link.download = `EventRent_Ticket_${cleanName}.png`;
+      // Bikin nama filenya makin keren pakai ID tiket!
+      link.download = `Tiket_${selectedQR.ticket_id}_${cleanName}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -169,11 +160,11 @@ export default function MyTickets() {
       console.error("Gagal download gambar tiket", err);
       alert("Oops, gagal download tiket. Coba lagi bro!");
     } finally {
-      // 4. Balikin layar ke posisi scroll semula secepat kilat!
       window.scrollTo(0, currentScroll);
       setIsDownloading(false);
     }
   };
+
   const OrderCardGroup = ({ orderGroup, isPast }) => {
     const isExpanded = expandedOrderId === orderGroup.order_id;
     return (
@@ -183,14 +174,11 @@ export default function MyTickets() {
         ${isPast ? 'md:opacity-70 md:grayscale-[30%]' : ''}`}>
         
         <div onClick={() => toggleExpand(orderGroup.order_id)} className="flex flex-row cursor-pointer group relative gap-3 md:gap-0">
-          
-          {/* IMAGE CONTAINER */}
-          <div className="w-24 h-32 rounded-xl shrink-0 bg-gray-100 overflow-hidden relative 
-                          md:w-64 md:rounded-none md:aspect-auto md:h-full">
+          <div className="w-24 h-32 rounded-xl shrink-0 bg-gray-100 overflow-hidden relative md:w-64 md:rounded-none md:aspect-auto md:h-full">
              <img src={orderGroup.img} alt={orderGroup.title} className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${isPast ? 'grayscale opacity-80 md:grayscale-0 md:opacity-100' : ''}`} />
           </div>
 
-          {/* 👇 UI KHUSUS MOBILE (Ala TIX ID) 👇 */}
+          {/* MOBILE UI */}
           <div className="md:hidden flex flex-col flex-1 py-1">
              <h3 className="text-sm font-bold text-gray-900 leading-snug mb-1.5 uppercase line-clamp-2">{orderGroup.title}</h3>
              <p className="text-[10px] font-semibold text-gray-500 flex items-center gap-1.5 mb-1">
@@ -209,7 +197,7 @@ export default function MyTickets() {
              </div>
           </div>
 
-          {/* 👇 UI KHUSUS DESKTOP (Sama persis kayak Kodingan Lama) 👇 */}
+          {/* DESKTOP UI */}
           <div className="hidden md:flex flex-1 p-6 md:p-8 flex-col justify-center relative">
              <div className="flex flex-row justify-between items-start gap-4 mb-4">
                <div>
@@ -236,10 +224,9 @@ export default function MyTickets() {
                </div>
              </div>
           </div>
-
         </div>
 
-        {/* EXPAND AREA (Isi Daftar Tiket) */}
+        {/* EXPAND AREA */}
         <AnimatePresence>
           {isExpanded && (
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
@@ -278,8 +265,9 @@ export default function MyTickets() {
                           return (
                             <div key={trx.ticket_id} className={`bg-white border rounded-xl md:rounded-2xl p-3 md:p-4 flex flex-row items-center justify-between shadow-sm transition-colors gap-3 ${isScanned ? 'border-gray-200 opacity-60' : 'border-gray-200 hover:border-[#FF6B35]'}`}>
                               <div className="overflow-hidden">
-                                <span className="text-[9px] md:text-[10px] text-gray-400 font-bold uppercase tracking-widest block mb-0.5 md:mb-1">
-                                  {isScanned ? 'TIKET TERPAKAI' : `E-Ticket ${tIndex + 1}`}
+                                {/* 👇 UPDATE: Nampilin TKT-XXXXX biar elegan 👇 */}
+                                <span className="text-[9px] md:text-[10px] text-[#FF6B35] font-black uppercase tracking-widest block mb-0.5 md:mb-1">
+                                  {isScanned ? 'TIKET TERPAKAI' : trx.ticket_id}
                                 </span>
                                 <p className={`font-bold text-xs md:text-sm truncate uppercase ${isScanned ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
                                   {attendeeName}
@@ -323,13 +311,21 @@ export default function MyTickets() {
                   <img src={selectedQR.img} alt="header" className="w-full h-full object-cover opacity-30" crossOrigin="anonymous" />
                 </div>
                 <div className="p-6 md:p-8 flex flex-col items-center -mt-8 md:-mt-10 relative z-10 bg-white rounded-t-[24px] md:rounded-t-[32px]">
-                  <div className="bg-white p-3 md:p-5 rounded-[20px] md:rounded-[24px] shadow-lg border border-gray-100 mb-5 md:mb-6">
-                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${selectedQR.uniqueQRData}`} alt="QR" className="w-40 h-40 md:w-48 md:h-48 mix-blend-multiply" crossOrigin="anonymous" />
+                  
+                  {/* 👇 FIX: Nambahin &ecc=H dan encodeURIComponent biar barcode-nya rapet sama persis kayak email 👇 */}
+                  <div className="bg-white p-3 md:p-5 rounded-[20px] md:rounded-[24px] shadow-lg border border-gray-100 mb-2">
+                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=H&data=${encodeURIComponent(selectedQR.uniqueQRData)}`} alt="QR" className="w-40 h-40 md:w-48 md:h-48 mix-blend-multiply" crossOrigin="anonymous" />
                   </div>
-                  <div className="text-center w-full">
-                    <span className="bg-orange-50 text-[#FF6B35] border border-orange-100 text-[9px] md:text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest mb-3 md:mb-4 inline-block">E-Ticket {selectedQR.attendeeNum}</span>
+                  
+                  {/* 👇 Nambahin teks ID Tiket (TKT-XXXX) di bawah Barcode 👇 */}
+                  <p className="text-[10px] md:text-xs font-black text-gray-400 uppercase tracking-widest mb-4 border-b-2 border-dashed border-gray-200 pb-4 px-8">
+                    {selectedQR.ticket_id}
+                  </p>
+
+                  <div className="text-center w-full mt-2">
+                    <span className="bg-orange-50 text-[#FF6B35] border border-orange-100 text-[9px] md:text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest mb-3 inline-block">Admit One</span>
                     <h3 className="text-xl md:text-2xl font-black text-gray-900 uppercase tracking-widest mb-2 md:mb-3 truncate px-2">{selectedQR.attendeeName}</h3>
-                    <div className="pt-3 border-t border-dashed border-gray-200">
+                    <div className="pt-3">
                       <h4 className="text-xs md:text-sm font-bold text-gray-600 leading-tight line-clamp-2">{selectedQR.title}</h4>
                       <p className="text-gray-400 text-[10px] md:text-xs font-semibold mt-1 uppercase tracking-wider">{selectedQR.session_name}</p>
                     </div>
@@ -348,28 +344,17 @@ export default function MyTickets() {
       </AnimatePresence>
 
       <div className="max-w-4xl mx-auto">
-        
         {/* HEADER & TABS NAVIGATION */}
         <div className="bg-gray-50 md:bg-transparent sticky md:relative top-0 z-40 pt-4 md:pt-0 mb-4 md:mb-8">
-           
-           {/* Judul Besar Hanya Tampil di Desktop */}
            <div className="hidden md:block">
              <h1 className="text-4xl font-extrabold mb-2 text-gray-900 tracking-tight">My Tickets</h1>
              <p className="text-gray-500 mb-8 font-medium">Riwayat pembelian dan e-ticket kamu.</p>
            </div>
-
-           {/* Tabs Mobile & Desktop */}
            <div className="flex border-b border-gray-200 bg-white md:bg-transparent rounded-t-[20px] md:rounded-none px-2 md:px-0 pt-2 md:pt-0">
-             <button 
-               onClick={() => setActiveTab('aktif')}
-               className={`flex-1 py-3.5 text-xs md:text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'aktif' ? 'border-b-2 border-[#FF6B35] text-[#FF6B35]' : 'border-b-2 border-transparent text-gray-400 hover:text-gray-600'}`}
-             >
+             <button onClick={() => setActiveTab('aktif')} className={`flex-1 py-3.5 text-xs md:text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'aktif' ? 'border-b-2 border-[#FF6B35] text-[#FF6B35]' : 'border-b-2 border-transparent text-gray-400 hover:text-gray-600'}`}>
                Tiket Aktif
              </button>
-             <button 
-               onClick={() => setActiveTab('riwayat')}
-               className={`flex-1 py-3.5 text-xs md:text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'riwayat' ? 'border-b-2 border-[#FF6B35] text-[#FF6B35]' : 'border-b-2 border-transparent text-gray-400 hover:text-gray-600'}`}
-             >
+             <button onClick={() => setActiveTab('riwayat')} className={`flex-1 py-3.5 text-xs md:text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'riwayat' ? 'border-b-2 border-[#FF6B35] text-[#FF6B35]' : 'border-b-2 border-transparent text-gray-400 hover:text-gray-600'}`}>
                Daftar Transaksi
              </button>
            </div>
@@ -391,7 +376,6 @@ export default function MyTickets() {
             </div>
           )}
         </div>
-
       </div>
     </div>
   );

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
 
-// 🔥 IMPORT KOMPONEN DARI FOLDER SHARED
 import CustomDatePicker from './shared/CustomDatePicker';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -27,6 +26,9 @@ export default function EditPublicEvent() {
   const { id } = useParams();
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user'));
+  
+  // 👇 FIX 1: Ambil ID user aja buat nge-trigger useEffect, jangan full object!
+  const userId = user?.id;
 
   const [formData, setFormData] = useState({
     title: '', phone: '', category: '', description: '', place: '',
@@ -41,8 +43,9 @@ export default function EditPublicEvent() {
 
   const categories = ['Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports', 'Seminar', 'Workshop'];
 
+  // 👇 FIX 2: Ganti array dependency 'user' jadi 'userId'
   useEffect(() => {
-    if (!user) { navigate('/'); return; }
+    if (!userId) { navigate('/'); return; }
 
     fetch(`/api/events/${id}`) 
       .then(res => {
@@ -78,11 +81,15 @@ export default function EditPublicEvent() {
         alert("Gagal memuat data edit");
         navigate('/manage');
       });
-  }, [id, navigate, user]);
+  }, [id, navigate, userId]); // <--- SEKARANG UDAH AMAN DARI INFINITE LOOP!
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (e && e.target) {
+      const { name, value } = e.target;
+      setFormData(prev => ({ ...prev, [name]: value }));
+    } else if (e && e.name && e.value !== undefined) {
+      setFormData(prev => ({ ...prev, [e.name]: e.value }));
+    }
   };
 
   const handleImageChange = (e) => {
@@ -122,7 +129,7 @@ export default function EditPublicEvent() {
         isPrivate: false 
       };
 
-      const res = await fetch(`/api/events/${id}?userId=${user.id}`, {
+      const res = await fetch(`/api/events/${id}?userId=${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -201,14 +208,13 @@ export default function EditPublicEvent() {
           <div className={sectionStyle}>
             <h2 className="text-xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4">Date & Location</h2>
             
-            {/* 🔥 TANGGAL EVENT (Pake CustomDatePicker Tema Public/Orange) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label className={labelStyle}>Tanggal Mulai</label>
                 <CustomDatePicker 
                   theme="public"
                   value={formData.eventStart} 
-                  onChange={(newDate) => handleChange({ target: { name: 'eventStart', value: newDate }})} 
+                  onChange={(newDate) => handleChange({ name: 'eventStart', value: newDate })} 
                   placeholder="Pilih Tanggal Mulai"
                 />
               </div>
@@ -217,7 +223,7 @@ export default function EditPublicEvent() {
                 <CustomDatePicker 
                   theme="public"
                   value={formData.eventEnd} 
-                  onChange={(newDate) => handleChange({ target: { name: 'eventEnd', value: newDate }})} 
+                  onChange={(newDate) => handleChange({ name: 'eventEnd', value: newDate })} 
                   placeholder="Pilih Tanggal Selesai"
                 />
               </div>
