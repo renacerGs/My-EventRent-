@@ -2,8 +2,6 @@
 -- PostgreSQL database dump
 --
 
-\restrict CXhDAUfcLdnaPQqfsAxyuahRUcvnTYCnZEuKzm08t5J2XBXPDyllByr53lkNHnh
-
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 18.2
 
@@ -657,6 +655,3 @@ ALTER TABLE ONLY public.user_likes
 --
 -- PostgreSQL database dump complete
 --
-
-\unrestrict CXhDAUfcLdnaPQqfsAxyuahRUcvnTYCnZEuKzm08t5J2XBXPDyllByr53lkNHnh
-

@@ -57,7 +57,7 @@ export class AppService implements OnModuleInit {
         SELECT e.id, e.title, 
                TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start,
                TO_CHAR(e.event_end, 'Dy, DD Mon YYYY') as date_end,
-               e.name_place, e.city, e.place, e.location as old_location,
+               e.name_place, e.city, e.place, 
                e.image_url as img, c.name as category, e.is_private,
                COALESCE((SELECT MIN(price) FROM event_sessions WHERE event_id = e.id), 0) as price,
                COALESCE((SELECT SUM(stock) FROM event_sessions WHERE event_id = e.id), 0) as stock,
@@ -144,7 +144,7 @@ export class AppService implements OnModuleInit {
         SELECT e.id, e.title, 
                TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start,
                TO_CHAR(e.event_end, 'Dy, DD Mon YYYY') as date_end,
-               e.name_place, e.city, e.place, e.location as old_location,
+               e.name_place, e.city, e.place, 
                e.image_url as img, c.name as category, e.is_private,
                COALESCE((SELECT MIN(price) FROM event_sessions WHERE event_id = e.id), 0) as price,
                COALESCE((SELECT SUM(stock) FROM event_sessions WHERE event_id = e.id), 0) as stock,
@@ -327,7 +327,7 @@ export class AppService implements OnModuleInit {
     try {
       await client.query('BEGIN'); 
 
-      const boughtTickets: string[] = []; // 👈 FIX: Diubah jadi array of strings (TKT-XXX)
+      const boughtTickets: string[] = []; 
       let totalTransactionPrice = 0;
 
       const evRes = await client.query('SELECT title FROM events WHERE id = $1', [eventId]);
@@ -345,7 +345,7 @@ export class AppService implements OnModuleInit {
         const firstSessionRes = await client.query('SELECT id FROM event_sessions WHERE event_id = $1 LIMIT 1', [eventId]);
         const dummySessionId = firstSessionRes.rows[0]?.id || null;
         
-        const ticketCode = this.generateTicketCode(); // Generate code
+        const ticketCode = this.generateTicketCode(); 
 
         await client.query(
           `INSERT INTO tickets (event_id, session_id, user_id, price, guest_email, attendee_name, attendee_email, custom_answers, pax, greeting, is_attending, ticket_code) 
@@ -384,7 +384,7 @@ export class AppService implements OnModuleInit {
           const pax = paxPerTicket; 
           const greeting = formAnswers[`${prefix}-greeting`] || formAnswers.greeting || null;
           
-          const ticketCode = this.generateTicketCode(); // 👈 FIX: Generate kode acak di sini!
+          const ticketCode = this.generateTicketCode(); 
           
           const customAnswers: any[] = [];
           for (const q of dbQuestions) {
@@ -397,7 +397,6 @@ export class AppService implements OnModuleInit {
           const singlePrice = session.price;
           totalTransactionPrice += Number(singlePrice);
 
-          // 👈 FIX: Masukin ticket_code ke query INSERT
           const ticketRes = await client.query(
             `INSERT INTO tickets (event_id, session_id, user_id, price, guest_email, attendee_name, attendee_email, custom_answers, pax, greeting, is_attending, ticket_code) 
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING ticket_code`,
@@ -429,7 +428,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 👇 GANTI WARNA JADI OREN (#FF6B35) 👇
   private async sendEmailReceipt(targetEmail: string, eventTitle: string, ticketCodes: string[], totalPrice: number, eventId: number) {
     let qrCodesHtml = '';
     const emailAttachments: any[] = []; 
@@ -439,7 +437,6 @@ export class AppService implements OnModuleInit {
       const qrDataUrl = await QRCode.toDataURL(qrPayload, { errorCorrectionLevel: 'H', margin: 2, color: { dark: '#000000', light: '#ffffff' } });
       const uniqueCid = `qr-ticket-${code}@eventrent.com`;
 
-      // 🔥 DESAIN TIKET HORIZONTAL ALA KONSER (TEMA OREN) 🔥
       qrCodesHtml += `
         <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 650px; margin: 20px auto; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.15); border-collapse: collapse; border: 1px solid #e2e8f0;">
           <tr>
@@ -514,7 +511,6 @@ export class AppService implements OnModuleInit {
     await this.transporter.sendMail(mailOptions);
   }
 
-  // 👇 FIX: Di query trackTicket, getMyTickets, getEventAttendees kita alias ticket_code AS ticket_id 👇
   async trackTicket(ticketCode: string, email: string) {
     try {
       const checkQuery = `
@@ -598,7 +594,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 👇 FIX: Pakai ticketCode untuk validasi scan 👇
   async scanTicket(ticketCode: string, eventId: number, userId: number) {
     try {
       const eventCheck = await this.pool.query('SELECT created_by FROM events WHERE id = $1', [eventId]);
