@@ -75,12 +75,9 @@ export default function ManageEvent() {
 
   const handleCardClick = (id) => navigate(`/manage/event/${id}`);
 
-  // 👇 FIX: Smart Routing buat tombol View
   const handleView = (e, event) => {
     e.stopPropagation(); 
     setActiveMenuId(null);
-    
-    // Arahkan ke URL yang tepat sesuai kategori
     if (event.category === 'Personal') {
       navigate(`/party/${event.id}`);
     } else if (event.category === 'Wedding' || event.is_private === true || event.is_private === 'true') {
@@ -90,14 +87,13 @@ export default function ManageEvent() {
     }
   };
 
-  // 👇 FIX: Smart Routing buat tombol Edit
   const handleEdit = (e, event) => {
     e.stopPropagation();
     setActiveMenuId(null);
     if (event.category === 'Wedding') {
       navigate(`/edit/wedding/${event.id}`);
     } else if (event.category === 'Personal') {
-      navigate(`/edit/personal/${event.id}`); // Ganti ini nanti kalau file edit personal udah ada
+      navigate(`/edit/personal/${event.id}`); 
     } else if (event.is_private === true || event.is_private === 'true') {
       navigate(`/edit/wedding/${event.id}`); 
     } else {
@@ -128,6 +124,34 @@ export default function ManageEvent() {
     }
   };
 
+  // 👇👇👇 FUNGSI BARU: TOGGLE VISIBILITY (OPTIMISTIC UPDATE) 👇👇👇
+  const handleToggleVisibility = async (e, eventId, currentPrivateStatus) => {
+    e.stopPropagation(); // Biar pas klik toggle, gak masuk ke halaman detail
+    
+    // 1. Ubah state UI langsung biar instan (gak nunggu loading)
+    setMyEvents(prev => prev.map(event => 
+      event.id === eventId ? { ...event, is_private: !currentPrivateStatus } : event
+    ));
+
+    try {
+      // 2. Tembak API backend secara background
+      const res = await fetch(`/api/events/${eventId}/visibility?userId=${user.id}`, {
+        method: 'PATCH',
+      });
+      
+      if (!res.ok) {
+        throw new Error("Gagal update di server");
+      }
+    } catch (err) {
+      console.error(err);
+      // 3. Kalau gagal, balikin statenya ke awal (Revert)
+      alert("Oops! Gagal merubah visibilitas. Coba lagi.");
+      setMyEvents(prev => prev.map(event => 
+        event.id === eventId ? { ...event, is_private: currentPrivateStatus } : event
+      ));
+    }
+  };
+
   return (
     <div className="bg-gray-50 min-h-screen font-sans pb-20 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 md:py-10">
@@ -155,7 +179,9 @@ export default function ManageEvent() {
                 const isPast = isEventPassed(event.date_start);
                 const isMenuActive = activeMenuId === event.id;
                 
-                const isWed = event.category === 'Wedding' || event.category === 'Personal' || event.is_private === true || event.is_private === 'true'; 
+                // Cek status private (bisa boolean atau string dari DB)
+                const isPrivate = event.is_private === true || event.is_private === 'true';
+                const isWed = event.category === 'Wedding' || event.category === 'Personal' || isPrivate; 
 
                 return (
                   <div 
@@ -180,6 +206,26 @@ export default function ManageEvent() {
                         <div className="flex items-center gap-3 text-[10px] md:text-xs text-gray-500 font-medium">
                           <span className="truncate">{formatPrettyDate(event.date_start)}</span>
                         </div>
+                        
+                        {/* 👇👇👇 UI TOGGLE SWITCH PUBLIC/PRIVATE 👇👇👇 */}
+                        <div 
+                          className="flex items-center gap-2 mt-2" 
+                          onClick={(e) => e.stopPropagation()} // Biar nggak ikut ke-klik pindah halaman
+                        >
+                          <button
+                            onClick={(e) => handleToggleVisibility(e, event.id, isPrivate)}
+                            className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors duration-300 ease-in-out focus:outline-none ${!isPrivate ? 'bg-[#FF6B35]' : 'bg-gray-300'}`}
+                          >
+                            <span 
+                              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-300 ease-in-out shadow-sm ${!isPrivate ? 'translate-x-4' : 'translate-x-0.5'}`} 
+                            />
+                          </button>
+                          <span className={`text-[9px] font-bold uppercase tracking-wider ${!isPrivate ? 'text-[#FF6B35]' : 'text-gray-400'}`}>
+                            {!isPrivate ? 'Publik' : 'Private'}
+                          </span>
+                        </div>
+                        {/* 👆👆👆 BATAS UI TOGGLE SWITCH 👆👆👆 */}
+
                       </div>
                     </div>
 

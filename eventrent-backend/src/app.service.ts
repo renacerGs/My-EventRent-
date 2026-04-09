@@ -285,6 +285,37 @@ export class AppService implements OnModuleInit {
     }
   }
 
+  // 👇 FUNGSI BARU: ON/OFF VISIBILITY EVENT 👇
+  async toggleEventVisibility(eventId: number, userId: number) {
+    try {
+      // 1. Cek dulu apakah event ini beneran punya si user
+      const checkRes = await this.pool.query('SELECT is_private FROM events WHERE id = $1 AND created_by = $2', [eventId, userId]);
+      
+      if (checkRes.rows.length === 0) {
+        throw new UnauthorizedException('Event tidak ditemukan atau bukan milikmu!');
+      }
+
+      // 2. Balik statusnya (kalau true jadi false, kalau false jadi true)
+      const currentStatus = checkRes.rows[0].is_private;
+      const newStatus = !currentStatus;
+
+      // 3. Update ke database
+      const updateRes = await this.pool.query(
+        'UPDATE events SET is_private = $1 WHERE id = $2 RETURNING id, is_private',
+        [newStatus, eventId]
+      );
+
+      return { 
+        message: newStatus ? 'Event disembunyikan (Private)' : 'Event ditampilkan (Public)',
+        isPrivate: updateRes.rows[0].is_private 
+      };
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
+      console.error("Error toggleEventVisibility:", err);
+      throw new InternalServerErrorException('Gagal mengubah visibilitas event');
+    }
+  }
+
   async toggleLike(userId: number, event_id: number) {
     try {
       const check = await this.pool.query('SELECT id FROM user_likes WHERE user_id = $1 AND event_id = $2', [userId, event_id]);

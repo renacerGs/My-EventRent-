@@ -63,6 +63,13 @@ export class AppController {
     return await this.appService.incrementView(id);
   }
 
+  @ApiTags('Events')
+  @ApiOperation({ summary: 'Menyalakan/mematikan visibilitas event di halaman utama (Public/Private)' })
+  @Patch('events/:id/visibility')
+  async toggleVisibility(@Param('id') id: number, @Query('userId') userId: number) {
+    return await this.appService.toggleEventVisibility(id, userId);
+  }
+
   // --- LIKES ---
   @ApiTags('Likes (Wishlist)')
   @ApiOperation({ summary: 'Menambah atau menghapus event dari wishlist' })
