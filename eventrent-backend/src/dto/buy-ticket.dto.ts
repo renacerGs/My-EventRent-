@@ -5,7 +5,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export class BuyTicketDto {
   @ApiProperty({ description: 'ID Event' })
   @IsInt({ message: 'eventId harus berupa angka' })
-  eventId: number;
+  eventId!: number; // 👈 FIX: Cuma ditambahin tanda seru (!) di sini bro
 
   // 👇 Opsional, karena kalau user udah login, userId yang dipakai
   @ApiProperty({ required: false })

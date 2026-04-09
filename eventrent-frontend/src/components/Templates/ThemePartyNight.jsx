@@ -1,47 +1,114 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarDays, Clock, MapPin, ExternalLink, Gift, Copy, Check, Send, ChevronLeft, ChevronRight, Sparkles, Star } from "lucide-react";
+import {
+  CalendarDays, Clock, MapPin, ExternalLink, Gift, Copy, Check, Send,
+  ChevronLeft, ChevronRight, Star, Music, Sparkles, Wine, Disc3,
+} from "lucide-react";
 
-/* ─── CUSTOM ANIMATIONS & GOLD/DARK STYLES ─── */
+/* ─── CUSTOM ANIMATIONS & NEON STYLES ─── */
 const CustomStyles = () => (
   <style dangerouslySetInnerHTML={{__html: `
-    .text-gold-gradient { 
-      background: linear-gradient(to right, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c); 
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+    .animate-float { animation: float 4s ease-in-out infinite; }
+    
+    .text-gradient-neon { 
+      background: linear-gradient(to right, #c084fc, #e879f9); 
       -webkit-background-clip: text; 
       -webkit-text-fill-color: transparent; 
     }
-    .divider-gold { height: 1px; background: linear-gradient(to right, transparent, #bf953f, transparent); }
-    .bg-night-glow { background-color: #0a0a0a; }
-    .bg-night-warm { background-color: #121212; }
-    .border-gold-glow { border-color: rgba(191, 149, 63, 0.3); box-shadow: 0 0 20px rgba(191,149,63,0.08); }
-    
-    @keyframes shimmer { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
-    .animate-shimmer { animation: shimmer 3s infinite; }
-    
-    @keyframes glow-pulse { 0%, 100% { box-shadow: 0 0 15px rgba(191, 149, 63, 0.2); } 50% { box-shadow: 0 0 30px rgba(191, 149, 63, 0.5); } }
-    .animate-glow-pulse { animation: glow-pulse 3s infinite; }
-
-    /* 🔥 3D CAROUSEL BENTUK PERSEGI PANJANG (LANDSCAPE) */
-    .carousel-container { perspective: 1000px; display: flex; align-items: center; justify-content: center; position: relative; height: 50vw; max-height: 380px; width: 100%; margin-bottom: 2rem; }
-    .carousel-item { position: absolute; width: 75%; max-width: 650px; height: 100%; transition: all 0.5s ease-in-out; overflow: hidden; border-radius: 1rem; border: 1px solid rgba(191, 149, 63, 0.5); object-fit: cover; }
-    .carousel-item.prev { transform: translateX(-35%) scale(0.85) rotateY(15deg); z-index: 10; opacity: 0.4; filter: blur(2px) grayscale(30%); }
-    .carousel-item.active { transform: translateX(0) scale(1) rotateY(0deg); z-index: 20; opacity: 1; filter: blur(0px); box-shadow: 0 0 25px rgba(191, 149, 63, 0.4); border: 2px solid rgba(191, 149, 63, 0.8); }
-    .carousel-item.next { transform: translateX(35%) scale(0.85) rotateY(-15deg); z-index: 10; opacity: 0.4; filter: blur(2px) grayscale(30%); }
+    .divider-neon { height: 2px; background: linear-gradient(to right, transparent, #c084fc, transparent); }
+    .glow-purple { box-shadow: 0 0 20px rgba(192, 132, 252, 0.4); }
+    .card-night { background-color: rgba(24, 24, 27, 0.7); backdrop-filter: blur(12px); border-radius: 1.5rem; }
+    .neon-border { border: 1px solid rgba(192, 132, 252, 0.3); box-shadow: 0 0 15px rgba(192, 132, 252, 0.1); }
   `}} />
 );
 
-const FloatingStar = ({ left, delay, size = "text-sm" }) => (
+/* ─── Sparkle Particle ─── */
+const SparkleParticle = ({ delay, left }) => (
   <motion.div
-    className={`absolute ${size} text-amber-500 animate-shimmer z-10`}
-    style={{ left, top: `${20 + Math.random() * 60}%`, animationDelay: `${delay}s` }}
-    initial={{ opacity: 0 }}
-    animate={{ opacity: [0, 1, 0] }}
-    transition={{ delay, duration: 3, repeat: Infinity }}
+    className="absolute w-1 h-1 rounded-full bg-purple-400"
+    style={{ left, top: `${Math.random() * 100}%` }}
+    animate={{ opacity: [0, 1, 0], scale: [0, 1.5, 0] }}
+    transition={{ delay, duration: 2 + Math.random() * 2, repeat: Infinity, repeatDelay: Math.random() * 4 }}
+  />
+);
+
+/* ─── Floating Glow ─── */
+const FloatingGlow = ({ emoji, left, delay }) => (
+  <motion.div
+    className="absolute text-2xl sm:text-3xl pointer-events-none opacity-60 z-10"
+    style={{ left }}
+    initial={{ y: "110vh" }}
+    animate={{ y: "-10vh" }}
+    transition={{ delay, duration: 12, repeat: Infinity, repeatDelay: 2, ease: "linear" }}
   >
-    ✦
+    <div className="animate-float" style={{ animationDelay: `${delay}s` }}>{emoji}</div>
   </motion.div>
 );
 
+/* ─── Countdown Hook ─── */
+const useCountdown = (targetDate) => {
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+  useEffect(() => {
+    if (!targetDate) return;
+    const interval = setInterval(() => {
+      const diff = new Date(targetDate).getTime() - Date.now();
+      if (diff <= 0) return;
+      setTimeLeft({
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((diff / (1000 * 60)) % 60),
+        seconds: Math.floor((diff / 1000) % 60),
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [targetDate]);
+  return timeLeft;
+};
+
+/* 🔥 KOMPONEN DAFTAR UCAPAN TAMU (Versi Neon Night) 🔥 */
+const DaftarUcapanTamuNight = ({ greetings }) => {
+  const daftarUcapan = (greetings || [])
+    .map((item, index) => ({
+      id: item.id || index,
+      nama: item.name || item.attendee_name || "Guest",
+      pesan: item.greeting || item.pesan || ""
+    }))
+    .filter(item => item.pesan.trim() !== "");
+
+  return (
+    <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-purple-500 scrollbar-track-transparent text-left">
+      {daftarUcapan.length > 0 ? (
+        daftarUcapan.map((item) => (
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }} 
+            whileInView={{ opacity: 1, x: 0 }} 
+            viewport={{ once: true }}
+            key={item.id} 
+            className="card-night p-5 text-left border border-zinc-800"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500/20 to-fuchsia-500/20 flex items-center justify-center border border-purple-500/30">
+                <Star className="w-3.5 h-3.5 text-purple-400" />
+              </div>
+              <p className="font-bold text-sm text-purple-400">{item.nama}</p>
+            </div>
+            <p className="text-sm text-zinc-400 pl-10 leading-relaxed">{item.pesan}</p>
+          </motion.div>
+        ))
+      ) : (
+        <div className="text-center text-zinc-500 italic card-night neon-border p-6 shadow-sm">
+          Belum ada ucapan. Jadilah yang pertama memberikan doa! ✨
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN COMPONENT — Theme Party Night (Dynamic)
+   ═══════════════════════════════════════════════════════════════ */
 export default function ThemePartyNight({ eventData, guestName, isOpen, onOpen, navigate, id }) {
   let details = eventData?.eventDetails || eventData?.event_details || {};
   if (typeof details === 'string') {
@@ -62,22 +129,15 @@ export default function ThemePartyNight({ eventData, guestName, isOpen, onOpen, 
   const sessions = eventData?.sessions || [];
   const gallery = details.galleryImages || details.gallery_images || [];
   const gifts = details.digitalGifts || details.digital_gifts || [];
+  const targetDate = eventData?.date_start || sessions[0]?.date || new Date(Date.now() + 864000000).toISOString();
 
-  /* 🔥 DEFAULT CAPTIONS KALAU DARI BACKEND KOSONG */
-  const defaultCaptions = [
-    "An evening of elegance and celebration ✨",
-    "Wrapped in love and luxury 🎁",
-    "Intimate moments under the stars 🌙",
-    "A night to remember forever 🥂",
-    "Cheers to another amazing year! 🎉"
-  ];
+  const defaultCaptions = ["Dance floor vibes 💃🕺", "Cheers to us! 🥂", "The beat drops here 🎵", "VIP only ✨", "Squad goals 📸"];
   const galleryCaptions = details.galleryCaptions?.length > 0 ? details.galleryCaptions : defaultCaptions;
 
-  /* Gallery Logic */
+  const countdown = useCountdown(targetDate);
   const [current, setCurrent] = useState(0);
   const prev = () => setCurrent((c) => (c === 0 ? gallery.length - 1 : c - 1));
   const next = () => setCurrent((c) => (c === gallery.length - 1 ? 0 : c + 1));
-  const getImgIdx = (offset) => (current + offset + gallery.length) % gallery.length;
 
   const [copied, setCopied] = useState(null);
   const copyNumber = (num, idx) => {
@@ -86,156 +146,284 @@ export default function ThemePartyNight({ eventData, guestName, isOpen, onOpen, 
     setTimeout(() => setCopied(null), 2000);
   };
 
-  if (!isOpen) return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-[#0a0a0a] px-4 text-center font-sans">
-      <CustomStyles />
-      <div className="absolute inset-0">
-        <img src={coverImg} alt="Cover" className="w-full h-full object-cover opacity-30 grayscale-[30%]" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a]/80 via-[#0a0a0a]/50 to-[#0a0a0a]" />
-      </div>
-      <FloatingStar left="8%" delay={0} />
-      <FloatingStar left="20%" delay={1.2} size="text-xs" />
-      <FloatingStar left="75%" delay={0.6} />
-      <FloatingStar left="88%" delay={1.8} size="text-lg" />
-      
-      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.8 }} className="relative z-20 text-center px-8 py-12 max-w-sm w-full bg-zinc-900/60 backdrop-blur-xl rounded-[2rem] border border-zinc-800">
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-5xl mb-6">🪩</motion.div>
-        <p className="font-bold text-amber-500 tracking-[0.3em] uppercase text-[10px] mb-4">You're Invited</p>
-        <h1 className="text-3xl sm:text-4xl text-gold-gradient mb-2 uppercase font-serif tracking-tight">{hostName}</h1>
-        <p className="text-sm text-zinc-400 font-bold uppercase tracking-wider">{eventData?.title}</p>
-        <div className="divider-gold w-full mx-auto my-8 opacity-50" />
-        <div className="mb-10">
-          <p className="text-zinc-500 text-[10px] font-bold tracking-widest uppercase mb-2">Exclusive For</p>
-          <p className="text-lg text-white font-black uppercase tracking-wider">{guestName}</p>
-        </div>
-        <button onClick={onOpen} className="w-full py-4 border border-amber-500 text-amber-500 hover:bg-amber-500 hover:text-zinc-950 text-xs font-black tracking-[0.2em] uppercase rounded-full transition-all">Enter Party</button>
-      </motion.div>
-    </section>
-  );
-
   return (
-    <div className="min-h-screen bg-[#0a0a0a] font-sans text-zinc-300 overflow-hidden pb-10">
+    <div className="min-h-screen bg-[#09090b] text-zinc-100 overflow-x-hidden font-sans selection:bg-purple-500 selection:text-white">
       <CustomStyles />
       
-      <div className="w-full h-64 md:h-80 relative">
-         <img src={coverImg} className="w-full h-full object-cover opacity-50" alt="Header" />
-         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0a0a0a]/80 to-[#0a0a0a]"></div>
-      </div>
-
-      <section className="-mt-16 relative z-10 px-6">
-        <motion.div initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="max-w-2xl mx-auto text-center bg-zinc-900/80 backdrop-blur-md border border-zinc-800 p-8 rounded-3xl shadow-[0_0_30px_rgba(0,0,0,0.5)]">
-          <p className="text-zinc-300 font-medium leading-relaxed text-base italic">"{details.openingMessage || details.opening_message || "Get ready for the most epic night! Good vibes, great music, and unforgettable memories await."}"</p>
-        </motion.div>
-      </section>
-
-      <section className="py-16 px-6">
-        <div className="mb-10 text-center">
-          <span className="text-4xl block mb-4 text-amber-500">👑</span>
-          <h2 className="text-3xl font-serif text-white uppercase tracking-widest text-gold-gradient">The Host</h2>
-        </div>
-        <motion.div initial={{ scale: 0.9, opacity: 0 }} whileInView={{ scale: 1, opacity: 1 }} viewport={{ once: true }} className="mx-auto max-w-sm rounded-[2.5rem] bg-zinc-900/80 backdrop-blur-sm p-10 text-center border border-zinc-800">
-          <div className="mx-auto mb-6 w-36 h-36 rounded-full overflow-hidden p-1 bg-gradient-to-tr from-amber-600 to-amber-300 animate-glow-pulse">
-            <img src={hostPhoto} alt="Host" className="w-full h-full object-cover rounded-full border-4 border-zinc-950" />
+      {/* ═══ HERO / COVER ═══ */}
+      {!isOpen && (
+        <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+          <div className="absolute inset-0">
+            <img src={coverImg} alt="Party Night" className="w-full h-full object-cover opacity-60" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-[#09090b]" />
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-900/20 via-transparent to-fuchsia-900/20" />
           </div>
-          <h3 className="text-3xl font-serif text-white mb-2 uppercase text-gold-gradient">{hostName}</h3>
-          {parentsInfo && <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">{parentsInfo}</p>}
-        </motion.div>
-      </section>
 
-      <section className="py-16 px-4 bg-night-warm">
-        <div className="mb-10 text-center">
-          <span className="text-4xl block mb-4">🪩</span>
-          <h2 className="text-3xl font-serif text-white uppercase tracking-widest text-gold-gradient">Time & Venue</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
-          {sessions.map((s, i) => (
-            <div key={i} className="rounded-[2rem] bg-zinc-900 border border-zinc-800 p-8 flex flex-col items-center text-center">
-              <h3 className="text-2xl font-serif text-amber-500 uppercase tracking-wider mb-6">{s.name}</h3>
-              <div className="space-y-4 text-sm font-light text-zinc-300 mb-8 w-full">
-                <div className="flex items-center justify-center gap-3"><CalendarDays className="h-5 w-5 text-amber-500/70" /><span>{s.date}</span></div>
-                <div className="flex items-center justify-center gap-3"><Clock className="h-5 w-5 text-amber-500/70" /><span>{s.start_time || s.startTime} - {s.end_time || s.endTime}</span></div>
-                <div className="flex items-center justify-center gap-3"><MapPin className="h-5 w-5 text-amber-500/70 shrink-0" /><span className="truncate">{s.name_place || s.location?.namePlace || s.place || s.location?.place}</span></div>
-              </div>
-              <a href={s.map_url || s.location?.mapUrl || "#"} target="_blank" rel="noreferrer" className="w-full mt-auto">
-                <button className="w-full rounded-full border border-amber-500/50 text-amber-500 hover:bg-amber-500 hover:text-zinc-950 py-3 text-xs font-black uppercase tracking-[0.2em] transition-all">Open Maps</button>
-              </a>
-            </div>
+          {Array.from({ length: 20 }).map((_, i) => (
+            <SparkleParticle key={i} delay={i * 0.5} left={`${Math.random() * 100}%`} />
           ))}
-        </div>
-      </section>
+          <FloatingGlow emoji="✨" left="5%" delay={0} />
+          <FloatingGlow emoji="🪩" left="85%" delay={3} />
+          <FloatingGlow emoji="💫" left="15%" delay={6} />
+          <FloatingGlow emoji="⭐" left="80%" delay={1.5} />
 
-      {/* ─── GALLERY DENGAN TEKS ─── */}
-      {gallery.length > 0 && (
-        <section className="py-20 px-6 bg-night-glow overflow-visible">
-          <div className="mb-12 text-center">
-            <span className="text-4xl block mb-4">📸</span>
-            <h2 className="text-3xl font-serif text-white uppercase tracking-widest text-gold-gradient">Moments</h2>
-          </div>
-          
-          <div className="carousel-container max-w-2xl mx-auto mb-8">
-              {gallery.length > 1 && <img src={gallery[getImgIdx(-1)]} alt="Prev" className="carousel-item prev" />}
-              <img src={gallery[getImgIdx(0)]} alt="Active" className="carousel-item active" />
-              {gallery.length > 2 && <img src={gallery[getImgIdx(1)]} alt="Next" className="carousel-item next" />}
-          </div>
+          <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1.2, ease: "easeOut" }} className="relative z-10 text-center px-6 max-w-lg">
+            <motion.div initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} transition={{ delay: 0.3, type: "spring" }} className="text-7xl sm:text-8xl mb-6 inline-block">
+              <motion.span animate={{ rotateY: [0, 360] }} transition={{ duration: 4, repeat: Infinity, ease: "linear" }} className="inline-block">🪩</motion.span>
+            </motion.div>
 
-          <div className="max-w-2xl mx-auto text-center">
-             {/* 🔥 TEKS CAPTION MUNCUL DI SINI 🔥 */}
-             <motion.p key={current + 'text'} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="text-gold-gradient font-serif text-base italic mb-8 px-4">
-                {galleryCaptions[current % galleryCaptions.length]}
-             </motion.p>
+            <motion.p initial={{ opacity: 0, letterSpacing: "0em" }} animate={{ opacity: 1, letterSpacing: "0.4em" }} transition={{ delay: 0.6, duration: 0.8 }} className="font-bold text-zinc-400 uppercase text-xs mb-4 tracking-[0.4em]">
+              You're Invited To
+            </motion.p>
 
-             <div className="flex flex-col items-center gap-6">
-                <div className="flex justify-center gap-4">
-                    <button onClick={prev} className="rounded-full bg-zinc-900 p-4 border border-zinc-800 hover:border-amber-500 text-white transition-colors active:scale-95 shadow-lg"><ChevronLeft className="h-6 w-6" /></button>
-                    <button onClick={next} className="rounded-full bg-zinc-900 p-4 border border-zinc-800 hover:border-amber-500 text-white transition-colors active:scale-95 shadow-lg"><ChevronRight className="h-6 w-6" /></button>
-                </div>
-                <div className="flex justify-center gap-2">
-                    {gallery.map((_, i) => (
-                      <button key={i} onClick={() => setCurrent(i)} className={`h-2 rounded-full transition-all ${i === current ? "bg-amber-500 w-8" : "bg-zinc-700 w-2"}`} />
+            <motion.h1 initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8, duration: 0.8 }} className="text-5xl sm:text-6xl font-black mb-2 leading-tight uppercase tracking-tight">
+              <span className="text-gradient-neon">{hostName}'s</span><br />
+              <span className="text-white">Party Night</span>
+            </motion.h1>
+
+            <motion.div initial={{ opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }} transition={{ delay: 1.1, duration: 0.6 }} className="divider-neon w-32 mx-auto my-5" />
+
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.2 }} className="text-2xl sm:text-3xl text-fuchsia-400 mb-2 italic font-serif">
+              One night, endless memories
+            </motion.p>
+
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.3 }} className="text-zinc-500 text-sm mb-4 font-bold tracking-widest uppercase">
+              {eventData?.title}
+            </motion.p>
+
+            {/* 🔥 INI YANG DIGANTI SESUAI REQUEST LU 🔥 */}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }} className="mb-10 bg-black/50 py-3 px-6 rounded-2xl border border-white/10 inline-block backdrop-blur-sm">
+              <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest mb-1">Untuk</p>
+              <p className="text-lg text-white font-semibold">Teman & Sahabat Tersayang 💜</p>
+            </motion.div>
+
+            <motion.button initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.7 }} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onOpen} className="w-full sm:w-auto px-10 py-4 bg-gradient-to-r from-purple-600 via-fuchsia-500 to-purple-600 text-white text-sm font-bold uppercase tracking-widest rounded-full glow-purple transition-all duration-300">
+              ✨ Enter Party
+            </motion.button>
+          </motion.div>
+        </section>
+      )}
+
+      {/* ═══ MAIN CONTENT ═══ */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 1 }}>
+
+            {/* ─── OPENING ─── */}
+            <section className="relative py-24 px-6 bg-[#09090b] overflow-hidden">
+              {Array.from({ length: 8 }).map((_, i) => <SparkleParticle key={i} delay={i * 0.7} left={`${10 + i * 12}%`} />)}
+              <motion.div initial={{ opacity: 0, y: 60 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.9 }} className="max-w-2xl mx-auto text-center relative z-10">
+                <motion.div initial={{ scale: 0 }} whileInView={{ scale: 1 }} viewport={{ once: true }} transition={{ type: "spring" }} className="text-6xl mb-5 inline-block">🎉</motion.div>
+                <h2 className="text-3xl sm:text-4xl font-black text-white mb-3 uppercase tracking-wide">
+                  Get Ready to <span className="text-gradient-neon">Party!</span>
+                </h2>
+                <div className="divider-neon w-28 mx-auto mb-6" />
+                <p className="text-zinc-400 leading-relaxed text-base sm:text-lg max-w-md mx-auto">
+                  {details.openingMessage || "Malam spesial ini cuma datang sekali. Dress up, show up, dan let's make it a night to remember! 🌙✨"}
+                </p>
+              </motion.div>
+            </section>
+
+            {/* ─── PROFILE ─── */}
+            <section className="py-24 px-6 bg-[#0f0f13]">
+              <motion.div initial={{ opacity: 0, y: 60 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="max-w-md mx-auto text-center">
+                <p className="text-xs uppercase tracking-[0.3em] text-purple-400 mb-2 font-bold">The Star of the Night</p>
+                <h2 className="text-2xl sm:text-3xl font-black text-white mb-1 uppercase tracking-wide">VIP Host</h2>
+                <div className="divider-neon w-20 mx-auto mb-10" />
+
+                <motion.div initial={{ scale: 0.85, opacity: 0 }} whileInView={{ scale: 1, opacity: 1 }} viewport={{ once: true }} transition={{ type: "spring" }} className="card-night p-8 sm:p-10 neon-border">
+                  <div className="relative w-36 h-36 mx-auto mb-6">
+                    <motion.div className="absolute -inset-1 rounded-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-pink-500 opacity-60 blur-md" animate={{ rotate: 360 }} transition={{ duration: 8, repeat: Infinity, ease: "linear" }} />
+                    <div className="relative w-full h-full rounded-full overflow-hidden border-2 border-purple-500/50">
+                      <img src={hostPhoto} alt={hostName} className="w-full h-full object-cover" />
+                    </div>
+                    <motion.div className="absolute -top-1 -right-1 text-2xl" animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 2, repeat: Infinity }}>👑</motion.div>
+                  </div>
+
+                  <h3 className="text-3xl font-black text-gradient-neon mb-1 tracking-wide uppercase">{hostName}</h3>
+                  <p className="text-xl text-fuchsia-400 mb-4 italic font-serif">~ Birthday Star ~</p>
+                  {parentsInfo && <p className="text-xs text-zinc-500 font-bold uppercase tracking-widest mb-4">{parentsInfo}</p>}
+                  
+                  <div className="flex flex-wrap justify-center gap-2 mt-6">
+                    {["Glam ✨", "Music Lover 🎵", "Night Owl 🦉"].map((tag, i) => (
+                      <span key={i} className="px-3 py-1.5 bg-purple-500/10 border border-purple-500/30 text-purple-400 text-xs font-semibold rounded-full">
+                        {tag}
+                      </span>
                     ))}
+                  </div>
+                </motion.div>
+              </motion.div>
+            </section>
+
+            {/* ─── COUNTDOWN ─── */}
+            <section className="py-20 px-6 bg-[#09090b]">
+              <motion.div initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="max-w-lg mx-auto text-center">
+                <p className="text-xl text-fuchsia-400 mb-2 italic font-serif">The Night Awaits ⏳</p>
+                <h2 className="text-2xl font-black text-white mb-8 uppercase tracking-widest">Hitung Mundur</h2>
+                <div className="grid grid-cols-4 gap-3">
+                  {[{ label: "Hari", value: countdown.days }, { label: "Jam", value: countdown.hours }, { label: "Menit", value: countdown.minutes }, { label: "Detik", value: countdown.seconds }].map((item, i) => (
+                    <motion.div key={item.label} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1 }} className="card-night neon-border p-4 text-center">
+                      <motion.p initial={{ scale: 1.3, opacity: 0.5 }} animate={{ scale: 1, opacity: 1 }} className="text-3xl sm:text-4xl font-black text-gradient-neon">
+                        {String(item.value).padStart(2, "0")}
+                      </motion.p>
+                      <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-2 font-bold">{item.label}</p>
+                    </motion.div>
+                  ))}
                 </div>
-             </div>
-          </div>
-        </section>
-      )}
+              </motion.div>
+            </section>
 
-      <section className="py-16 px-6 bg-night-warm">
-        <div className="mx-auto max-w-sm bg-zinc-900 p-8 rounded-[2.5rem] border border-zinc-800 text-center">
-          <p className="text-zinc-400 text-sm mb-8 font-medium leading-relaxed">Confirm your attendance and let us know you're coming to the party.</p>
-          <button onClick={() => navigate(`/party-rsvp/${id}`)} className="w-full rounded-full bg-amber-500 py-4 font-black text-zinc-950 uppercase tracking-[0.2em] text-xs shadow-[0_0_15px_rgba(245,158,11,0.3)] hover:bg-amber-400 flex justify-center gap-2">
-            <Send className="w-4 h-4" /> RSVP Now
-          </button>
-        </div>
-      </section>
+            {/* ─── EVENT DETAILS ─── */}
+            <section className="py-24 px-6 bg-[#0f0f13]">
+              <motion.div initial={{ opacity: 0, y: 60 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="max-w-2xl mx-auto text-center">
+                <p className="text-xs uppercase tracking-[0.3em] text-fuchsia-400 mb-2 font-bold">Save The Date</p>
+                <h2 className="text-2xl sm:text-3xl font-black text-white mb-1 uppercase tracking-widest">Kapan & Dimana</h2>
+                <div className="divider-neon w-24 mx-auto mb-12" />
 
-      {gifts.length > 0 && (
-        <section className="py-16 px-6 bg-night-glow">
-          <div className="mb-10 text-center">
-            <span className="text-4xl block mb-4">🎁</span>
-            <h2 className="text-3xl font-serif text-white uppercase tracking-widest text-gold-gradient">Gift Drop</h2>
-          </div>
-          <div className="mx-auto max-w-md space-y-4">
-            {gifts.map((acc, idx) => (
-              <div key={idx} className="rounded-3xl bg-zinc-900 p-6 flex items-center border border-zinc-800 gap-4">
-                <div className="w-14 h-14 bg-zinc-950 rounded-full flex items-center justify-center shrink-0 border border-zinc-800 text-2xl">{idx % 2 === 0 ? "🏦" : "💳"}</div>
-                <div className="flex-1">
-                  <p className="font-bold text-amber-500 text-[10px] tracking-widest uppercase mb-1">{acc.bankName || acc.bank_name}</p>
-                  <p className="font-bold text-white mb-1 uppercase text-sm">{acc.accountName || acc.account_name}</p>
-                  <p className="font-mono text-lg text-zinc-400 tracking-wider">{acc.accountNumber || acc.account_number}</p>
+                <div className="space-y-6">
+                  {sessions.map((session, idx) => (
+                    <motion.div key={idx} initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="card-night neon-border p-8 sm:p-10">
+                      <motion.p animate={{ rotateY: [0, 360] }} transition={{ duration: 4, repeat: Infinity, ease: "linear" }} className="text-5xl mb-4 inline-block">{session.emoji || "🪩"}</motion.p>
+                      <h3 className="text-2xl text-gradient-neon font-black mb-8 uppercase tracking-widest">{session.name}</h3>
+
+                      <div className="space-y-3 text-sm">
+                        <div className="flex items-center justify-center gap-3 bg-zinc-900/50 rounded-xl py-3 px-5 border border-white/5">
+                          <CalendarDays className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                          <span className="text-zinc-300 font-medium">{session.date}</span>
+                        </div>
+                        <div className="flex items-center justify-center gap-3 bg-zinc-900/50 rounded-xl py-3 px-5 border border-white/5">
+                          <Clock className="w-4 h-4 text-fuchsia-400 flex-shrink-0" />
+                          <span className="text-zinc-300 font-medium">{session.start_time || session.startTime} - {session.end_time || session.endTime}</span>
+                        </div>
+                        <div className="flex items-center justify-center gap-3 bg-zinc-900/50 rounded-xl py-3 px-5 border border-white/5">
+                          <MapPin className="w-4 h-4 text-pink-400 flex-shrink-0" />
+                          <span className="text-zinc-300 font-medium">{session.name_place || session.location?.namePlace || session.place || session.location?.place}</span>
+                        </div>
+                      </div>
+
+                      <motion.a href={session.map_url || session.location?.mapUrl || "#"} target="_blank" rel="noopener noreferrer" whileHover={{ scale: 1.05, boxShadow: "0 0 25px rgba(192, 132, 252, 0.3)" }} whileTap={{ scale: 0.95 }} className="inline-flex items-center gap-2 mt-8 px-8 py-3 bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white text-xs font-bold uppercase tracking-wider rounded-full glow-purple transition-all">
+                        <ExternalLink className="w-3.5 h-3.5" /> Lihat Lokasi
+                      </motion.a>
+                    </motion.div>
+                  ))}
                 </div>
-                <button onClick={() => copyNumber(acc.accountNumber || acc.account_number, idx)} className="rounded-xl bg-zinc-950 border border-zinc-800 p-3 hover:text-amber-500 text-zinc-500 transition-colors"><Copy className="w-5 h-5" /></button>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
-      <section className="text-center py-20 mt-10">
-        <div className="divider-gold w-1/2 mx-auto mb-16 opacity-30" />
-        <h2 className="text-4xl font-serif text-white uppercase mb-6 text-gold-gradient">See You There!</h2>
-        <p className="mx-auto max-w-md text-zinc-400 font-medium leading-relaxed mb-10 px-6 italic">{details.closingMessage || details.closing_message || "Dress to impress and get ready for a night to remember!"}</p>
-        <p className="text-2xl font-serif text-amber-500 tracking-[0.3em] uppercase">{hostName}</p>
-      </section>
+                <div className="flex justify-center gap-6 mt-14">
+                  {[{ icon: Disc3, label: "DJ" }, { icon: Wine, label: "Drinks" }, { icon: Music, label: "Music" }, { icon: Sparkles, label: "VIP" }].map((item, i) => (
+                    <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 + i * 0.1 }} className="flex flex-col items-center gap-2">
+                      <div className="w-14 h-14 rounded-xl card-night neon-border flex items-center justify-center">
+                        <item.icon className="w-6 h-6 text-purple-400" />
+                      </div>
+                      <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">{item.label}</span>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            </section>
+
+            {/* ─── GALLERY ─── */}
+            {gallery.length > 0 && (
+              <section className="py-24 px-6 bg-[#09090b]">
+                <motion.div initial={{ opacity: 0, y: 60 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="max-w-2xl mx-auto text-center">
+                  <p className="text-xs uppercase tracking-[0.3em] text-fuchsia-400 mb-2 font-bold">Gallery</p>
+                  <h2 className="text-2xl sm:text-3xl font-black text-white mb-2 uppercase tracking-widest">Sneak Peek 📸</h2>
+                  <div className="divider-neon w-20 mx-auto mb-10" />
+
+                  <div className="relative overflow-hidden rounded-2xl neon-border">
+                    <AnimatePresence mode="wait">
+                      <motion.img key={current} src={gallery[current]} alt={`Gallery ${current}`} initial={{ opacity: 0, scale: 1.1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.5 }} className="w-full h-72 sm:h-96 object-cover" />
+                    </AnimatePresence>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                    
+                    <button onClick={prev} className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center hover:bg-black transition border border-purple-500/30 shadow-lg"><ChevronLeft className="w-5 h-5 text-white" /></button>
+                    <button onClick={next} className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center hover:bg-black transition border border-purple-500/30 shadow-lg"><ChevronRight className="w-5 h-5 text-white" /></button>
+                    <div className="absolute bottom-4 right-4 px-3 py-1 bg-black/60 backdrop-blur-sm rounded-full text-xs font-bold text-zinc-300 border border-purple-500/30">{current + 1} / {gallery.length}</div>
+                  </div>
+
+                  {galleryCaptions.length > 0 && (
+                    <p className="text-xl text-fuchsia-400 mt-5 italic font-serif">{galleryCaptions[current % galleryCaptions.length]}</p>
+                  )}
+
+                  <div className="flex justify-center gap-2 mt-5">
+                    {gallery.map((_, i) => (
+                      <button key={i} onClick={() => setCurrent(i)} className={`h-2 rounded-full transition-all duration-300 ${i === current ? "bg-purple-500 w-10 glow-purple" : "bg-zinc-800 w-3 hover:bg-purple-500/30"}`} />
+                    ))}
+                  </div>
+                </motion.div>
+              </section>
+            )}
+
+            {/* ─── RSVP & WISHES ─── */}
+            <section className="py-24 px-6 bg-[#0f0f13]">
+              <motion.div initial={{ opacity: 0, y: 60 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="max-w-lg mx-auto text-center">
+                <p className="text-4xl mb-2">💬</p>
+                <h2 className="text-2xl sm:text-3xl font-black text-white mb-1 uppercase tracking-widest">RSVP & Messages</h2>
+                <p className="text-sm text-zinc-400 mb-8">Confirm attendance & drop a message 💜</p>
+
+                {/* Tombol Arah ke Form RSVP */}
+                <div className="card-night neon-border p-8 mb-10 text-center">
+                  <h3 className="text-xl font-black text-white mb-3">Join The Party!</h3>
+                  <p className="text-xs text-zinc-400 mb-6">Let us know you're coming so we can prepare the best night for you.</p>
+                  <button onClick={() => navigate(`/party-rsvp/${id}`)} className="w-full flex items-center justify-center gap-2 py-4 bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-bold text-sm tracking-widest uppercase rounded-xl glow-purple hover:opacity-90 transition-all">
+                    <Send className="w-5 h-5" /> RSVP Sekarang
+                  </button>
+                </div>
+
+                {/* List Ucapan dari Data */}
+                <DaftarUcapanTamuNight greetings={eventData?.greetings} />
+
+              </motion.div>
+            </section>
+
+            {/* ─── GIFT ─── */}
+            {gifts.length > 0 && (
+              <section className="py-24 px-6 bg-[#09090b]">
+                <motion.div initial={{ opacity: 0, y: 60 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="max-w-lg mx-auto text-center">
+                  <motion.div animate={{ rotate: [0, 10, -10, 0] }} transition={{ duration: 3, repeat: Infinity }} className="text-5xl mb-3 inline-block">🎁</motion.div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-white mb-2 uppercase tracking-widest">Send a Gift</h2>
+                  <p className="text-sm text-zinc-400 mb-10">Your presence is the best gift 💜<br />But if you insist... 😉</p>
+
+                  <div className="space-y-5">
+                    {gifts.map((acc, idx) => (
+                      <div key={idx} className="card-night neon-border p-7">
+                        <p className="text-3xl mb-2">{idx % 2 === 0 ? "💳" : "📱"}</p>
+                        <p className="text-xs text-fuchsia-400 font-bold uppercase tracking-wider mb-1">{acc.bankName || acc.bank_name}</p>
+                        <p className="text-zinc-400 text-sm mb-4 font-medium">{acc.accountName || acc.account_name}</p>
+                        <div className="flex items-center justify-center gap-3 bg-black/50 border border-white/5 rounded-xl py-3 px-5">
+                          <span className="text-lg text-white font-bold tracking-wider">{acc.accountNumber || acc.account_number}</span>
+                          <motion.button onClick={() => copyNumber(acc.accountNumber || acc.account_number, idx)} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} className="p-2 hover:bg-white/5 transition rounded-lg">
+                            {copied === idx ? <Check className="w-5 h-5 text-fuchsia-400" /> : <Copy className="w-5 h-5 text-zinc-500" />}
+                          </motion.button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              </section>
+            )}
+
+            {/* ─── CLOSING ─── */}
+            <section className="relative py-24 px-6 bg-[#0f0f13] overflow-hidden">
+              {Array.from({ length: 10 }).map((_, i) => <SparkleParticle key={i} delay={i * 0.6} left={`${Math.random() * 100}%`} />)}
+              <motion.div initial={{ opacity: 0, y: 60 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="max-w-lg mx-auto text-center relative z-10">
+                <motion.div initial={{ scale: 0 }} whileInView={{ scale: 1 }} viewport={{ once: true }} transition={{ type: "spring", stiffness: 200 }} className="text-6xl mb-5 inline-block">🌙</motion.div>
+                <h2 className="text-2xl sm:text-3xl font-black text-white mb-4 uppercase tracking-widest">
+                  See You <span className="text-gradient-neon">Tonight!</span>
+                </h2>
+                <div className="divider-neon w-24 mx-auto mb-6" />
+                <p className="text-zinc-400 leading-relaxed text-base mb-8 max-w-sm mx-auto">{details.closingMessage || details.closing_message || "Kehadiran kamu bakal bikin malam ini makin berkesan. Let's celebrate, dance, and make memories! 💃🕺"}</p>
+                
+                <div className="card-night neon-border p-8 inline-block mt-4">
+                  <p className="text-xs text-zinc-500 uppercase tracking-widest mb-2 font-bold">With Love</p>
+                  <p className="text-4xl font-black text-gradient-neon mb-2 uppercase">{hostName}</p>
+                  <p className="text-sm text-zinc-500 font-semibold">💜✨🪩</p>
+                </div>
+              </motion.div>
+            </section>
+
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

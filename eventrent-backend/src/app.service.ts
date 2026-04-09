@@ -357,7 +357,6 @@ export class AppService implements OnModuleInit {
         return { message: 'Terima kasih atas doa dan ucapan Anda', ticketIds: [] };
       }
 
-      // Proses normal jika HADIR
       for (const item of cart) {
         const sessionId = item.sessionId;
         const qty = item.qty || item.quantity || 1; 
@@ -375,7 +374,6 @@ export class AppService implements OnModuleInit {
         const qRes = await client.query('SELECT id, question_text FROM session_questions WHERE session_id = $1', [sessionId]);
         const dbQuestions = qRes.rows;
 
-        // Generate Tiket Beserta TICKET CODE
         for (let i = 0; i < qty; i++) {
           const prefix = `cart-${item.id}-ticket-${i}`;
           
@@ -410,7 +408,6 @@ export class AppService implements OnModuleInit {
 
       await client.query('COMMIT');
 
-      // Kirim email QR Code pakai Array Kode (TKT-XXX)
       if (targetEmail && boughtTickets.length > 0) {
         this.sendEmailReceipt(targetEmail, eventTitle, boughtTickets, totalTransactionPrice, eventId)
           .catch(e => console.error("Gagal mengirim email struk:", e)); 
@@ -641,7 +638,7 @@ export class AppService implements OnModuleInit {
       const defaultPic = user.picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name)}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4`;
       
       const insertRes = await this.pool.query(
-        `INSERT INTO users (email, name, picture, google_id) VALUES ($1, $2, $3, $4) RETURNING *`,
+        `INSERT INTO users (email, name, picture, google_id, is_verified) VALUES ($1, $2, $3, $4, TRUE) RETURNING *`,
         [user.email, user.name, defaultPic, user.googleId]
       );
       
@@ -667,12 +664,38 @@ export class AppService implements OnModuleInit {
     const hashedPassword = await bcrypt.hash(data.password, 10);
     const defaultPic = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(data.name)}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4`;
     
+    // Generate OTP (6 digit)
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiresAt = new Date(Date.now() + 15 * 60000); // 15 menit
+
     const insertRes = await this.pool.query(
-      `INSERT INTO users (name, email, password, picture) VALUES ($1, $2, $3, $4) RETURNING *`,
-      [data.name, data.email, hashedPassword, defaultPic]
+      `INSERT INTO users (name, email, password, picture, is_verified, otp_code, otp_expires_at) 
+       VALUES ($1, $2, $3, $4, FALSE, $5, $6) RETURNING *`,
+      [data.name, data.email, hashedPassword, defaultPic, otpCode, otpExpiresAt]
     );
     
     const newUser = insertRes.rows[0];
+
+    // Kirim Email OTP pake Nodemailer
+    const mailOptions = {
+      from: '"EventRent Team" <noreply@eventrent.com>',
+      to: data.email,
+      subject: 'Kode Verifikasi Akun EventRent 🎟️',
+      html: `
+        <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+          <h2>Halo ${data.name}, selamat datang!</h2>
+          <p>Ini adalah kode verifikasi OTP kamu untuk EventRent:</p>
+          <h1 style="color: #EE7354; letter-spacing: 5px; font-size: 36px; background-color: #fefce8; padding: 10px; border-radius: 8px; display: inline-block;">${otpCode}</h1>
+          <p style="color: #555;">Kode ini hanya berlaku 15 menit. Jangan bagikan kepada siapapun!</p>
+        </div>
+      `,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+    } catch (mailError) {
+      console.error('Gagal kirim email OTP:', mailError);
+    }
 
     await this.pool.query(
       `UPDATE tickets SET user_id = $1 WHERE guest_email = $2 AND user_id IS NULL`,
@@ -680,14 +703,89 @@ export class AppService implements OnModuleInit {
     );
     console.log(`[Auth] Auto-merged guest tickets for: ${newUser.email}`);
 
-    const { password, ...user } = newUser;
-    return user;
+    return {
+      success: true,
+      message: 'Registrasi berhasil. Silakan cek email untuk kode verifikasi.',
+      userId: newUser.id,
+      email: newUser.email
+    };
+  }
+
+  // 👇 FUNGSI BARU: Verifikasi OTP
+  async verifyOTP(email: string, otpCode: string) {
+    const res = await this.pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (res.rows.length === 0) throw new BadRequestException('User tidak ditemukan');
+    
+    const user = res.rows[0];
+
+    if (user.is_verified) throw new BadRequestException('Akun ini sudah terverifikasi');
+    if (user.otp_code !== otpCode) throw new BadRequestException('Kode OTP salah!');
+    if (new Date() > new Date(user.otp_expires_at)) throw new BadRequestException('Kode OTP sudah kedaluwarsa. Silakan minta kode baru.');
+
+    const updateRes = await this.pool.query(
+      `UPDATE users SET is_verified = TRUE, otp_code = NULL, otp_expires_at = NULL WHERE id = $1 RETURNING *`,
+      [user.id]
+    );
+
+    const verifiedUser = updateRes.rows[0];
+    const { password, ...userWithoutPassword } = verifiedUser;
+    
+    return {
+      success: true,
+      message: 'Verifikasi berhasil! Silakan login.',
+      user: userWithoutPassword
+    };
+  }
+
+  // 👇 FUNGSI BARU: Kirim Ulang OTP
+  async resendOTP(email: string) {
+    const res = await this.pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (res.rows.length === 0) throw new BadRequestException('User tidak ditemukan');
+    
+    const user = res.rows[0];
+    if (user.is_verified) throw new BadRequestException('Akun ini sudah terverifikasi');
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiresAt = new Date(Date.now() + 15 * 60000); // 15 menit
+
+    await this.pool.query(
+      `UPDATE users SET otp_code = $1, otp_expires_at = $2 WHERE id = $3`,
+      [otpCode, otpExpiresAt, user.id]
+    );
+
+    const mailOptions = {
+      from: '"EventRent Team" <noreply@eventrent.com>',
+      to: email,
+      subject: 'KODE BARU: Verifikasi Akun EventRent 🎟️',
+      html: `
+        <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+          <h2>Halo ${user.name}, ini kode OTP barumu.</h2>
+          <h1 style="color: #EE7354; letter-spacing: 5px; font-size: 36px; background-color: #fefce8; padding: 10px; border-radius: 8px; display: inline-block;">${otpCode}</h1>
+          <p style="color: #555;">Kode ini berlaku 15 menit.</p>
+        </div>
+      `,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+    } catch (mailError) {
+      console.error('Gagal kirim ulang email OTP:', mailError);
+      throw new InternalServerErrorException('Gagal mengirim email OTP.');
+    }
+
+    return { success: true, message: 'Kode OTP baru telah dikirim ke email.' };
   }
 
   async loginUser(data: any) {
     const res = await this.pool.query('SELECT * FROM users WHERE email = $1', [data.email]);
     if (res.rows.length === 0) throw new UnauthorizedException('Email/Password salah');
     const user = res.rows[0];
+    
+    // Cek Verifikasi
+    if (!user.is_verified) {
+      throw new UnauthorizedException('Akun belum terverifikasi! Silakan cek email Anda untuk OTP.');
+    }
+
     if (!user.password) throw new UnauthorizedException('Gunakan Login Google');
     const isMatch = await bcrypt.compare(data.password, user.password);
     if (!isMatch) throw new UnauthorizedException('Email/Password salah');

@@ -88,12 +88,10 @@ export class AppController {
   })
   @Post('tickets/buy')
   async buyTicket(@Body() data: BuyTicketDto) { 
-    // 1. Ambil data standar
     let finalCart = data.cart;
     let finalAnswers = data.formAnswers || {};
     let email = data.guestEmail || data.guest_email;
 
-    // 2. ADAPTER UNTUK RSVP WEDDING / PERSONAL EVENT
     if (!finalCart && data.sessionId) {
       finalCart = [{
         sessionId: data.sessionId,
@@ -108,7 +106,6 @@ export class AppController {
       };
     }
 
-    // 3. Eksekusi ke Service
     return await this.appService.buyTicket(
       data.userId || null, 
       data.eventId, 
@@ -127,10 +124,9 @@ export class AppController {
 
   @ApiTags('Tickets')
   @ApiOperation({ summary: 'Melacak/Mencari tiket (Guest Checkout) menggunakan Order ID dan Email' })
-  // 👇 FIX: Update example Swagger ke format String Alphanumeric
   @ApiBody({ schema: { example: { ticketId: "TKT-A9X2B1", email: "tamu@gmail.com" } } })
   @Post('tickets/track')
-  async trackTicket(@Body() data: { ticketId: string; email: string }) { // ✅ Ini udah bener string
+  async trackTicket(@Body() data: { ticketId: string; email: string }) { 
     return await this.appService.trackTicket(data.ticketId, data.email);
   }
 
@@ -143,10 +139,8 @@ export class AppController {
 
   @ApiTags('Tickets')
   @ApiOperation({ summary: 'Melakukan validasi/scan kehadiran tiket' })
-  // 👇 FIX: Update example Swagger ke format String
   @ApiBody({ schema: { example: { ticketId: "TKT-A9X2B1", eventId: 32, userId: 1 } } })
   @Post('tickets/scan')
-  // 👇 FIX: Ubah ticketId dari number jadi STRING 👇
   async scanTicket(@Body() body: { ticketId: string, eventId: number, userId: number }) {
     return this.appService.scanTicket(body.ticketId, body.eventId, body.userId);
   }
@@ -164,6 +158,22 @@ export class AppController {
   @Post('auth/register')
   async register(@Body() userData: any) {
     return await this.appService.registerUser(userData);
+  }
+
+  @ApiTags('Authentication & Users')
+  @ApiOperation({ summary: 'Verifikasi Kode OTP dari Email' })
+  @ApiBody({ schema: { example: { email: "user@gmail.com", otpCode: "123456" } } })
+  @Post('auth/verify-otp')
+  async verifyOtp(@Body() body: { email: string; otpCode: string }) {
+    return await this.appService.verifyOTP(body.email, body.otpCode);
+  }
+
+  @ApiTags('Authentication & Users')
+  @ApiOperation({ summary: 'Kirim Ulang Kode OTP ke Email' })
+  @ApiBody({ schema: { example: { email: "user@gmail.com" } } })
+  @Post('auth/resend-otp')
+  async resendOtp(@Body() body: { email: string }) {
+    return await this.appService.resendOTP(body.email);
   }
 
   @ApiTags('Authentication & Users')
