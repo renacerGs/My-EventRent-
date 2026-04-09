@@ -1,5 +1,6 @@
 // src/app.controller.ts
-import { Controller, Get, Post, Body, Query, Delete, Param, Put } from '@nestjs/common'; 
+// 👇 FIX: Sudah ditambahkan 'Patch' di sini
+import { Controller, Get, Post, Body, Query, Delete, Param, Put, Patch } from '@nestjs/common'; 
 import { AppService } from './app.service';
 
 // <--- 1. IMPORT DECORATOR SWAGGER --->
@@ -63,6 +64,7 @@ export class AppController {
     return await this.appService.incrementView(id);
   }
 
+  // 👇 FIX: ENDPOINT BARU UNTUK TOGGLE VISIBILITY 👇
   @ApiTags('Events')
   @ApiOperation({ summary: 'Menyalakan/mematikan visibilitas event di halaman utama (Public/Private)' })
   @Patch('events/:id/visibility')
@@ -86,7 +88,7 @@ export class AppController {
     return await this.appService.getMyLikes(userId);
   }
 
- // --- TICKETS ---
+  // --- TICKETS ---
   @ApiTags('Tickets')
   @ApiOperation({ summary: 'Membeli tiket (Checkout Public) atau RSVP (Personal Event)' })
   @ApiBody({ 
