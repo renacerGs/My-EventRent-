@@ -52,8 +52,7 @@ export default function App() {
     location.pathname.startsWith('/rsvp') || 
     location.pathname.startsWith('/party-rsvp');
 
-  // 👇👇👇 FIX: LOGIC AUTO-REFRESH SAAT KEMBALI KE TAB 👇👇👇
-  const fetchPublicEvents = () => {
+  useEffect(() => {
     fetch('/api/events')
       .then(res => res.json())
       .then(data => {
@@ -63,21 +62,7 @@ export default function App() {
         console.error("Gagal mengambil data event:", err);
         setEvents([]); 
       });
-  };
-
-  useEffect(() => {
-    // 1. Panggil pertama kali saat aplikasi/komponen dimuat
-    fetchPublicEvents();
-
-    // 2. Tambahkan event listener untuk memantau saat user kembali fokus ke tab browser
-    window.addEventListener('focus', fetchPublicEvents);
-
-    // 3. Cleanup listener saat komponen di-unmount (Best Practice biar gak memory leak)
-    return () => {
-      window.removeEventListener('focus', fetchPublicEvents);
-    };
   }, []);
-  // 👆👆👆 BATAS LOGIC AUTO-REFRESH 👆👆👆
 
   const ProtectedRoute = ({ children }) => {
     if (!user) {

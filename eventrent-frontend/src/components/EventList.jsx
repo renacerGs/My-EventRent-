@@ -34,6 +34,19 @@ const isEventPassed = (event) => {
   }
 };
 
+// 👇 FIX: FUNGSI PINTAR UNTUK MENENTUKAN URL LANDING PAGE 👇
+const getEventLink = (event) => {
+  const isPrivate = event.is_private === true || event.is_private === 'true';
+  
+  if (event.category === 'Personal') {
+    return `/party/${event.id}`;
+  } else if (event.category === 'Wedding' || isPrivate) {
+    return `/invitation/${event.id}`;
+  } else {
+    return `/event/${event.id}`; // Default Public Event
+  }
+};
+
 export default function EventList({ events, searchQuery, onClearSearch }) {
   const [activeCategory, setActiveCategory] = useState('All');
   const categories = ['All', 'Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports'];
@@ -137,12 +150,12 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
         </div>
       </div>
 
-      {/* SISA KODINGAN CARD EVENT TETAP SAMA */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
         {filteredEvents.length > 0 ? (
           filteredEvents.map(event => (
             <Link 
-              to={`/event/${event.id}`} 
+              // 👇 FIX: URL SEKARANG DINAMIS SESUAI TIPE EVENT 👇
+              to={getEventLink(event)} 
               key={event.id} 
               className="bg-white rounded-[24px] shadow-sm border border-gray-100 overflow-hidden hover:-translate-y-1 hover:shadow-lg transition-all duration-300 group flex flex-col"
             >
