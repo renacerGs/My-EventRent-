@@ -6,7 +6,7 @@ import toast from 'react-hot-toast';
 import ThemeElegantGold from '../components/Templates/ThemeElegantGold';
 import ThemeFloralWhite from '../components/Templates/ThemeFloralWhite';
 import ThemeDarkRomantic from '../components/Templates/ThemeDarkRomantic';
-/
+
 
 export default function WeddingInvitation() {
   const { id } = useParams();
