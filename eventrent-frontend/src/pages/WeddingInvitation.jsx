@@ -3,9 +3,12 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 // Import Semua Tema di Sini
-import ThemeElegantGold from '../components/Templates/ThemeElegantGold';
-import ThemeFloralWhite from '../components/Templates/ThemeFloralWhite';
-import ThemeDarkRomantic from '../components/Templates/ThemeDarkRomantic';
+import ThemeElegantGold from 
+'../components/Templates/ThemeElegantGold';
+import ThemeFloralWhite from 
+'../components/Templates/ThemeFloralWhite';
+import ThemeDarkRomantic from 
+'../components/Templates/ThemeDarkRomantic';
 
 
 export default function WeddingInvitation() {
