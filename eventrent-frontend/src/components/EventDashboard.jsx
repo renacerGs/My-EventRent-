@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 export default function EventDashboard() {
   const { id } = useParams();
@@ -21,10 +22,10 @@ export default function EventDashboard() {
       if (isBackground) setIsRefreshing(true);
       else setLoading(true);
       
-      const resEvent = await fetch(`/api/events/${id}`);
+      const resEvent = await fetch(`https://my-event-rent.vercel.app/api/events/${id}`);
       const eventData = await resEvent.json();
 
-      const resAttendees = await fetch(`/api/events/${id}/attendees?userId=${user?.id}`);
+      const resAttendees = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/attendees?userId=${user?.id}`);
       const dataAttendees = await resAttendees.json();
 
       const groupedMap = new Map();
@@ -90,7 +91,7 @@ export default function EventDashboard() {
     setConfirmDialog({ show: false, ticketId: null }); 
 
     try {
-      const res = await fetch('/api/tickets/scan', {
+      const res = await fetch('https://my-event-rent.vercel.app/api/tickets/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticketId: ticketId, eventId: parseInt(id), userId: user?.id })

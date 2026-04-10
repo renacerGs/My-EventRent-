@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import { createClient } from '@supabase/supabase-js';
+import toast from 'react-hot-toast';
 
 // 🔥 IMPORT KOMPONEN DARI FOLDER SHARED
 import CustomDatePicker from './shared/CustomDatePicker';
@@ -100,7 +101,7 @@ export default function CreatePublicEvent() {
       setShowCropModal(false); 
     } catch (e) {
       console.error(e);
-      alert('Gagal memotong gambar!');
+      toast.error('Gagal memotong gambar!');
     }
   };
 
@@ -124,7 +125,7 @@ export default function CreatePublicEvent() {
   };
 
   const removeSession = (indexToRemove) => {
-    if (formData.sessions.length <= 1) return alert("Minimal harus ada 1 session untuk event ini!");
+    if (formData.sessions.length <= 1) return toast.error("Minimal harus ada 1 session untuk event ini!");
     const updatedSessions = formData.sessions.filter((_, index) => index !== indexToRemove);
     setFormData({ ...formData, sessions: updatedSessions });
   };
@@ -172,8 +173,8 @@ export default function CreatePublicEvent() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!imageBase64) return alert("Poster/Gambar wajib diupload!");
-    if (!formData.eventStart || !formData.eventEnd) return alert("Harap isi Tanggal Mulai dan Selesai Event!");
+    if (!imageBase64) return toast.error("Poster/Gambar wajib diupload!");
+    if (!formData.eventStart || !formData.eventEnd) return toast.error("Harap isi Tanggal Mulai dan Selesai Event!");
     
     setIsLoading(true);
     try {
@@ -196,7 +197,7 @@ export default function CreatePublicEvent() {
           img: publicUrlData.publicUrl 
       };
 
-      const response = await fetch('/api/events', {
+      const response = await fetch('https://my-event-rent.vercel.app/api/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -206,10 +207,10 @@ export default function CreatePublicEvent() {
           navigate('/manage'); 
       } else {
           const errorData = await response.json();
-          alert("Gagal membuat acara: " + (errorData.message || 'Server error'));
+          toast.error("Gagal membuat acara: " + (errorData.message || 'Server error'));
       }
     } catch (error) {
-        alert(error.message || "Gagal terhubung ke server.");
+        toast.error(error.message || "Gagal terhubung ke server.");
     } finally {
         setIsLoading(false);
     }

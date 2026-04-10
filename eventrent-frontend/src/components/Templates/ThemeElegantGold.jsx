@@ -110,7 +110,7 @@ const MusicPlayer = ({ src, autoPlay = false }) => {
     if (autoPlay && audioRef.current) {
       audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
     }
-  }, [autoPlay, src]); // Re-run kalau src lagunya ganti
+  }, [autoPlay, src]); 
 
   const toggle = () => {
     if (!audioRef.current) return;
@@ -143,7 +143,13 @@ const HeroSection = ({ onOpen, name1, name2, guestName, coverImg }) => (
     transition={{ duration: 0.8 }}
   >
     <div className="absolute inset-0 opacity-30">
-        <img src={coverImg} alt="Cover" className="w-full h-full object-cover blur-sm" />
+        {/* 👇 SABUK PENGAMAN GAMBAR 1 👇 */}
+        <img 
+          src={coverImg} 
+          alt="Cover" 
+          className="w-full h-full object-cover blur-sm" 
+          onError={(e) => { e.target.onerror = null; e.target.src = "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=1000&auto=format&fit=crop"; }}
+        />
     </div>
 
     <motion.div
@@ -161,7 +167,13 @@ const HeroSection = ({ onOpen, name1, name2, guestName, coverImg }) => (
       </motion.div>
 
       <div className="w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 mx-auto rounded-full overflow-hidden border-4 border-[#D4AF37]/50 p-2 shadow-2xl relative z-10 bg-slate-950">
-         <img src={coverImg} alt="Couple" className="w-full h-full object-cover rounded-full" />
+         {/* 👇 SABUK PENGAMAN GAMBAR 2 👇 */}
+         <img 
+           src={coverImg} 
+           alt="Couple" 
+           className="w-full h-full object-cover rounded-full" 
+           onError={(e) => { e.target.onerror = null; e.target.src = "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=1000&auto=format&fit=crop"; }}
+         />
       </div>
 
       <div className="mt-8 flex flex-col items-center justify-center z-20">
@@ -181,7 +193,7 @@ const HeroSection = ({ onOpen, name1, name2, guestName, coverImg }) => (
     <motion.div className="mt-8 space-y-4 z-10" initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.4, duration: 0.8 }}>
       <p className="text-gray-300 font-sans text-sm">Kepada Yth.</p>
       <motion.p className="font-sans font-bold text-2xl text-white" animate={{ opacity: [0.7, 1, 0.7] }} transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}>
-        {guestName}
+        {guestName || "Tamu Undangan"}
       </motion.p>
       <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
         <button onClick={onOpen} className="mt-6 px-10 py-4 rounded-full bg-[#D4AF37] text-slate-950 font-bold uppercase tracking-widest text-sm hover:bg-[#FFDF73] transition-colors shadow-[0_0_20px_rgba(212,175,55,0.3)]">
@@ -215,25 +227,31 @@ const CoupleSection = ({ profiles }) => (
       <div className="flex flex-col sm:flex-row gap-8 items-stretch justify-center">
         {profiles.map((person, index) => (
             <AnimatedSection
-                key={person.id}
+                key={person.id || index}
                 delay={index * 0.2}
                 animation={index % 2 === 0 ? "fade-left" : "fade-right"}
                 className="flex-1 min-w-[280px] flex flex-col items-center bg-white rounded-3xl p-8 text-center border border-slate-100 shadow-xl hover:shadow-2xl hover:border-[#D4AF37]/30 transition-all duration-500"
             >
-                {person.photoUrl && (
+                {person.photoUrl || person.photo_url ? (
                   <div className="w-44 h-44 sm:w-52 sm:h-52 mx-auto rounded-full overflow-hidden border-4 border-[#D4AF37]/30 p-1 mb-6 shadow-inner">
+                    {/* 👇 SABUK PENGAMAN GAMBAR 3 👇 */}
                     <img 
-                      src={person.photoUrl} 
-                      alt={person.fullName} 
+                      src={person.photoUrl || person.photo_url} 
+                      alt={person.fullName || person.full_name} 
                       className="w-full h-full object-cover object-center rounded-full" 
+                      onError={(e) => { e.target.onerror = null; e.target.src = "https://images.unsplash.com/photo-1522529599102-193c0d76b5b6?auto=format&fit=crop&w=500&q=80"; }}
                     />
                   </div>
+                ) : (
+                  <div className="w-44 h-44 sm:w-52 sm:h-52 mx-auto rounded-full overflow-hidden border-4 border-[#D4AF37]/30 p-1 mb-6 shadow-inner flex items-center justify-center bg-slate-50">
+                     <Heart className="w-12 h-12 text-[#D4AF37]" />
+                  </div>
                 )}
-                <p className="text-[#D4AF37] text-xs font-bold tracking-[0.2em] uppercase mb-4 font-sans">{person.role}</p>
-                <h3 className="font-serif text-2xl sm:text-3xl text-slate-800 mb-4 leading-tight font-medium italic">{person.fullName}</h3>
+                <p className="text-[#D4AF37] text-xs font-bold tracking-[0.2em] uppercase mb-4 font-sans">{person.role || (index === 0 ? "Mempelai Pria" : "Mempelai Wanita")}</p>
+                <h3 className="font-serif text-2xl sm:text-3xl text-slate-800 mb-4 leading-tight font-medium italic">{person.fullName || person.full_name}</h3>
                 <div className="w-12 h-px bg-[#D4AF37]/40 mx-auto mb-4" />
-                <p className="font-sans text-slate-600 text-base leading-relaxed">{person.parentsInfo}</p>
-                <p className="font-sans text-slate-500 text-sm mt-3 font-bold italic">{person.birthPlace}</p>
+                <p className="font-sans text-slate-600 text-base leading-relaxed">{person.parentsInfo || person.parents_info}</p>
+                <p className="font-sans text-slate-500 text-sm mt-3 font-bold italic">{person.birthPlace || person.birth_place}</p>
                 {person.address && <p className="font-sans text-slate-400 text-sm mt-1">{person.address}</p>}
             </AnimatedSection>
         ))}
@@ -297,47 +315,50 @@ const CountdownSection = ({ targetDate }) => {
   );
 };
 
-const EventsSection = ({ sessions, eventId, navigate }) => (
-  <div className="py-20 px-6 max-w-4xl mx-auto">
-    <AnimatedSection className="text-center mb-12">
-      <h2 className="font-serif text-3xl sm:text-4xl text-slate-800 italic">Rangkaian Acara</h2>
-      <SectionDivider />
-      <p className="text-slate-500 text-lg">Momen yang telah kami nantikan</p>
-    </AnimatedSection>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-      {sessions.map((s, i) => (
-          <AnimatedSection key={s.id} delay={i * 0.15} className="bg-white rounded-3xl p-8 text-center border border-slate-100 shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-1 bg-[#D4AF37]"></div>
-            <h3 className="font-serif text-2xl text-[#D4AF37] mb-6">{s.name}</h3>
-            <div className="space-y-4 text-slate-600 font-medium mb-8 font-sans">
-              <div className="flex items-center justify-center gap-3"><Calendar className="w-5 h-5 text-[#D4AF37]" /><span>{s.date}</span></div>
-              <div className="flex items-center justify-center gap-3"><Clock className="w-5 h-5 text-[#D4AF37]" /><span>{s.start_time} – {s.end_time}</span></div>
-              <div className="flex items-center justify-center gap-3"><MapPin className="w-5 h-5 text-[#D4AF37]" /><span>{s.name_place || s.place}</span></div>
-            </div>
-            {s.map_url && (
-                <a href={s.map_url} target="_blank" rel="noopener noreferrer" className="inline-block mt-2">
-                <button className="px-6 py-2 text-xs font-bold tracking-widest uppercase border-2 border-[#D4AF37] text-[#D4AF37] rounded-full hover:bg-[#D4AF37] hover:text-white transition-colors flex items-center gap-2 font-sans">
-                    <MapPin className="w-4 h-4" /> Buka Peta
-                </button>
-                </a>
-            )}
-          </AnimatedSection>
-      ))}
-    </div>
+const EventsSection = ({ sessions, eventId, navigate }) => {
+  if (!sessions || !Array.isArray(sessions) || sessions.length === 0) return null;
+  return (
+    <div className="py-20 px-6 max-w-4xl mx-auto">
+      <AnimatedSection className="text-center mb-12">
+        <h2 className="font-serif text-3xl sm:text-4xl text-slate-800 italic">Rangkaian Acara</h2>
+        <SectionDivider />
+        <p className="text-slate-500 text-lg">Momen yang telah kami nantikan</p>
+      </AnimatedSection>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+        {sessions.map((s, i) => (
+            <AnimatedSection key={s.id || i} delay={i * 0.15} className="bg-white rounded-3xl p-8 text-center border border-slate-100 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-1 bg-[#D4AF37]"></div>
+              <h3 className="font-serif text-2xl text-[#D4AF37] mb-6">{s.name}</h3>
+              <div className="space-y-4 text-slate-600 font-medium mb-8 font-sans">
+                <div className="flex items-center justify-center gap-3"><Calendar className="w-5 h-5 text-[#D4AF37]" /><span>{s.date}</span></div>
+                <div className="flex items-center justify-center gap-3"><Clock className="w-5 h-5 text-[#D4AF37]" /><span>{s.start_time || s.startTime} – {s.end_time || s.endTime}</span></div>
+                <div className="flex items-center justify-center gap-3"><MapPin className="w-5 h-5 text-[#D4AF37]" /><span>{s.name_place || s.place || s.location?.namePlace}</span></div>
+              </div>
+              {(s.map_url || s.mapUrl || s.location?.mapUrl) && (
+                  <a href={s.map_url || s.mapUrl || s.location?.mapUrl} target="_blank" rel="noopener noreferrer" className="inline-block mt-2">
+                  <button className="px-6 py-2 text-xs font-bold tracking-widest uppercase border-2 border-[#D4AF37] text-[#D4AF37] rounded-full hover:bg-[#D4AF37] hover:text-white transition-colors flex items-center gap-2 font-sans">
+                      <MapPin className="w-4 h-4" /> Buka Peta
+                  </button>
+                  </a>
+              )}
+            </AnimatedSection>
+        ))}
+      </div>
 
-    <AnimatedSection delay={0.4} className="mt-16 text-center">
-        <button 
-            onClick={() => navigate(`/rsvp/${eventId}`)}
-            className="px-10 py-5 bg-slate-900 text-[#D4AF37] rounded-full font-bold uppercase tracking-widest shadow-2xl hover:bg-slate-800 transition-all hover:-translate-y-1 font-sans"
-        >
-            Tentukan Kehadiran (RSVP)
-        </button>
-    </AnimatedSection>
-  </div>
-);
+      <AnimatedSection delay={0.4} className="mt-16 text-center">
+          <button 
+              onClick={() => navigate(`/rsvp/${eventId}`)}
+              className="px-10 py-5 bg-slate-900 text-[#D4AF37] rounded-full font-bold uppercase tracking-widest shadow-2xl hover:bg-slate-800 transition-all hover:-translate-y-1 font-sans"
+          >
+              Tentukan Kehadiran (RSVP)
+          </button>
+      </AnimatedSection>
+    </div>
+  );
+};
 
 const GallerySection = ({ images }) => {
-  if (!images || images.length === 0) return null;
+  if (!images || !Array.isArray(images) || images.length === 0) return null;
   const [current, setCurrent] = useState(0);
   const prev = () => setCurrent((c) => (c === 0 ? images.length - 1 : c - 1));
   const next = () => setCurrent((c) => (c === images.length - 1 ? 0 : c + 1));
@@ -357,7 +378,18 @@ const GallerySection = ({ images }) => {
       <AnimatedSection className="relative">
         <div className="relative overflow-hidden rounded-3xl aspect-[4/3] bg-slate-100 shadow-2xl">
           <AnimatePresence mode="wait">
-            <motion.img key={current} src={images[current]} alt={`Gallery ${current + 1}`} className="w-full h-full object-cover" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} transition={{ duration: 0.4 }} />
+            {/* 👇 SABUK PENGAMAN GAMBAR 4 👇 */}
+            <motion.img 
+              key={current} 
+              src={images[current]} 
+              alt={`Gallery ${current + 1}`} 
+              className="w-full h-full object-cover" 
+              initial={{ opacity: 0, x: 50 }} 
+              animate={{ opacity: 1, x: 0 }} 
+              exit={{ opacity: 0, x: -50 }} 
+              transition={{ duration: 0.4 }} 
+              onError={(e) => { e.target.onerror = null; e.target.src = "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=800&q=80"; }}
+            />
           </AnimatePresence>
           <button onClick={prev} className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/80 backdrop-blur shadow-lg flex items-center justify-center text-slate-800 hover:bg-white transition-colors"><ChevronLeft className="w-6 h-6" /></button>
           <button onClick={next} className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-white/80 backdrop-blur shadow-lg flex items-center justify-center text-slate-800 hover:bg-white transition-colors"><ChevronRight className="w-6 h-6" /></button>
@@ -377,56 +409,59 @@ const GallerySection = ({ images }) => {
   );
 };
 
-const WishesSection = ({ quote, greetings }) => (
-  <div className="py-20 px-6 max-w-4xl mx-auto text-center">
-    <AnimatedSection>
-      <h2 className="font-serif text-3xl sm:text-4xl text-slate-800 italic">Doa & Ucapan</h2>
-      <SectionDivider />
-    </AnimatedSection>
-    
-    <AnimatedSection delay={0.2} className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-100 shadow-xl mt-8 relative">
-      <Heart className="w-10 h-10 text-[#D4AF37] mx-auto mb-8 animate-pulse" />
-      <p className="font-serif text-xl md:text-2xl text-slate-700 leading-relaxed italic whitespace-pre-line font-medium mb-10">
-        "{quote || 'Dan di antara tanda-tanda kekuasaan-Nya ialah Dia menciptakan untukmu pasangan hidup dari jenismu sendiri...'}"
-      </p>
+const WishesSection = ({ quote, greetings }) => {
+  const safeGreetings = Array.isArray(greetings) ? greetings : [];
+  return (
+    <div className="py-20 px-6 max-w-4xl mx-auto text-center">
+      <AnimatedSection>
+        <h2 className="font-serif text-3xl sm:text-4xl text-slate-800 italic">Doa & Ucapan</h2>
+        <SectionDivider />
+      </AnimatedSection>
+      
+      <AnimatedSection delay={0.2} className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-100 shadow-xl mt-8 relative">
+        <Heart className="w-10 h-10 text-[#D4AF37] mx-auto mb-8 animate-pulse" />
+        <p className="font-serif text-xl md:text-2xl text-slate-700 leading-relaxed italic whitespace-pre-line font-medium mb-10">
+          "{quote || 'Dan di antara tanda-tanda kekuasaan-Nya ialah Dia menciptakan untukmu pasangan hidup dari jenismu sendiri...'}"
+        </p>
 
-      <div className="text-left bg-slate-50 p-6 rounded-2xl border border-slate-200">
-        <div className="flex items-center gap-3 mb-6 border-b border-slate-200 pb-4">
-           <span className="bg-[#D4AF37] text-white font-bold px-3 py-1 rounded-lg text-sm">{greetings?.length || 0}</span>
-           <h3 className="font-bold text-slate-800 font-sans uppercase tracking-widest text-sm">Pesan Kehadiran</h3>
-        </div>
+        <div className="text-left bg-slate-50 p-6 rounded-2xl border border-slate-200">
+          <div className="flex items-center gap-3 mb-6 border-b border-slate-200 pb-4">
+              <span className="bg-[#D4AF37] text-white font-bold px-3 py-1 rounded-lg text-sm">{safeGreetings.length}</span>
+              <h3 className="font-bold text-slate-800 font-sans uppercase tracking-widest text-sm">Pesan Kehadiran</h3>
+          </div>
 
-        <div className="h-80 overflow-y-auto pr-2 space-y-4" style={{ scrollbarWidth: 'thin', scrollbarColor: '#D4AF37 transparent' }}>
-          {greetings && greetings.length > 0 ? (
-            greetings.map((g, i) => (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }} 
-                whileInView={{ opacity: 1, y: 0 }} 
-                viewport={{ once: true }} 
-                key={i} 
-                className="bg-white p-5 rounded-xl shadow-sm border border-slate-100"
-              >
-                <div className="flex justify-between items-center mb-2">
-                  <p className="font-bold text-slate-800 font-sans text-sm capitalize">{g.name}</p>
-                  <p className="text-[10px] text-slate-400 font-sans uppercase tracking-wider">{g.time}</p>
-                </div>
-                <p className="text-slate-600 font-sans text-sm leading-relaxed italic">"{g.greeting}"</p>
-              </motion.div>
-            ))
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400 opacity-60">
-               <span className="text-4xl mb-3">💌</span>
-               <p className="font-sans text-sm italic text-center">Belum ada ucapan.<br/>Jadilah yang pertama memberikan doa saat RSVP!</p>
-            </div>
-          )}
+          <div className="h-80 overflow-y-auto pr-2 space-y-4" style={{ scrollbarWidth: 'thin', scrollbarColor: '#D4AF37 transparent' }}>
+            {safeGreetings.length > 0 ? (
+              safeGreetings.map((g, i) => (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }} 
+                  whileInView={{ opacity: 1, y: 0 }} 
+                  viewport={{ once: true }} 
+                  key={i} 
+                  className="bg-white p-5 rounded-xl shadow-sm border border-slate-100"
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="font-bold text-slate-800 font-sans text-sm capitalize">{g.name || g.attendee_name}</p>
+                    <p className="text-[10px] text-slate-400 font-sans uppercase tracking-wider">{g.time || ""}</p>
+                  </div>
+                  <p className="text-slate-600 font-sans text-sm leading-relaxed italic">"{g.greeting || g.pesan}"</p>
+                </motion.div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-slate-400 opacity-60">
+                 <span className="text-4xl mb-3">💌</span>
+                 <p className="font-sans text-sm italic text-center">Belum ada ucapan.<br/>Jadilah yang pertama memberikan doa saat RSVP!</p>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </AnimatedSection>
-  </div>
-);
+      </AnimatedSection>
+    </div>
+  );
+};
 
 const GiftSection = ({ gifts }) => {
-  if (!gifts || gifts.length === 0) return null;
+  if (!gifts || !Array.isArray(gifts) || gifts.length === 0) return null;
   return (
     <div className="py-20 px-6 max-w-2xl mx-auto">
       <AnimatedSection className="text-center mb-12">
@@ -442,15 +477,15 @@ const GiftSection = ({ gifts }) => {
         {gifts.map((account, index) => {
            const [copied, setCopied] = useState(false);
            const copy = () => {
-             navigator.clipboard.writeText(account.accountNumber);
+             navigator.clipboard.writeText(account.accountNumber || account.account_number);
              setCopied(true);
              setTimeout(() => setCopied(false), 2000);
            };
            return (
-              <AnimatedSection key={account.id} delay={index * 0.15} className="bg-white rounded-3xl p-8 border border-slate-100 shadow-lg text-center">
-                <p className="text-[#D4AF37] text-sm font-bold tracking-widest uppercase mb-4">{account.bankName}</p>
-                <p className="font-serif text-2xl text-slate-800 mb-2 italic font-medium">{account.accountName}</p>
-                <p className="font-mono text-slate-600 text-xl tracking-[0.2em] mb-6 font-bold">{account.accountNumber}</p>
+              <AnimatedSection key={account.id || index} delay={index * 0.15} className="bg-white rounded-3xl p-8 border border-slate-100 shadow-lg text-center">
+                <p className="text-[#D4AF37] text-sm font-bold tracking-widest uppercase mb-4">{account.bankName || account.bank_name}</p>
+                <p className="font-serif text-2xl text-slate-800 mb-2 italic font-medium">{account.accountName || account.account_name}</p>
+                <p className="font-mono text-slate-600 text-xl tracking-[0.2em] mb-6 font-bold">{account.accountNumber || account.account_number}</p>
                 <button onClick={copy} className="px-6 py-2 rounded-full border-2 border-[#D4AF37] text-[#D4AF37] font-bold uppercase text-xs tracking-widest hover:bg-[#D4AF37] hover:text-white transition-colors flex items-center justify-center mx-auto gap-2">
                   {copied ? <><Check className="w-4 h-4" /> Tersalin</> : <><Copy className="w-4 h-4" /> Salin Nomor</>}
                 </button>
@@ -484,13 +519,22 @@ const ClosingSection = ({ message, name1, name2 }) => (
 export default function ThemeElegantGold({ eventData, guestName, isOpen, onOpen }) {
   const navigate = useNavigate();
 
-  const details = eventData.event_details || {};
-  const profiles = details.profiles || [];
-  const gallery = details.galleryImages || [];
-  const gifts = details.digitalGifts || [];
+  // Safe parsing untuk event details
+  let details = eventData?.eventDetails || eventData?.event_details || {};
+  if (typeof details === 'string') {
+    try { details = JSON.parse(details); } catch (e) { details = {}; }
+  }
+
+  let profilesList = details.profiles || [];
+  if (typeof profilesList === 'string') {
+    try { profilesList = JSON.parse(profilesList); } catch (e) { profilesList = []; }
+  }
+
+  const gallery = Array.isArray(details.galleryImages || details.gallery_images) ? (details.galleryImages || details.gallery_images) : [];
+  const gifts = Array.isArray(details.digitalGifts || details.digital_gifts) ? (details.digitalGifts || details.digital_gifts) : [];
   
-  const name1 = profiles[0]?.nickName || profiles[0]?.fullName?.split(' ')[0] || 'Mempelai 1';
-  const name2 = profiles[1]?.nickName || profiles[1]?.fullName?.split(' ')[0] || 'Mempelai 2';
+  const name1 = profilesList[0]?.nickName || profilesList[0]?.fullName?.split(' ')[0] || 'Mempelai 1';
+  const name2 = profilesList[1]?.nickName || profilesList[1]?.fullName?.split(' ')[0] || 'Mempelai 2';
 
   // 🔥 BACKSOUND MUSIC OTOMATIS: Ambil dari database kalau klien ngisi, kalau kosong pakai lagu default.
   const audioSrc = details.bgMusicUrl || "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"; 
@@ -504,7 +548,7 @@ export default function ThemeElegantGold({ eventData, guestName, isOpen, onOpen 
                onOpen={onOpen} 
                name1={name1} name2={name2} 
                guestName={guestName} 
-               coverImg={eventData.img} 
+               coverImg={eventData?.img || "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=1000&auto=format&fit=crop"} 
             />
           </motion.div>
         ) : (
@@ -513,11 +557,11 @@ export default function ThemeElegantGold({ eventData, guestName, isOpen, onOpen 
             <MusicPlayer src={audioSrc} autoPlay /> 
             
             <OpeningSection message={details.openingMessage} />
-            {profiles.length > 0 && <CoupleSection profiles={profiles} />}
-            <CountdownSection targetDate={eventData.date_start} />
-            <EventsSection sessions={eventData.sessions || []} eventId={eventData.id} navigate={navigate} />
+            {profilesList.length > 0 && <CoupleSection profiles={profilesList} />}
+            <CountdownSection targetDate={eventData?.date_start} />
+            <EventsSection sessions={eventData?.sessions || []} eventId={eventData?.id} navigate={navigate} />
             <GallerySection images={gallery} />
-            <WishesSection quote={details.quote} greetings={eventData.greetings} />
+            <WishesSection quote={details.quote} greetings={eventData?.greetings} />
             <GiftSection gifts={gifts} />
             <ClosingSection message={details.closingMessage} name1={name1} name2={name2} />
           </motion.div>

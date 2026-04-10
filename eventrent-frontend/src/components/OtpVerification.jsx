@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, CheckCircle2, RefreshCw, ArrowLeft } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function OtpVerification({ email, onVerified, onCancel }) {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -43,7 +44,7 @@ export default function OtpVerification({ email, onVerified, onCancel }) {
 
     try {
       // PANGGIL API BACKEND LU DI SINI
-      const response = await fetch('http://localhost:3000/api/auth/verify-otp', {
+      const response = await fetch('http://my-event-rent.vercel.app/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otpCode }),
@@ -70,7 +71,7 @@ export default function OtpVerification({ email, onVerified, onCancel }) {
     
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:3000/api/auth/resend-otp', {
+      const response = await fetch('http://my-event-rent.vercel.app/api/auth/resend-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -88,7 +89,7 @@ export default function OtpVerification({ email, onVerified, onCancel }) {
         });
       }, 1000);
       
-      alert('Kode baru udah dikirim ke email lu bro!');
+      toast.success('Kode baru udah dikirim ke email lu bro!');
     } catch (err) {
       setError(err.message);
     } finally {

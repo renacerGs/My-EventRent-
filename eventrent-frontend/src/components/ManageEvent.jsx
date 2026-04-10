@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 // --- FUNGSI FORMAT TANGGAL ---
 const formatPrettyDate = (dateString) => {
@@ -47,7 +48,7 @@ export default function ManageEvent() {
   }, []);
 
   const fetchEvents = () => {
-    fetch(`/api/events/my?userId=${user.id}`)
+    fetch(`https://my-event-rent.vercel.app/api/events/my?userId=${user.id}`)
       .then(res => res.json())
       .then(data => { 
         setMyEvents(Array.isArray(data) ? data : []); 
@@ -110,7 +111,7 @@ export default function ManageEvent() {
   const confirmDelete = async () => {
     if (!eventToDelete) return;
     try {
-      const res = await fetch(`/api/events/${eventToDelete}?userId=${user.id}`, { method: 'DELETE' });
+      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${eventToDelete}?userId=${user.id}`, { method: 'DELETE' });
       if (res.ok) {
         setMyEvents(prev => prev.filter(event => event.id !== eventToDelete));
         setEventToDelete(null); 
@@ -135,7 +136,7 @@ export default function ManageEvent() {
 
     try {
       // 2. Tembak API backend secara background
-      const res = await fetch(`/api/events/${eventId}/visibility?userId=${user.id}`, {
+      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${eventId}/visibility?userId=${user.id}`, {
         method: 'PATCH',
       });
       
@@ -145,7 +146,7 @@ export default function ManageEvent() {
     } catch (err) {
       console.error(err);
       // 3. Kalau gagal, balikin statenya ke awal (Revert)
-      alert("Oops! Gagal merubah visibilitas. Coba lagi.");
+      toast.error("Oops! Gagal merubah visibilitas. Coba lagi.");
       setMyEvents(prev => prev.map(event => 
         event.id === eventId ? { ...event, is_private: currentPrivateStatus } : event
       ));

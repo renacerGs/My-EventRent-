@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { Toaster, toast } from 'react-hot-toast'; // 🔥 IMPORT: Tambahkan ini untuk Toast
 
 // Import Komponen
 import Navbar from './components/Navbar';
@@ -26,7 +27,7 @@ import CreatePersonalEvent from "./components/CreatePersonalEvent";
 // --- ROUTE KHUSUS EDIT EVENT ---
 import EditPublicEvent from "./components/EditPublicEvent"; 
 import EditWeddingEvent from "./components/EditWeddingEvent"; 
-import EditPersonalEvent from "./components/EditPersonalEvent"; // 🔥 UDAH DI-UNCOMMENT!
+import EditPersonalEvent from "./components/EditPersonalEvent"; 
 
 // --- ROUTE KHUSUS WEDDING/PERSONAL ---
 import WeddingInvitation from './pages/WeddingInvitation';
@@ -45,7 +46,7 @@ export default function App() {
   });
 
   const location = useLocation();
-  // 👇 FIX: Sembunyikan Navbar/Footer di Halaman Undangan DAN Form RSVP
+  // Sembunyikan Navbar/Footer di Halaman Undangan DAN Form RSVP
   const isInvitationPage = 
     location.pathname.startsWith('/invitation') || 
     location.pathname.startsWith('/party') || 
@@ -53,13 +54,14 @@ export default function App() {
     location.pathname.startsWith('/party-rsvp');
 
   useEffect(() => {
-    fetch('/api/events')
+    fetch('https://my-event-rent.vercel.app/api/events')
       .then(res => res.json())
       .then(data => {
         setEvents(Array.isArray(data) ? data : []);
       })
       .catch(err => {
         console.error("Gagal mengambil data event:", err);
+        toast.error("Gagal terhubung ke server"); // 🔥 IMPLEMENTASI TOAST ERROR
         setEvents([]); 
       });
   }, []);
@@ -75,6 +77,19 @@ export default function App() {
   return (
     <div className="bg-white min-h-screen font-sans flex flex-col">
       
+      {/* 🔥 KOMPONEN WAJIB TOAST: Taruh di root agar bisa muncul di semua halaman */}
+      <Toaster 
+        position="top-center" 
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#333',
+            color: '#fff',
+            borderRadius: '10px',
+          },
+        }} 
+      />
+
       {!isInvitationPage && (
         <Navbar 
           user={user} 
@@ -85,6 +100,7 @@ export default function App() {
           onLogout={() => {
             setUser(null);
             localStorage.removeItem('user');
+            toast.success('Berhasil logout bro!'); // 🔥 IMPLEMENTASI TOAST LOGOUT
           }}
         />
       )}
@@ -126,11 +142,9 @@ export default function App() {
           <Route path="/create/wedding" element={<ProtectedRoute><CreateWeddingEvent /></ProtectedRoute>} />
           <Route path="/create/personal" element={<ProtectedRoute><CreatePersonalEvent /></ProtectedRoute>} />
 
-          {/* --- EDIT EVENT (DIPISAH BERDASARKAN TIPE) --- */}
+          {/* --- EDIT EVENT --- */}
           <Route path="/edit/public/:id" element={<ProtectedRoute><EditPublicEvent /></ProtectedRoute>} />
           <Route path="/edit/wedding/:id" element={<ProtectedRoute><EditWeddingEvent /></ProtectedRoute>} />
-          
-          {/* 🔥 ROUTE EDIT PERSONAL EVENT UDAH AKTIF! 🔥 */}
           <Route path="/edit/personal/:id" element={<ProtectedRoute><EditPersonalEvent /></ProtectedRoute>} />
           
           {/* HALAMAN 404 FALLBACK */}
@@ -149,6 +163,7 @@ export default function App() {
             localStorage.setItem('user', JSON.stringify({ ...userData, picture: null }));
           }
           setIsLoginOpen(false); 
+          toast.success('Login berhasil! Welcome back bro.'); // 🔥 IMPLEMENTASI TOAST LOGIN SUCCESS
         }}
       />
 

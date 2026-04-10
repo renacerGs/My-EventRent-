@@ -20,7 +20,7 @@ export default function TrackTicket() {
     setTicketData([]);
 
     try {
-      const res = await fetch('/api/tickets/track', {
+      const res = await fetch('https://my-event-rent.vercel.app/api/tickets/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

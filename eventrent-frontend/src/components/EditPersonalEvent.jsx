@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import { createClient } from '@supabase/supabase-js';
+import toast from 'react-hot-toast';
 
 // 🔥 IMPORT KOMPONEN DARI FOLDER SHARED
 import CustomDatePicker from './shared/CustomDatePicker';
@@ -112,7 +113,7 @@ export default function EditPersonalEvent() {
 
     const fetchEventData = async () => {
       try {
-        const res = await fetch(`/api/events/${id}`);
+        const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}`);
         const data = await res.json();
 
         const formattedSessions = (data.sessions || []).map(s => ({
@@ -214,7 +215,7 @@ export default function EditPersonalEvent() {
 
   const handleGallerySelect = (e) => {
     const files = Array.from(e.target.files);
-    if (galleryFiles.length + files.length > 5) return alert("Maksimal hanya 5 foto galeri!");
+    if (galleryFiles.length + files.length > 5) return toast.error("Maksimal hanya 5 foto galeri!");
     const newFiles = files.map(file => ({ file, preview: URL.createObjectURL(file), caption: '' }));
     setGalleryFiles(prev => [...prev, ...newFiles]);
     e.target.value = null; 
@@ -242,7 +243,7 @@ export default function EditPersonalEvent() {
       if (cropTarget === 'cover') { setImagePreview(croppedImageBase64); setImageBase64(croppedImageBase64); } 
       else { setEventDetails(prev => ({ ...prev, profiles: prev.profiles.map(p => p.id === cropTarget ? { ...p, photoUrl: croppedImageBase64 } : p) })); }
       setShowCropModal(false); setCropTarget(null);
-    } catch (e) { console.error(e); alert('Gagal memotong gambar!'); }
+    } catch (e) { console.error(e); toast.error('Gagal memotong gambar!'); }
   };
 
   const handleSessionLocationChange = (sIndex, field, value) => {
@@ -268,7 +269,7 @@ export default function EditPersonalEvent() {
 
   const removeSession = (indexToRemove) => {
     setFormData(prev => {
-      if (prev.sessions.length <= 1) { alert("Minimal harus ada 1 session untuk event ini!"); return prev; }
+      if (prev.sessions.length <= 1) { toast.error("Minimal harus ada 1 session untuk event ini!"); return prev; }
       return { ...prev, sessions: prev.sessions.filter((_, index) => index !== indexToRemove) };
     });
   };
@@ -345,8 +346,8 @@ export default function EditPersonalEvent() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!imageBase64) return alert("Poster/Cover Utama wajib diupload!");
-    if (!formData.eventStart || !formData.eventEnd) return alert("Harap isi Tanggal Mulai dan Selesai Event!"); 
+    if (!imageBase64) return toast.error("Poster/Cover Utama wajib diupload!");
+    if (!formData.eventStart || !formData.eventEnd) return toast.error("Harap isi Tanggal Mulai dan Selesai Event!");
     
     setIsSaving(true);
     try {
@@ -376,7 +377,7 @@ export default function EditPersonalEvent() {
         isPrivate: true       // 👈 WAJIB ADA
       };
 
-      const response = await fetch(`/api/events/${id}?userId=${userId}`, {
+      const response = await fetch(`https://my-event-rent.vercel.app/api/events/${id}?userId=${userId}`, {
           method: 'PUT', 
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -387,11 +388,11 @@ export default function EditPersonalEvent() {
           setTimeout(() => { navigate('/manage'); }, 1500); 
       } else {
           const errorData = await response.json();
-          alert("Gagal update undangan: " + (errorData.message || 'Server error'));
+          toast.error("Gagal update undangan: " + (errorData.message || 'Server error'));
       }
     } catch (error) {
         console.error(error);
-        alert(error.message || "Gagal terhubung ke server.");
+        toast.error(error.message || "Gagal terhubung ke server.");
     } finally {
         setIsSaving(false);
     }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import { createClient } from '@supabase/supabase-js';
+import toast from 'react-hot-toast';
 
 // 🔥 IMPORT KOMPONEN DARI FOLDER SHARED
 import CustomDatePicker from './shared/CustomDatePicker';
@@ -149,7 +150,7 @@ export default function CreatePersonalEvent() {
   const handleGallerySelect = (e) => {
     const files = Array.from(e.target.files);
     if (galleryFiles.length + files.length > 5) {
-      return alert("Maksimal hanya 5 foto galeri!");
+      return toast.error("Maksimal hanya 5 foto galeri!");
     }
     const newFiles = files.map(file => ({
       file,
@@ -204,7 +205,7 @@ export default function CreatePersonalEvent() {
       setCropTarget(null);
     } catch (e) {
       console.error(e);
-      alert('Gagal memotong gambar!');
+      toast.error('Gagal memotong gambar!');
     }
   };
 
@@ -231,7 +232,7 @@ export default function CreatePersonalEvent() {
     }));
   };
   const removeSession = (indexToRemove) => {
-    if (formData.sessions.length <= 1) return alert("Minimal harus ada 1 session untuk event ini!");
+    if (formData.sessions.length <= 1) return toast.error("Minimal harus ada 1 session untuk event ini!");
     const updatedSessions = formData.sessions.filter((_, index) => index !== indexToRemove);
     setFormData({ ...formData, sessions: updatedSessions });
   };
@@ -292,8 +293,8 @@ export default function CreatePersonalEvent() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!imageBase64) return alert("Poster/Cover Utama wajib diupload!");
-    if (!formData.eventStart || !formData.eventEnd) return alert("Harap isi Tanggal Mulai dan Selesai Event!");
+    if (!imageBase64) return toast.error("Poster/Cover Utama wajib diupload!");
+    if (!formData.eventStart || !formData.eventEnd) return toast.error("Harap isi Tanggal Mulai dan Selesai Event!");
     
     setIsLoading(true);
     try {
@@ -325,7 +326,7 @@ export default function CreatePersonalEvent() {
           eventDetails: finalEventDetails 
       };
 
-      const response = await fetch('/api/events', {
+      const response = await fetch('https://my-event-rent.vercel.app/api/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -335,11 +336,11 @@ export default function CreatePersonalEvent() {
           navigate('/manage'); 
       } else {
           const errorData = await response.json();
-          alert("Gagal membuat undangan: " + (errorData.message || 'Server error'));
+          toast.error("Gagal membuat undangan: " + (errorData.message || 'Server error'));
       }
     } catch (error) {
         console.error(error);
-        alert(error.message || "Gagal terhubung ke server.");
+        toast.error(error.message || "Gagal terhubung ke server.");
     } finally {
         setIsLoading(false);
     }

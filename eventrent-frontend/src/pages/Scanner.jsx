@@ -33,7 +33,7 @@ export default function Scanner() {
     }
 
     try {
-      const res = await fetch('/api/tickets/scan', {
+      const res = await fetch('https://my-event-rent.vercel.app/api/tickets/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticketId, eventId, userId: user?.id })

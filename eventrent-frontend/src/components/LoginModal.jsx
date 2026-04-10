@@ -61,7 +61,8 @@ const OtpVerification = ({ email, onVerified, onCancel }) => {
     setError('');
 
     try {
-      const response = await fetch('/api/auth/verify-otp', {
+      // ✅ URL Vercel udah dipasang dengan aman
+      const response = await fetch('https://my-event-rent.vercel.app/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otpCode: codeToVerify }),
@@ -135,7 +136,8 @@ const OtpVerification = ({ email, onVerified, onCancel }) => {
     setIsLoading(true);
     setError('');
     try {
-      const response = await fetch('/api/auth/resend-otp', {
+      // ✅ URL Vercel udah dipasang dengan aman
+      const response = await fetch('https://my-event-rent.vercel.app/api/auth/resend-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -251,7 +253,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
         });
         const googleUser = await res.json();
         
-        const backendRes = await fetch('/api/auth/google', {
+        // ✅ URL Vercel udah dipasang dengan aman
+        const backendRes = await fetch('https://my-event-rent.vercel.app/api/auth/google', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -289,7 +292,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
       : { email: formData.email, password: formData.password };
 
     try {
-      const res = await fetch(`/api/auth/${endpoint}`, {
+      // ✅ URL Vercel udah dipasang dengan aman (pakai backtick)
+      const res = await fetch(`https://my-event-rent.vercel.app/api/auth/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { createClient } from '@supabase/supabase-js';
+import toast from 'react-hot-toast';
 
 import CustomDatePicker from './shared/CustomDatePicker';
 
@@ -47,14 +48,14 @@ export default function EditPublicEvent() {
   useEffect(() => {
     if (!userId) { navigate('/'); return; }
 
-    fetch(`/api/events/${id}`) 
+    fetch(`https://my-event-rent.vercel.app/api/events/${id}`) 
       .then(res => {
         if (!res.ok) throw new Error("Gagal load event");
         return res.json();
       })
       .then(found => {
         if (found.category === 'Wedding' || found.category === 'Personal' || found.is_private) {
-          alert("Ini adalah Private Event. Silakan edit melalui menu yang sesuai.");
+          toast.error("Ini adalah Private Event. Silakan edit melalui menu yang sesuai.");
           navigate('/manage');
           return;
         }
@@ -78,7 +79,7 @@ export default function EditPublicEvent() {
       })
       .catch(err => {
         console.error(err);
-        alert("Gagal memuat data edit");
+        toast.error("Gagal memuat data edit");
         navigate('/manage');
       });
   }, [id, navigate, userId]); // <--- SEKARANG UDAH AMAN DARI INFINITE LOOP!
@@ -129,7 +130,7 @@ export default function EditPublicEvent() {
         isPrivate: false 
       };
 
-      const res = await fetch(`/api/events/${id}?userId=${userId}`, {
+      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}?userId=${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -139,11 +140,11 @@ export default function EditPublicEvent() {
         setShowSuccessModal(true);
         setTimeout(() => { navigate('/manage'); }, 1500); 
       } else {
-        alert("Gagal update event. Pastikan kamu pembuat event ini.");
+        toast.error("Gagal update event. Pastikan kamu pembuat event ini.");
       }
     } catch (err) {
       console.error(err);
-      alert(err.message || "Terjadi kesalahan saat menyimpan data.");
+      toast.error(err.message || "Terjadi kesalahan saat menyimpan data.");
     } finally {
       setIsSaving(false);
     }

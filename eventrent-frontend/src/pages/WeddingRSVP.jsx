@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ChevronLeft, CheckCircle2, User, Users } from "lucide-react";
+import toast from 'react-hot-toast';
 
 export default function WeddingRSVP() {
   const { id } = useParams();
@@ -25,7 +26,7 @@ export default function WeddingRSVP() {
   useEffect(() => {
     const fetchEvent = async () => {
       try {
-        const res = await fetch(`/api/events/${id}`);
+        const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}`);
         if (!res.ok) throw new Error("Event tidak ditemukan");
         const data = await res.json();
         setEvent(data);
@@ -34,7 +35,7 @@ export default function WeddingRSVP() {
           setSelectedSessions([data.sessions[0].id]);
         }
       } catch (err) {
-        alert(err.message);
+        toast.error(err.message);
       } finally {
         setIsLoading(false);
       }
@@ -85,15 +86,15 @@ export default function WeddingRSVP() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (formData.isAttending === null) return alert("Pilih konfirmasi kehadiran Anda!");
+    if (formData.isAttending === null) return toast.error("Pilih konfirmasi kehadiran Anda!");
     if (formData.isAttending === true && selectedSessions.length === 0) {
-      return alert("Pilih minimal 1 sesi acara yang akan dihadiri!");
+      return toast.error("Pilih minimal 1 sesi acara yang akan dihadiri!");
     }
     
     // Validasi Custom Checkbox (Wajib Isi)
     for (const q of activeQuestions) {
       if (q.is_required && q.answer_type === 'Checkbox' && (!formData[q.id] || formData[q.id].length === 0)) {
-        return alert(`Pertanyaan "${q.question_text}" wajib diisi!`);
+        return toast.error(`Pertanyaan "${q.question_text}" wajib diisi!`);
       }
     }
 
@@ -124,7 +125,7 @@ export default function WeddingRSVP() {
       const token = localStorage.getItem("token");
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const response = await fetch('/api/tickets/buy', {
+      const response = await fetch('https://my-event-rent.vercel.app/api/tickets/buy', {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(payload)
@@ -142,7 +143,7 @@ export default function WeddingRSVP() {
       }, 3000);
 
     } catch (error) {
-      alert(error.message);
+      toast.error(error.message);
     } finally {
       setIsSubmitting(false);
     }

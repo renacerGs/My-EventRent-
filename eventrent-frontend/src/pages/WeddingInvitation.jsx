@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useSearchParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 // Import Semua Tema di Sini
 import ThemeElegantGold from '../components/templates/ThemeElegantGold';
@@ -19,13 +20,13 @@ export default function WeddingInvitation() {
   useEffect(() => {
     const fetchEvent = async () => {
       try {
-        const res = await fetch(`/api/events/${id}`);
+        const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}`);
         if (!res.ok) throw new Error('Undangan tidak ditemukan');
         const data = await res.json();
         setEvent(data);
       } catch (err) {
         console.error(err);
-        alert(err.message);
+        toast.error(err.message);
       } finally {
         setIsLoading(false);
       }

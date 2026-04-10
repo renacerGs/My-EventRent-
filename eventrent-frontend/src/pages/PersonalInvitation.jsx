@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 
+
 // 🔥 IMPORT SEMUA TEMPLATE LU DI SINI
 import ThemeBirthday from "../components/Templates/ThemeBirthday";
 import ThemePartyNight from "../components/Templates/ThemePartyNight"; 
@@ -19,7 +20,7 @@ export default function PersonalInvitation() {
   const guestName = searchParams.get("to") || "Bapak/Ibu/Saudara/i";
 
   useEffect(() => {
-    fetch(`/api/events/${id}`)
+    fetch(`https://my-event-rent.vercel.app/api/events/${id}`)
       .then(res => res.json())
       .then(data => {
         setEventData(data);

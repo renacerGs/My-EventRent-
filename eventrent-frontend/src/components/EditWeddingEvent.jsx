@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import { createClient } from '@supabase/supabase-js';
+import toast from 'react-hot-toast';
 
 // 🔥 IMPORT KOMPONEN DARI FOLDER SHARED
 import CustomDatePicker from './shared/CustomDatePicker';
@@ -88,14 +89,14 @@ export default function EditWeddingEvent() {
   useEffect(() => {
     if (!userId) { navigate('/'); return; }
 
-    fetch(`/api/events/${id}`)
+    fetch(`https://my-event-rent.vercel.app/api/events/${id}`)
       .then(res => {
         if (!res.ok) throw new Error("Gagal load event");
         return res.json();
       })
       .then(found => {
         if (found.category !== 'Wedding' && found.category !== 'Personal' && !found.is_private) {
-          alert("Ini bukan Private/Wedding Event. Gunakan menu Edit Public Event.");
+          toast.error("Ini bukan Private/Wedding Event. Gunakan menu Edit Public Event.");
           navigate('/manage');
           return;
         }
@@ -146,7 +147,7 @@ export default function EditWeddingEvent() {
       })
       .catch(err => {
         console.error(err);
-        alert("Gagal memuat data edit");
+        toast.error("Gagal memuat data edit");
         navigate('/manage');
       });
   }, [id, navigate, userId]);
@@ -170,7 +171,7 @@ export default function EditWeddingEvent() {
 
   const handleGallerySelect = (e) => {
     const files = Array.from(e.target.files);
-    if (existingGallery.length + newGalleryFiles.length + files.length > 5) return alert("Maksimal hanya 5 foto galeri!");
+    if (existingGallery.length + newGalleryFiles.length + files.length > 5) return toast.error("Maksimal hanya 5 foto galeri!");
     const newFiles = files.map(file => ({ file, preview: URL.createObjectURL(file) }));
     setNewGalleryFiles(prev => [...prev, ...newFiles]);
     e.target.value = null; 
@@ -196,7 +197,7 @@ export default function EditWeddingEvent() {
       if (cropTarget === 'cover') { setImagePreview(croppedBase64); setNewCoverBase64(croppedBase64); } 
       else { setProfiles(prev => prev.map(p => p.id === cropTarget ? { ...p, photoUrl: croppedBase64 } : p)); }
       setShowCropModal(false); setCropTarget(null);
-    } catch (e) { alert('Gagal memotong gambar!'); }
+    } catch (e) { toast.error('Gagal memotong gambar!'); }
   };
 
   const handleSessionLocationChange = (sIndex, field, value) => {
@@ -222,7 +223,7 @@ export default function EditWeddingEvent() {
 
   const removeSession = (indexToRemove) => {
     setFormData(prev => {
-      if (prev.sessions.length <= 1) { alert("Minimal harus ada 1 session untuk event ini!"); return prev; }
+      if (prev.sessions.length <= 1) { toast.error("Minimal harus ada 1 session untuk event ini!"); return prev; }
       return { ...prev, sessions: prev.sessions.filter((_, index) => index !== indexToRemove) };
     });
   };
@@ -328,15 +329,15 @@ export default function EditWeddingEvent() {
         isPrivate: true      
       };
 
-      const res = await fetch(`/api/events/${id}?userId=${userId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}?userId=${userId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 
       if (res.ok) { 
         setShowSuccessModal(true);
         setTimeout(() => { navigate('/manage'); }, 1500); 
       } else { 
-        alert("Gagal update. Pastikan kamu pembuat event ini."); 
+        toast.error("Gagal update. Pastikan kamu pembuat event ini.");
       }
-    } catch (err) { console.error(err); alert(err.message || "Terjadi kesalahan."); } 
+    } catch (err) { console.error(err); toast.error(err.message || "Terjadi kesalahan."); }
     finally { setIsSaving(false); }
   };
 

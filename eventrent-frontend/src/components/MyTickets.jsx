@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import html2canvas from 'html2canvas';
+import toast from 'react-hot-toast';
 
 const formatPrettyDate = (dateString) => {
   if (!dateString) return '';
@@ -69,8 +70,11 @@ export default function MyTickets() {
         return;
       }
       try {
-        const response = await axios.get(`/api/tickets/my?userId=${user.id}`);
-        const rawTickets = response.data;
+        // ✅ URL VERCEL
+        const response = await axios.get(`https://my-event-rent.vercel.app/api/tickets/my?userId=${user.id}`);
+        
+        // ✅ SABUK PENGAMAN (Cek apakah response beneran Array)
+        const rawTickets = Array.isArray(response.data) ? response.data : [];
 
         const grouped = {};
         rawTickets.forEach(ticket => {
@@ -158,7 +162,7 @@ export default function MyTickets() {
       document.body.removeChild(link);
     } catch (err) {
       console.error("Gagal download gambar tiket", err);
-      alert("Oops, gagal download tiket. Coba lagi bro!");
+      toast.error("Oops, gagal download tiket. Coba lagi bro!");
     } finally {
       window.scrollTo(0, currentScroll);
       setIsDownloading(false);

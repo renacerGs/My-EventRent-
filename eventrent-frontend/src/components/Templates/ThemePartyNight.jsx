@@ -154,7 +154,13 @@ export default function ThemePartyNight({ eventData, guestName, isOpen, onOpen, 
       {!isOpen && (
         <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
           <div className="absolute inset-0">
-            <img src={coverImg} alt="Party Night" className="w-full h-full object-cover opacity-60" />
+            {/* 👇 SABUK PENGAMAN GAMBAR 1 👇 */}
+            <img 
+              src={coverImg} 
+              alt="Party Night" 
+              className="w-full h-full object-cover opacity-60" 
+              onError={(e) => { e.target.onerror = null; e.target.src = "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?q=80&w=1000&auto=format&fit=crop"; }}
+            />
             <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/50 to-[#09090b]" />
             <div className="absolute inset-0 bg-gradient-to-r from-purple-900/20 via-transparent to-fuchsia-900/20" />
           </div>
@@ -191,7 +197,6 @@ export default function ThemePartyNight({ eventData, guestName, isOpen, onOpen, 
               {eventData?.title}
             </motion.p>
 
-            {/* 🔥 INI YANG DIGANTI SESUAI REQUEST LU 🔥 */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.5 }} className="mb-10 bg-black/50 py-3 px-6 rounded-2xl border border-white/10 inline-block backdrop-blur-sm">
               <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest mb-1">Untuk</p>
               <p className="text-lg text-white font-semibold">Teman & Sahabat Tersayang 💜</p>
@@ -235,7 +240,13 @@ export default function ThemePartyNight({ eventData, guestName, isOpen, onOpen, 
                   <div className="relative w-36 h-36 mx-auto mb-6">
                     <motion.div className="absolute -inset-1 rounded-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-pink-500 opacity-60 blur-md" animate={{ rotate: 360 }} transition={{ duration: 8, repeat: Infinity, ease: "linear" }} />
                     <div className="relative w-full h-full rounded-full overflow-hidden border-2 border-purple-500/50">
-                      <img src={hostPhoto} alt={hostName} className="w-full h-full object-cover" />
+                      {/* 👇 SABUK PENGAMAN GAMBAR 2 👇 */}
+                      <img 
+                        src={hostPhoto} 
+                        alt={hostName} 
+                        className="w-full h-full object-cover" 
+                        onError={(e) => { e.target.onerror = null; e.target.src = "https://api.dicebear.com/7.x/avataaars/svg?seed=Night"; }}
+                      />
                     </div>
                     <motion.div className="absolute -top-1 -right-1 text-2xl" animate={{ scale: [1, 1.3, 1] }} transition={{ duration: 2, repeat: Infinity }}>👑</motion.div>
                   </div>
@@ -331,7 +342,18 @@ export default function ThemePartyNight({ eventData, guestName, isOpen, onOpen, 
 
                   <div className="relative overflow-hidden rounded-2xl neon-border">
                     <AnimatePresence mode="wait">
-                      <motion.img key={current} src={gallery[current]} alt={`Gallery ${current}`} initial={{ opacity: 0, scale: 1.1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.5 }} className="w-full h-72 sm:h-96 object-cover" />
+                      {/* 👇 SABUK PENGAMAN GAMBAR 3 👇 */}
+                      <motion.img 
+                        key={current} 
+                        src={gallery[current]} 
+                        alt={`Gallery ${current}`} 
+                        initial={{ opacity: 0, scale: 1.1 }} 
+                        animate={{ opacity: 1, scale: 1 }} 
+                        exit={{ opacity: 0, scale: 0.95 }} 
+                        transition={{ duration: 0.5 }} 
+                        className="w-full h-72 sm:h-96 object-cover" 
+                        onError={(e) => { e.target.onerror = null; e.target.src = "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=1000&auto=format&fit=crop"; }}
+                      />
                     </AnimatePresence>
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
                     

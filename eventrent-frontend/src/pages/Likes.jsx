@@ -51,10 +51,14 @@ export default function Likes() {
       }
       try {
         setLoading(true);
-        const response = await axios.get(`/api/likes/my?userId=${user.id}`);
+        // ✅ URL VERCEL UDAH DISESUAIKAN DI SINI
+        const response = await axios.get(`https://my-event-rent.vercel.app/api/likes/my?userId=${user.id}`);
+        
         if (response.data) {
-          setLikedEvents(response.data);
-          localStorage.setItem('likedEvents', JSON.stringify(response.data));
+          // ✅ SABUK PENGAMAN BIAR GAK ERROR .map is not a function
+          const validData = Array.isArray(response.data) ? response.data : [];
+          setLikedEvents(validData);
+          localStorage.setItem('likedEvents', JSON.stringify(validData));
         }
       } catch (error) {
         console.error("Gagal mengambil data likes:", error);
@@ -81,7 +85,8 @@ export default function Likes() {
     setEventToUnlike(null);
     
     try {
-      await axios.post('/api/likes/toggle', {
+      // ✅ URL VERCEL (Ini udah bener dari lu sebelumnya)
+      await axios.post('https://my-event-rent.vercel.app/api/likes/toggle', {
         userId: user.id,
         eventId: eventToUnlike
       });
