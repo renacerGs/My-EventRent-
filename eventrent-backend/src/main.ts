@@ -12,7 +12,15 @@ async function bootstrap() {
   if (!cachedApp) {
     const app = await NestFactory.create(AppModule);
     
-    app.enableCors();
+    // 👇 FIX: CORS udah diamankan dan diarahkan ke Frontend lu
+    app.enableCors({
+      origin: [
+        'http://localhost:5173', 
+        'https://my-event-rent-jd94.vercel.app' // GANTI SAMA URL FRONTEND VERSI LIVE LU
+      ],
+      methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+      credentials: true,
+    });
 
     app.useGlobalPipes(new ValidationPipe({
       whitelist: true, 
@@ -32,23 +40,20 @@ async function bootstrap() {
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('api-docs', app, document);
 
-    // 👇 FIX: Jangan gunakan app.listen di sini, cukup inisialisasi mesinnya saja
     await app.init();
     cachedApp = app;
   }
   return cachedApp;
 }
 
-// 👇 JALUR 1: VERCEL SERVERLESS (Tanpa Port, Langsung Tembak Handler) 👇
-// Vercel akan otomatis ngebaca fungsi ini pas deploy
+// JALUR 1: VERCEL SERVERLESS
 export default async function (req: any, res: any) {
   const app = await bootstrap();
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp(req, res);
 }
 
-// 👇 JALUR 2: LOKAL DEVELOPMENT (Buat di Laptop Lu Sendiri) 👇
-// Kalau environment-nya BUKAN Vercel, dia bakal jalanin port kayak biasa
+// JALUR 2: LOKAL DEVELOPMENT
 if (!process.env.VERCEL) {
   bootstrap().then(app => {
     const port = process.env.PORT || 3000;
