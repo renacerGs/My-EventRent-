@@ -592,7 +592,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 👇 FIX: SEKARANG BISA DIAKSES OLEH EO ATAU AGEN 👇
   async getEventAttendees(eventId: number, userId: number) {
     try {
       // 1. Cek apakah dia Pemilik Event (EO)
@@ -769,11 +768,12 @@ export class AppService implements OnModuleInit {
     }
   }
 
+  // 👇 FIX RATING TAMPIL DI FRONTEND 👇
   async getAssignedEvents(agentId: number) {
     try {
       const query = `
         SELECT e.id, e.title, e.image_url as img, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start, 
-               e.place as location, ea.role, u.name as organizer_name
+               e.place as location, ea.role, ea.rating_given, u.name as organizer_name
         FROM event_agents ea
         JOIN events e ON ea.event_id = e.id
         JOIN users u ON e.created_by = u.id

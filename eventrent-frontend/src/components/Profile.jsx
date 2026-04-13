@@ -7,6 +7,7 @@ export default function Profile() {
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null);
   
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState(''); // STATE BARU UNTUK NO HP
   const [imagePreview, setImagePreview] = useState(null);
   const [imageBase64, setImageBase64] = useState(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
@@ -15,7 +16,6 @@ export default function Profile() {
   const [isLoadingPass, setIsLoadingPass] = useState(false);
 
   const [bankData, setBankData] = useState({ bank_name: '', bank_account: '', bank_account_name: '' });
-  const [assignedEvents, setAssignedEvents] = useState([]);
 
   const [popup, setPopup] = useState({ isOpen: false, message: '', type: 'info', action: null });
 
@@ -28,7 +28,6 @@ export default function Profile() {
     setPopup({ isOpen: false, message: '', type: 'info', action: null });
   };
 
-  // 👇 FIX: HANYA JALAN SEKALI SAAT HALAMAN DIBUKA (Mencegah Infinite Loop Egress) 👇
   useEffect(() => {
     if (!user) {
       navigate('/'); 
@@ -36,6 +35,7 @@ export default function Profile() {
     }
     
     setName(user.name || '');
+    setPhone(user.phone || ''); // ISI STATE NO HP DARI LOKAL (JIKA ADA)
     setImagePreview(user.picture || null);
     
     if (user.bank_name) {
@@ -45,22 +45,7 @@ export default function Profile() {
         bank_account_name: user.bank_account_name || ''
       });
     }
-
-    const fetchAssignedEvents = async () => {
-      try {
-        // FIX: URL nembak ke Vercel, bukan localhost
-        const res = await fetch(`https://my-event-rent.vercel.app/api/users/${user.id}/assigned-events`);
-        if (res.ok) {
-          const data = await res.json();
-          setAssignedEvents(data);
-        }
-      } catch (err) {
-        console.error("Gagal mengambil data tugas agen");
-      }
-    };
-
-    fetchAssignedEvents();
-  }, []); // <-- Array kosong ini kunci biar nggak nge-loop narik data terus
+  }, [navigate, user]); 
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -103,16 +88,22 @@ export default function Profile() {
     }
   };
 
+  const handlePhoneChange = (e) => {
+    // Validasi: Hanya izinkan input angka
+    const value = e.target.value.replace(/\D/g, '');
+    setPhone(value);
+  };
+
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     setIsLoadingProfile(true);
     try {
-      // FIX: URL nembak ke Vercel
       const res = await fetch(`https://my-event-rent.vercel.app/api/users/${user.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           name, 
+          phone, // KIRIM NO HP KE BACKEND
           img: imageBase64,
           bank_name: bankData.bank_name,
           bank_account: bankData.bank_account,
@@ -125,11 +116,12 @@ export default function Profile() {
         const newPicture = data.picture || imagePreview; 
         const updatedUser = { 
           ...user, 
-          name: data.name, 
+          name: data.name || name, // Fallback jika data name undefined
+          phone: data.phone || phone, // Fallback jika data phone undefined
           picture: newPicture,
-          bank_name: data.bank_name,
-          bank_account: data.bank_account,
-          bank_account_name: data.bank_account_name
+          bank_name: data.bank_name || bankData.bank_name,
+          bank_account: data.bank_account || bankData.bank_account,
+          bank_account_name: data.bank_account_name || bankData.bank_account_name
         };
         
         try {
@@ -167,7 +159,6 @@ export default function Profile() {
 
     setIsLoadingPass(true);
     try {
-      // FIX: URL nembak ke Vercel
       const res = await fetch(`https://my-event-rent.vercel.app/api/users/${user.id}/password`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -288,9 +279,22 @@ export default function Profile() {
                     <p className="text-[10px] text-red-400 font-bold mt-2 ml-1 uppercase tracking-widest">*Email tidak dapat diubah</p>
                   </div>
 
-                  {/* 👇 FIX: INPUT DATA BANK DIBIKIN 1 BARIS (GRID-COLS-3) 👇 */}
+                  {/* 👇 TAMBAHAN INPUT NO TELEPON 👇 */}
+                  <div>
+                    <label className={labelStyle}>No. Telepon / WhatsApp</label>
+                    <input 
+                      type="tel" 
+                      value={phone} 
+                      onChange={handlePhoneChange} 
+                      className={inputStyle} 
+                      placeholder="081234567890" 
+                    />
+                    <p className="text-[10px] text-gray-400 font-bold mt-2 ml-1">*Hanya gunakan angka</p>
+                  </div>
+
+                  {/* INPUT DATA BANK */}
                   <div className="pt-4 mt-6 border-t border-gray-100">
-                    <h3 className="text-[10px] font-black mb-4 uppercase tracking-widest bg-orange-50 w-max px-3 py-1.5 rounded-lg border border-orange-100 text-[#FF6B35]">🏦 Data Rekening (Untuk Agen)</h3>
+                    <h3 className="text-[10px] font-black mb-4 uppercase tracking-widest bg-orange-50 w-max px-3 py-1.5 rounded-lg border border-orange-100 text-[#FF6B35]">Data Rekening (Untuk Agen)</h3>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
@@ -323,7 +327,7 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* BAGIAN KANAN: SECURITY & TUGAS AGEN */}
+          {/* BAGIAN KANAN: SECURITY (KOTAK TUGAS AGEN DIHAPUS) */}
           <div className="lg:col-span-5 flex flex-col gap-8">
             <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100">
               <h2 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-wide border-b border-gray-100 pb-4">Keamanan</h2>
@@ -360,40 +364,6 @@ export default function Profile() {
                 </form>
               )}
             </div>
-
-            {/* 👇 KOTAK TUGAS AGEN (ASSIGNED EVENTS) 👇 */}
-            <div className="bg-gradient-to-br from-slate-900 to-black p-8 rounded-[32px] shadow-2xl border border-slate-800">
-              <div className="flex items-center gap-3 mb-6 border-b border-slate-800 pb-4">
-                <span className="text-2xl">📋</span>
-                <h2 className="text-xl font-black text-white uppercase tracking-wide">Tugas Kepanitiaan</h2>
-              </div>
-              
-              {assignedEvents.length > 0 ? (
-                <div className="space-y-4">
-                  {assignedEvents.map(ev => (
-                    <div key={ev.id} className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700 hover:bg-slate-800 transition-colors">
-                      <p className="text-[9px] font-black text-orange-400 uppercase tracking-widest mb-1">Role: {ev.role}</p>
-                      <h3 className="text-white font-bold text-base mb-1 truncate">{ev.title}</h3>
-                      <p className="text-slate-400 text-xs mb-4">Oleh: {ev.organizer_name}</p>
-                      <button 
-                        onClick={() => navigate(`/scanner/${ev.id}`)}
-                        className="w-full bg-[#FF6B35] text-white py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-all flex items-center justify-center gap-2"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
-                        Buka Scanner
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6">
-                  <p className="text-slate-500 text-xs font-bold leading-relaxed">
-                    Kamu belum ditugaskan sebagai panitia/agen di event mana pun.
-                  </p>
-                </div>
-              )}
-            </div>
-
           </div>
 
         </div>

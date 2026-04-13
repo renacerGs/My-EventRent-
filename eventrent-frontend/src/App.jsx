@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { Toaster, toast } from 'react-hot-toast'; // 🔥 IMPORT: Tambahkan ini untuk Toast
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Toaster, toast } from 'react-hot-toast'; 
 
 // Import Komponen
 import Navbar from './components/Navbar';
@@ -17,6 +17,9 @@ import EventDashboard from "./components/EventDashboard";
 import Checkout from "./pages/Checkout"; 
 import Scanner from './pages/Scanner';
 import TrackTicket from './pages/TrackTicket'; 
+
+// 👇 FIX: PASTIKAN FILE INI ADA DI DALAM FOLDER src/components/ 👇
+import AgentDashboard from './components/AgentDashboard'; 
 
 // --- ROUTE KHUSUS PEMBUATAN EVENT ---
 import ChooseEventType from "./components/ChooseEventType"; 
@@ -36,6 +39,7 @@ import PersonalInvitation from './pages/PersonalInvitation';
 import PersonalRSVP from './pages/PersonalRSVP';
 
 export default function App() {
+  const navigate = useNavigate();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [events, setEvents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,7 +65,7 @@ export default function App() {
       })
       .catch(err => {
         console.error("Gagal mengambil data event:", err);
-        toast.error("Gagal terhubung ke server"); // 🔥 IMPLEMENTASI TOAST ERROR
+        toast.error("Gagal terhubung ke server"); 
         setEvents([]); 
       });
   }, []);
@@ -77,7 +81,6 @@ export default function App() {
   return (
     <div className="bg-white min-h-screen font-sans flex flex-col">
       
-      {/* 🔥 KOMPONEN WAJIB TOAST: Taruh di root agar bisa muncul di semua halaman */}
       <Toaster 
         position="top-center" 
         toastOptions={{
@@ -100,7 +103,7 @@ export default function App() {
           onLogout={() => {
             setUser(null);
             localStorage.removeItem('user');
-            toast.success('Berhasil logout bro!'); // 🔥 IMPLEMENTASI TOAST LOGOUT
+            toast.success('Berhasil logout bro!'); 
           }}
         />
       )}
@@ -130,6 +133,9 @@ export default function App() {
           <Route path="/likes" element={<ProtectedRoute><Likes /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/my-tickets" element={<ProtectedRoute><MyTickets /></ProtectedRoute>} />
+          
+          {/* 👇 ROUTE BARU KHUSUS PORTAL AGEN 👇 */}
+          <Route path="/agent" element={<ProtectedRoute><AgentDashboard /></ProtectedRoute>} />
           
           {/* --- MANAJEMEN EVENT & DASHBOARD --- */}
           <Route path="/manage" element={<ProtectedRoute><ManageEvent /></ProtectedRoute>} />
@@ -163,7 +169,14 @@ export default function App() {
             localStorage.setItem('user', JSON.stringify({ ...userData, picture: null }));
           }
           setIsLoginOpen(false); 
-          toast.success('Login berhasil! Welcome back bro.'); // 🔥 IMPLEMENTASI TOAST LOGIN SUCCESS
+          
+          // 👇 LOGIKA REDIRECT BERDASARKAN ROLE 👇
+          if (userData.role === 'agent') {
+            toast.success(`Berhasil masuk portal agen, ${userData.name}!`);
+            navigate('/agent'); // Langsung lempar ke markas agen
+          } else {
+            toast.success('Login berhasil! Welcome back bro.'); 
+          }
         }}
       />
 
