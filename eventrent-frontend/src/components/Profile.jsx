@@ -7,7 +7,7 @@ export default function Profile() {
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null);
   
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState(''); // STATE BARU UNTUK NO HP
+  const [phone, setPhone] = useState(''); 
   const [imagePreview, setImagePreview] = useState(null);
   const [imageBase64, setImageBase64] = useState(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
@@ -35,7 +35,7 @@ export default function Profile() {
     }
     
     setName(user.name || '');
-    setPhone(user.phone || ''); // ISI STATE NO HP DARI LOKAL (JIKA ADA)
+    setPhone(user.phone || ''); 
     setImagePreview(user.picture || null);
     
     if (user.bank_name) {
@@ -45,7 +45,7 @@ export default function Profile() {
         bank_account_name: user.bank_account_name || ''
       });
     }
-  }, [navigate, user]); 
+  }, []);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -88,12 +88,6 @@ export default function Profile() {
     }
   };
 
-  const handlePhoneChange = (e) => {
-    // Validasi: Hanya izinkan input angka
-    const value = e.target.value.replace(/\D/g, '');
-    setPhone(value);
-  };
-
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     setIsLoadingProfile(true);
@@ -103,7 +97,7 @@ export default function Profile() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           name, 
-          phone, // KIRIM NO HP KE BACKEND
+          phone, 
           img: imageBase64,
           bank_name: bankData.bank_name,
           bank_account: bankData.bank_account,
@@ -116,12 +110,12 @@ export default function Profile() {
         const newPicture = data.picture || imagePreview; 
         const updatedUser = { 
           ...user, 
-          name: data.name || name, // Fallback jika data name undefined
-          phone: data.phone || phone, // Fallback jika data phone undefined
+          name: data.name, 
+          phone: data.phone, 
           picture: newPicture,
-          bank_name: data.bank_name || bankData.bank_name,
-          bank_account: data.bank_account || bankData.bank_account,
-          bank_account_name: data.bank_account_name || bankData.bank_account_name
+          bank_name: data.bank_name,
+          bank_account: data.bank_account,
+          bank_account_name: data.bank_account_name
         };
         
         try {
@@ -190,7 +184,6 @@ export default function Profile() {
   return (
     <div className="bg-[#F8F9FA] min-h-screen pt-10 pb-20 font-sans relative">
       
-      {/* --- UI POP UP MODERN ANIMATED --- */}
       <AnimatePresence>
         {popup.isOpen && (
           <div className="fixed inset-0 z-[120] flex flex-col items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
@@ -268,9 +261,16 @@ export default function Profile() {
                 </div>
 
                 <div className="space-y-6">
-                  <div>
-                    <label className={labelStyle}>Full Name</label>
-                    <input type="text" value={name} onChange={e => setName(e.target.value)} className={inputStyle} required />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className={labelStyle}>Full Name</label>
+                      <input type="text" value={name} onChange={e => setName(e.target.value)} className={inputStyle} required />
+                    </div>
+                    {/* INPUT NOMOR HP */}
+                    <div>
+                      <label className={labelStyle}>WhatsApp / Phone</label>
+                      <input type="text" value={phone} onChange={e => setPhone(e.target.value)} className={inputStyle} placeholder="081234567890" />
+                    </div>
                   </div>
                   
                   <div>
@@ -279,20 +279,6 @@ export default function Profile() {
                     <p className="text-[10px] text-red-400 font-bold mt-2 ml-1 uppercase tracking-widest">*Email tidak dapat diubah</p>
                   </div>
 
-                  {/* 👇 TAMBAHAN INPUT NO TELEPON 👇 */}
-                  <div>
-                    <label className={labelStyle}>No. Telepon / WhatsApp</label>
-                    <input 
-                      type="tel" 
-                      value={phone} 
-                      onChange={handlePhoneChange} 
-                      className={inputStyle} 
-                      placeholder="081234567890" 
-                    />
-                    <p className="text-[10px] text-gray-400 font-bold mt-2 ml-1">*Hanya gunakan angka</p>
-                  </div>
-
-                  {/* INPUT DATA BANK */}
                   <div className="pt-4 mt-6 border-t border-gray-100">
                     <h3 className="text-[10px] font-black mb-4 uppercase tracking-widest bg-orange-50 w-max px-3 py-1.5 rounded-lg border border-orange-100 text-[#FF6B35]">Data Rekening (Untuk Agen)</h3>
                     
@@ -306,7 +292,7 @@ export default function Profile() {
                         <input type="text" value={bankData.bank_account} onChange={e => setBankData({...bankData, bank_account: e.target.value})} className={inputStyle} placeholder="1234567890" />
                       </div>
                       <div>
-                        <label className={labelStyle}>A.N (Nama Pemilik)</label>
+                        <label className={labelStyle}>A.N (Pemilik)</label>
                         <input type="text" value={bankData.bank_account_name} onChange={e => setBankData({...bankData, bank_account_name: e.target.value})} className={inputStyle} placeholder="Budi Santoso" />
                       </div>
                     </div>
@@ -327,7 +313,7 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* BAGIAN KANAN: SECURITY (KOTAK TUGAS AGEN DIHAPUS) */}
+          {/* BAGIAN KANAN: SECURITY SAJA SEKARANG */}
           <div className="lg:col-span-5 flex flex-col gap-8">
             <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100">
               <h2 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-wide border-b border-gray-100 pb-4">Keamanan</h2>

@@ -12,7 +12,11 @@ export default function AgentDashboard() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [attendees, setAttendees] = useState([]);
   const [loadingAttendees, setLoadingAttendees] = useState(false);
+  
   const [searchQuery, setSearchQuery] = useState('');
+  // 👇 STATE BARU UNTUK FILTER SESI 👇
+  const [selectedSessionFilter, setSelectedSessionFilter] = useState('Semua Sesi');
+  
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -42,6 +46,7 @@ export default function AgentDashboard() {
   const handleOpenGuestList = async (eventData) => {
     setSelectedEvent(eventData);
     setSearchQuery('');
+    setSelectedSessionFilter('Semua Sesi');
     setCurrentPage(1);
     fetchGuestList(eventData.id);
   };
@@ -94,16 +99,26 @@ export default function AgentDashboard() {
     </div>
   );
 
+  // 👇 MENGAMBIL DAFTAR SESI YANG UNIK DARI DATA TAMU 👇
+  const uniqueSessions = ['Semua Sesi', ...new Set(attendees.map(t => t.session_name))];
+
+  // 👇 LOGIKA FILTER GABUNGAN (SEARCH + FILTER SESI) 👇
   const filteredAttendees = attendees.filter(t => {
-    if (!searchQuery) return true;
     const searchLower = searchQuery.toLowerCase();
-    return (t.attendee_name?.toLowerCase().includes(searchLower) || t.buyer_name?.toLowerCase().includes(searchLower) || t.ticket_id?.toLowerCase().includes(searchLower));
+    const matchSearch = !searchQuery || (
+      t.attendee_name?.toLowerCase().includes(searchLower) || 
+      t.buyer_name?.toLowerCase().includes(searchLower) || 
+      t.ticket_id?.toLowerCase().includes(searchLower)
+    );
+    const matchSession = selectedSessionFilter === 'Semua Sesi' || t.session_name === selectedSessionFilter;
+    
+    return matchSearch && matchSession;
   });
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredAttendees.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredAttendees.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredAttendees.length / itemsPerPage) || 1;
 
   const ratedEvents = assignedEvents.filter(ev => ev.rating_given > 0);
   const avgRating = ratedEvents.length > 0 
@@ -153,11 +168,9 @@ export default function AgentDashboard() {
               <h2 className="text-xl md:text-2xl font-black text-white uppercase tracking-wide">Daftar Tugas Anda</h2>
             </div>
 
-            {/* 👇👇 TAMPILAN LIST MEMANJANG ALA MANAGE EVENT 👇👇 */}
             {assignedEvents.length > 0 ? (
               <div className="bg-slate-800/50 rounded-[24px] md:rounded-[32px] border border-slate-700/50 overflow-hidden shadow-xl">
                 
-                {/* HEADER TABEL (KHUSUS DESKTOP) */}
                 <div className="hidden md:flex items-center justify-between px-8 py-4 bg-slate-900/50 border-b border-slate-700/50 text-[10px] font-black text-slate-500 uppercase tracking-widest">
                   <div className="w-[40%]">Event Details</div>
                   <div className="w-[20%] text-center">Tugas & Rating</div>
@@ -165,12 +178,10 @@ export default function AgentDashboard() {
                   <div className="w-[25%] text-right">Action</div>
                 </div>
 
-                {/* LIST EVENT */}
                 <div className="flex flex-col">
                   {assignedEvents.map((ev, index) => (
                     <div key={ev.id} className={`flex flex-col md:flex-row items-start md:items-center justify-between p-5 md:px-8 md:py-6 hover:bg-slate-700/30 transition-colors gap-4 md:gap-0 ${index !== assignedEvents.length - 1 ? 'border-b border-slate-700/50' : ''}`}>
                       
-                      {/* 1. Event Details (Gambar + Judul) */}
                       <div className="flex items-center gap-4 w-full md:w-[40%]">
                         <img src={ev.img} alt={ev.title} className="w-16 h-16 md:w-20 md:h-20 rounded-xl object-cover border border-slate-700 shrink-0" />
                         <div>
@@ -183,7 +194,6 @@ export default function AgentDashboard() {
                         </div>
                       </div>
 
-                      {/* 2. Tugas & Rating */}
                       <div className="w-full md:w-[20%] flex flex-row md:flex-col items-center justify-between md:justify-center gap-2 border-t md:border-none border-slate-700 pt-3 md:pt-0">
                         <span className="md:hidden text-[10px] font-bold text-slate-500 uppercase">Tugas:</span>
                         <div className="flex flex-col items-end md:items-center gap-1.5">
@@ -196,7 +206,6 @@ export default function AgentDashboard() {
                         </div>
                       </div>
 
-                      {/* 3. Status Event (ACTIVE) */}
                       <div className="w-full md:w-[15%] flex justify-between md:justify-center items-center border-t md:border-none border-slate-700 pt-3 md:pt-0">
                         <span className="md:hidden text-[10px] font-bold text-slate-500 uppercase">Status:</span>
                         <span className="bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">
@@ -204,14 +213,11 @@ export default function AgentDashboard() {
                         </span>
                       </div>
 
-                      {/* 4. Actions (Tombol) */}
                       <div className="w-full md:w-[25%] flex items-center justify-end gap-2 mt-2 md:mt-0">
-                        {/* Tombol Daftar Tamu */}
                         <button onClick={() => handleOpenGuestList(ev)} className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 transition-colors text-[10px] font-black uppercase tracking-widest border border-slate-600" title="Daftar Tamu">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                           <span className="md:hidden">Tamu</span>
                         </button>
-                        {/* Tombol Buka Scanner */}
                         <button onClick={() => navigate(`/scanner/${ev.id}`)} className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors text-[10px] font-black uppercase tracking-widest shadow-lg shadow-orange-500/20" title="Buka Scanner">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
                           <span className="md:hidden">Scan</span>
@@ -235,9 +241,8 @@ export default function AgentDashboard() {
             )}
           </>
         ) : (
-          /* TAMPILAN 2: DAFTAR TAMU SPESIFIK EVENT */
           <div className="animate-fadeIn">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
               <div>
                 <button onClick={() => setSelectedEvent(null)} className="text-slate-400 hover:text-orange-500 font-bold text-[10px] uppercase tracking-widest mb-2 flex items-center gap-1 transition-colors">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7"></path></svg> Kembali
@@ -245,15 +250,34 @@ export default function AgentDashboard() {
                 <h2 className="text-xl md:text-2xl font-black text-white leading-tight">Daftar Tamu: <span className="text-orange-500">{selectedEvent.title}</span></h2>
               </div>
               
-              <div className="relative w-full md:w-64">
-                <input 
-                  type="text" 
-                  placeholder="Cari nama atau ID tiket..." 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all"
-                />
-                <svg className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+              {/* 👇👇 DROPDOWN FILTER & SEARCH BAR 👇👇 */}
+              <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+                <select
+                  value={selectedSessionFilter}
+                  onChange={(e) => {
+                    setSelectedSessionFilter(e.target.value);
+                    setCurrentPage(1); // Reset halaman ke 1 pas filter diganti
+                  }}
+                  className="bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 cursor-pointer appearance-none"
+                >
+                  {uniqueSessions.map(session => (
+                    <option key={session} value={session}>{session}</option>
+                  ))}
+                </select>
+
+                <div className="relative w-full sm:w-64">
+                  <input 
+                    type="text" 
+                    placeholder="Cari nama, email, ID..." 
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1); // Reset halaman ke 1 pas ngetik search
+                    }}
+                    className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all"
+                  />
+                  <svg className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
               </div>
             </div>
 
@@ -307,7 +331,7 @@ export default function AgentDashboard() {
                           ))
                         ) : (
                           <tr>
-                            <td colSpan="5" className="px-6 py-12 text-center text-slate-500 font-bold text-sm">Tidak ada data tamu yang cocok.</td>
+                            <td colSpan="5" className="px-6 py-12 text-center text-slate-500 font-bold text-sm">Tidak ada data tamu yang cocok dengan filter.</td>
                           </tr>
                         )}
                       </tbody>

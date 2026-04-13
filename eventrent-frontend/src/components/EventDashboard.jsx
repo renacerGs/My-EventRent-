@@ -14,6 +14,8 @@ export default function EventDashboard() {
   const [isRefreshing, setIsRefreshing] = useState(false); 
   
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedSessionFilter, setSelectedSessionFilter] = useState('Semua Sesi'); // State Filter Sesi
+  
   const [popup, setPopup] = useState({ show: false, message: '', type: 'success' });
   const [confirmDialog, setConfirmDialog] = useState({ show: false, ticketId: null });
 
@@ -24,8 +26,6 @@ export default function EventDashboard() {
   const [agents, setAgents] = useState([]);
   const [agentEmailInput, setAgentEmailInput] = useState('');
   const [agentDetailModal, setAgentDetailModal] = useState(null); 
-  
-  // 👇 FIX BINTANG RATING: Tambah state rating_given 👇
   const [agentEditRole, setAgentEditRole] = useState({ show: false, agentId: null, role: '', rating_given: 0 });
 
   const fetchData = async (isBackground = false) => {
@@ -105,7 +105,7 @@ export default function EventDashboard() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery]);
+  }, [searchQuery, selectedSessionFilter]); // Reset halaman jika search/filter berubah
 
   const handleAddAgent = async (e) => {
     e.preventDefault();
@@ -144,7 +144,6 @@ export default function EventDashboard() {
     }
   };
 
-  // 👇 FIX BINTANG RATING: Mengirim rating_given ke backend 👇
   const submitEditRole = async () => {
     try {
       const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/agents/${agentEditRole.agentId}?eoId=${user?.id}`, {
@@ -187,6 +186,9 @@ export default function EventDashboard() {
   };
 
   const isWed = event?.is_private || event?.category === 'Wedding' || event?.category === 'Personal';
+  
+  // CEK APAKAH EVENT SUDAH SELESAI
+  const isEventEnded = event ? new Date(event.date_end) < new Date() : false;
 
   const handleExportCSV = () => {
     let csvHeader = isWed 
@@ -223,19 +225,25 @@ export default function EventDashboard() {
     setPopup({ show: true, message: "Link Undangan/Event berhasil disalin!", type: 'success' }); 
   };
 
+  // FILTER GABUNGAN (SEARCH + SESSION)
   const filteredOrders = groupedAttendees.filter(order => {
-    if (!searchQuery) return true;
-    return order.tickets.some(t => 
+    const matchSearch = !searchQuery || order.tickets.some(t => 
       t.attendee_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
       order.buyer_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (t.greeting && t.greeting.toLowerCase().includes(searchQuery.toLowerCase())) 
     );
+    
+    const matchSession = selectedSessionFilter === 'Semua Sesi' || order.tickets.some(t => t.session_name === selectedSessionFilter);
+
+    return matchSearch && matchSession;
   });
+
+  const uniqueSessions = ['Semua Sesi', ...new Set(groupedAttendees.flatMap(o => o.tickets.map(t => t.session_name)))];
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredOrders.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage) || 1;
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   if (loading && !event) return (
@@ -303,8 +311,12 @@ export default function EventDashboard() {
             <div className="flex flex-col items-center mb-6">
               <img src={agentDetailModal.picture} alt={agentDetailModal.name} className="w-24 h-24 rounded-full object-cover border-4 border-orange-50 shadow-md mb-4" />
               <h4 className="text-xl font-black text-gray-900">{agentDetailModal.name}</h4>
-              <p className="text-xs text-gray-500 font-bold mb-3">{agentDetailModal.email}</p>
-              <div className="bg-yellow-50 text-yellow-600 px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest flex items-center gap-1.5">
+              <p className="text-xs text-gray-500 font-bold">{agentDetailModal.email}</p>
+              {/* NAMPILIN NOMOR HP AGEN */}
+              {agentDetailModal.phone && (
+                <p className="text-xs text-[#FF6B35] font-black mt-1">📞 {agentDetailModal.phone}</p>
+              )}
+              <div className="bg-yellow-50 text-yellow-600 px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest flex items-center gap-1.5 mt-3">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
                 {agentDetailModal.rating_given ? `${agentDetailModal.rating_given}.0` : 'Belum Ada Rating'}
               </div>
@@ -326,7 +338,7 @@ export default function EventDashboard() {
         </div>
       )}
 
-      {/* 👇 FIX BINTANG RATING: MODAL KELOLA AGEN DENGAN BINTANG 👇 */}
+      {/* KELOLA AGEN DENGAN BINTANG & LOCK */}
       {agentEditRole.show && (
         <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
           <div className="bg-white rounded-[32px] p-8 max-w-sm w-full shadow-2xl">
@@ -344,22 +356,31 @@ export default function EventDashboard() {
               />
             </div>
 
-            {/* BINTANG RATING UNTUK EO */}
+            {/* BINTANG RATING DENGAN LOCK JIKA EVENT BELUM SELESAI */}
             <div className="mb-8">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 block">Berikan Bintang / Rating</label>
-              <div className="flex gap-2 justify-center bg-gray-50 p-3 rounded-xl border border-gray-200">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 flex justify-between items-center">
+                <span>Berikan Bintang / Rating</span>
+                {!isEventEnded && <span className="bg-red-50 text-red-500 px-2 py-0.5 rounded text-[8px] flex items-center gap-1"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg> TERKUNCI</span>}
+              </label>
+              
+              <div className={`flex gap-2 justify-center bg-gray-50 p-3 rounded-xl border border-gray-200 ${!isEventEnded ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}>
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
                     key={star}
                     type="button"
+                    disabled={!isEventEnded}
                     onClick={() => setAgentEditRole(prev => ({ ...prev, rating_given: star }))}
-                    className={`text-3xl transition-transform active:scale-75 ${agentEditRole.rating_given >= star ? 'text-yellow-400 drop-shadow-sm' : 'text-gray-300'}`}
+                    className={`text-3xl transition-transform ${isEventEnded ? 'active:scale-75' : ''} ${agentEditRole.rating_given >= star ? 'text-yellow-400 drop-shadow-sm' : 'text-gray-300'}`}
                   >
                     ★
                   </button>
                 ))}
               </div>
-              <p className="text-[10px] text-center font-bold text-gray-400 mt-2 italic">Rating Anda bakal tampil di profil Agen.</p>
+              {!isEventEnded ? (
+                <p className="text-[10px] text-center font-bold text-red-400 mt-2 italic">*Rating baru bisa diberikan setelah event selesai ({event?.date_end}).</p>
+              ) : (
+                <p className="text-[10px] text-center font-bold text-gray-400 mt-2 italic">Rating Anda bakal tampil di profil Agen.</p>
+              )}
             </div>
 
             <div className="flex gap-3">
@@ -437,7 +458,22 @@ export default function EventDashboard() {
           <div className="bg-white rounded-[24px] md:rounded-[32px] shadow-sm border border-gray-200 overflow-hidden mb-10 animate-fadeIn">
             <div className="px-5 py-5 md:px-8 md:py-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <h3 className="text-lg md:text-xl font-bold text-gray-900">{isWed ? 'Buku Tamu & RSVP' : 'Peserta Event'}</h3>
-              <div className="flex flex-row items-center gap-2 md:gap-3 w-full md:w-auto">
+              
+              {/* DROPDOWN FILTER & SEARCH UNTUK EO */}
+              <div className="flex flex-col sm:flex-row items-center gap-2 md:gap-3 w-full lg:w-auto">
+                <select
+                  value={selectedSessionFilter}
+                  onChange={(e) => {
+                    setSelectedSessionFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full sm:w-auto bg-gray-50 border border-gray-200 text-gray-700 rounded-xl px-4 py-2.5 text-xs font-bold focus:outline-none focus:border-[#FF6B35] focus:ring-1 focus:ring-[#FF6B35]"
+                >
+                  {uniqueSessions.map(session => (
+                    <option key={session} value={session}>{session}</option>
+                  ))}
+                </select>
+
                 <div className="relative flex-1 sm:w-64">
                   <input type="text" placeholder={isWed ? "Cari tamu atau doa..." : "Cari peserta..."} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-9 pr-3 md:pl-10 md:pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs md:text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/20 focus:border-[#FF6B35] transition-all" />
                   <svg className="w-3.5 h-3.5 md:w-4 md:h-4 text-gray-400 absolute left-3.5 md:left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
@@ -509,7 +545,7 @@ export default function EventDashboard() {
                   ))
                 ) : (
                   <tbody>
-                    <tr><td colSpan="6" className="px-8 py-10 text-center text-gray-400 font-bold text-sm"><div className="flex flex-col items-center justify-center"><svg className="w-12 h-12 mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>Tidak ada data yang cocok.</div></td></tr>
+                    <tr><td colSpan="6" className="px-8 py-10 text-center text-gray-400 font-bold text-sm"><div className="flex flex-col items-center justify-center"><svg className="w-12 h-12 mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>Tidak ada data yang cocok dengan filter.</div></td></tr>
                   </tbody>
                 )}
               </table>
@@ -607,7 +643,6 @@ export default function EventDashboard() {
                         <td className="px-8 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <button onClick={() => setAgentDetailModal(a)} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors" title="Lihat CV/Profil"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg></button>
-                            {/* TOMBOL EDIT ROLE DIKLIK -> BUKA MODAL */}
                             <button onClick={() => setAgentEditRole({ show: true, agentId: a.id, role: a.role || '', rating_given: a.rating_given || 0 })} className="p-2 bg-orange-50 text-[#FF6B35] rounded-xl hover:bg-orange-100 transition-colors" title="Kelola Agen"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
                             <button onClick={() => handleRemoveAgent(a.id)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors" title="Berhentikan Agen"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
                           </div>
