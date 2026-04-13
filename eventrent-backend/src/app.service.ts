@@ -935,8 +935,15 @@ export class AppService implements OnModuleInit {
 
   async updateProfile(userId: number, data: any) {
     const res = await this.pool.query(
-      `UPDATE users SET name = $1, picture = COALESCE($2, picture) WHERE id = $3 RETURNING id, name, email, picture`,
-      [data.name, data.img || null, userId]
+      `UPDATE users 
+       SET name = $1, 
+           picture = COALESCE($2, picture),
+           bank_name = COALESCE($3, bank_name),
+           bank_account = COALESCE($4, bank_account),
+           bank_account_name = COALESCE($5, bank_account_name)
+       WHERE id = $6 
+       RETURNING id, name, email, picture, bank_name, bank_account, bank_account_name`,
+      [data.name, data.img || null, data.bank_name, data.bank_account, data.bank_account_name, userId]
     );
     return res.rows[0];
   }
