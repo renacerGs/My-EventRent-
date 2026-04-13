@@ -39,14 +39,13 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 👇 FUNGSI BARU: GENERATOR KODE TIKET ALPHANUMERIC
   private generateTicketCode(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
     for (let i = 0; i < 6; i++) {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    return `TKT-${code}`; // Hasil: TKT-A9X2B1
+    return `TKT-${code}`; 
   }
 
   // --- EVENTS ---
@@ -285,21 +284,17 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 👇 FUNGSI BARU: ON/OFF VISIBILITY EVENT 👇
   async toggleEventVisibility(eventId: number, userId: number) {
     try {
-      // 1. Cek dulu apakah event ini beneran punya si user
       const checkRes = await this.pool.query('SELECT is_private FROM events WHERE id = $1 AND created_by = $2', [eventId, userId]);
       
       if (checkRes.rows.length === 0) {
         throw new UnauthorizedException('Event tidak ditemukan atau bukan milikmu!');
       }
 
-      // 2. Balik statusnya (kalau true jadi false, kalau false jadi true)
       const currentStatus = checkRes.rows[0].is_private;
       const newStatus = !currentStatus;
 
-      // 3. Update ke database
       const updateRes = await this.pool.query(
         'UPDATE events SET is_private = $1 WHERE id = $2 RETURNING id, is_private',
         [newStatus, eventId]
@@ -622,11 +617,26 @@ export class AppService implements OnModuleInit {
     }
   }
 
+  // 👇 FIX: SEKARANG SCANNER BISA DIAKSES OLEH EO ATAU AGEN
   async scanTicket(ticketCode: string, eventId: number, userId: number) {
     try {
+      // 1. Cek apakah dia Pemilik Event (EO)
       const eventCheck = await this.pool.query('SELECT created_by FROM events WHERE id = $1', [eventId]);
       if (eventCheck.rows.length === 0) throw new BadRequestException('Event tidak ditemukan');
-      if (eventCheck.rows[0].created_by != userId) throw new UnauthorizedException('Akses ditolak! Kamu bukan panitia event ini.');
+      
+      const isOwner = eventCheck.rows[0].created_by == userId;
+
+      // 2. Cek apakah dia Agen di event ini (Jika bukan owner)
+      let isAgent = false;
+      if (!isOwner) {
+        const agentCheck = await this.pool.query('SELECT id FROM event_agents WHERE event_id = $1 AND user_id = $2', [eventId, userId]);
+        isAgent = agentCheck.rows.length > 0;
+      }
+
+      // 3. Kalau bukan bos dan bukan agen, tolak!
+      if (!isOwner && !isAgent) {
+        throw new UnauthorizedException('Akses ditolak! Kamu bukan pembuat event atau panitia di event ini.');
+      }
 
       const ticketRes = await this.pool.query(`
         SELECT t.id, t.is_scanned, t.scanned_at, t.price, t.pax, t.greeting, t.is_attending,
@@ -656,6 +666,110 @@ export class AppService implements OnModuleInit {
     } catch (err) {
       if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
       throw new InternalServerErrorException('Gagal memproses validasi tiket');
+    }
+  }
+
+  // --- AGENTS (PANITIA/EO) ---
+
+  async addAgent(eventId: number, eoId: number, agentEmail: string, role: string = 'Agen') {
+    try {
+      const eventCheck = await this.pool.query('SELECT id FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
+      if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
+
+      const userRes = await this.pool.query('SELECT id FROM users WHERE email = $1', [agentEmail]);
+      if (userRes.rows.length === 0) throw new BadRequestException('Email tidak ditemukan. Pastikan agen sudah daftar akun EventRent.');
+      const agentId = userRes.rows[0].id;
+
+      if (agentId == eoId) throw new BadRequestException('Anda adalah pembuat event, tidak perlu ditambahkan sebagai agen.');
+
+      const checkAgent = await this.pool.query('SELECT id FROM event_agents WHERE event_id = $1 AND user_id = $2', [eventId, agentId]);
+      if (checkAgent.rows.length > 0) throw new BadRequestException('Agen ini sudah terdaftar di event ini!');
+
+      const insertRes = await this.pool.query(
+        'INSERT INTO event_agents (event_id, user_id, role) VALUES ($1, $2, $3) RETURNING *',
+        [eventId, agentId, role]
+      );
+      
+      return { message: 'Agen berhasil ditambahkan!', data: insertRes.rows[0] };
+    } catch (err) {
+      if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
+      console.error(err);
+      throw new InternalServerErrorException('Gagal menambahkan agen');
+    }
+  }
+
+  async getEventAgents(eventId: number, eoId: number) {
+    try {
+      const eventCheck = await this.pool.query('SELECT id FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
+      if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
+
+      const query = `
+        SELECT ea.user_id as id, ea.role, ea.rating_given, ea.created_at, 
+               u.name, u.email, u.picture, u.bank_name, u.bank_account, u.bank_account_name
+        FROM event_agents ea
+        JOIN users u ON ea.user_id = u.id
+        WHERE ea.event_id = $1
+        ORDER BY ea.created_at DESC
+      `;
+      const { rows } = await this.pool.query(query, [eventId]);
+      return rows;
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
+      throw new InternalServerErrorException('Gagal mengambil daftar agen');
+    }
+  }
+
+  async removeAgent(eventId: number, eoId: number, agentId: number) {
+    try {
+      const eventCheck = await this.pool.query('SELECT id FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
+      if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
+
+      const delRes = await this.pool.query('DELETE FROM event_agents WHERE event_id = $1 AND user_id = $2 RETURNING id', [eventId, agentId]);
+      if (delRes.rowCount === 0) throw new BadRequestException('Agen tidak ditemukan di event ini');
+
+      return { message: 'Agen berhasil dihapus/diberhentikan' };
+    } catch (err) {
+      if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
+      throw new InternalServerErrorException('Gagal menghapus agen');
+    }
+  }
+
+  async updateAgent(eventId: number, eoId: number, agentId: number, data: { role?: string, rating_given?: number }) {
+    try {
+      const eventCheck = await this.pool.query('SELECT id FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
+      if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
+
+      const updateRes = await this.pool.query(
+        `UPDATE event_agents SET 
+         role = COALESCE($1, role), 
+         rating_given = COALESCE($2, rating_given) 
+         WHERE event_id = $3 AND user_id = $4 RETURNING *`,
+        [data.role, data.rating_given, eventId, agentId]
+      );
+
+      if (updateRes.rowCount === 0) throw new BadRequestException('Agen tidak ditemukan');
+      return { message: 'Data agen diperbarui', data: updateRes.rows[0] };
+    } catch (err) {
+      if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
+      throw new InternalServerErrorException('Gagal mengupdate data agen');
+    }
+  }
+
+  async getAssignedEvents(agentId: number) {
+    try {
+      const query = `
+        SELECT e.id, e.title, e.image_url as img, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start, 
+               e.place as location, ea.role, u.name as organizer_name
+        FROM event_agents ea
+        JOIN events e ON ea.event_id = e.id
+        JOIN users u ON e.created_by = u.id
+        WHERE ea.user_id = $1
+        ORDER BY e.event_start ASC
+      `;
+      const { rows } = await this.pool.query(query, [agentId]);
+      return rows;
+    } catch (err) {
+      throw new InternalServerErrorException('Gagal mengambil daftar tugas agen');
     }
   }
 
@@ -695,9 +809,8 @@ export class AppService implements OnModuleInit {
     const hashedPassword = await bcrypt.hash(data.password, 10);
     const defaultPic = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(data.name)}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4`;
     
-    // Generate OTP (6 digit)
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiresAt = new Date(Date.now() + 15 * 60000); // 15 menit
+    const otpExpiresAt = new Date(Date.now() + 15 * 60000); 
 
     const insertRes = await this.pool.query(
       `INSERT INTO users (name, email, password, picture, is_verified, otp_code, otp_expires_at) 
@@ -707,7 +820,6 @@ export class AppService implements OnModuleInit {
     
     const newUser = insertRes.rows[0];
 
-    // Kirim Email OTP pake Nodemailer
     const mailOptions = {
       from: '"EventRent Team" <noreply@eventrent.com>',
       to: data.email,
@@ -742,7 +854,6 @@ export class AppService implements OnModuleInit {
     };
   }
 
-  // 👇 FUNGSI BARU: Verifikasi OTP
   async verifyOTP(email: string, otpCode: string) {
     const res = await this.pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (res.rows.length === 0) throw new BadRequestException('User tidak ditemukan');
@@ -768,7 +879,6 @@ export class AppService implements OnModuleInit {
     };
   }
 
-  // 👇 FUNGSI BARU: Kirim Ulang OTP
   async resendOTP(email: string) {
     const res = await this.pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (res.rows.length === 0) throw new BadRequestException('User tidak ditemukan');
@@ -777,7 +887,7 @@ export class AppService implements OnModuleInit {
     if (user.is_verified) throw new BadRequestException('Akun ini sudah terverifikasi');
 
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiresAt = new Date(Date.now() + 15 * 60000); // 15 menit
+    const otpExpiresAt = new Date(Date.now() + 15 * 60000); 
 
     await this.pool.query(
       `UPDATE users SET otp_code = $1, otp_expires_at = $2 WHERE id = $3`,
@@ -812,7 +922,6 @@ export class AppService implements OnModuleInit {
     if (res.rows.length === 0) throw new UnauthorizedException('Email/Password salah');
     const user = res.rows[0];
     
-    // Cek Verifikasi
     if (!user.is_verified) {
       throw new UnauthorizedException('Akun belum terverifikasi! Silakan cek email Anda untuk OTP.');
     }

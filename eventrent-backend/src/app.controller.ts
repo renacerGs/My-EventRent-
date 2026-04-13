@@ -1,11 +1,7 @@
 // src/app.controller.ts
-// 👇 FIX: Sudah ditambahkan 'Patch' di sini
 import { Controller, Get, Post, Body, Query, Delete, Param, Put, Patch } from '@nestjs/common'; 
 import { AppService } from './app.service';
-
-// <--- 1. IMPORT DECORATOR SWAGGER --->
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
-
 import { BuyTicketDto } from './dto/buy-ticket.dto';
 
 @Controller('api')
@@ -64,7 +60,6 @@ export class AppController {
     return await this.appService.incrementView(id);
   }
 
-  // 👇 FIX: ENDPOINT BARU UNTUK TOGGLE VISIBILITY 👇
   @ApiTags('Events')
   @ApiOperation({ summary: 'Menyalakan/mematikan visibilitas event di halaman utama (Public/Private)' })
   @Patch('events/:id/visibility')
@@ -153,6 +148,56 @@ export class AppController {
   async scanTicket(@Body() body: { ticketId: string, eventId: number, userId: number }) {
     return this.appService.scanTicket(body.ticketId, body.eventId, body.userId);
   }
+
+  // 👇👇👇 API BARU UNTUK AGENTS (KEPANITIAAN) 👇👇👇
+  @ApiTags('Agents (Kepanitiaan)')
+  @ApiOperation({ summary: 'Menambahkan agen baru ke dalam event' })
+  @Post('events/:id/agents')
+  async addAgent(
+    @Param('id') eventId: number, 
+    @Query('eoId') eoId: number, 
+    @Body() body: { email: string; role?: string }
+  ) {
+    return await this.appService.addAgent(eventId, eoId, body.email, body.role);
+  }
+
+  @ApiTags('Agents (Kepanitiaan)')
+  @ApiOperation({ summary: 'Mendapatkan daftar agen di sebuah event (Untuk Dashboard EO)' })
+  @Get('events/:id/agents')
+  async getEventAgents(@Param('id') eventId: number, @Query('eoId') eoId: number) {
+    return await this.appService.getEventAgents(eventId, eoId);
+  }
+
+  @ApiTags('Agents (Kepanitiaan)')
+  @ApiOperation({ summary: 'Mengubah peran (role) atau memberikan rating ke agen' })
+  @Put('events/:id/agents/:agentId')
+  async updateAgent(
+    @Param('id') eventId: number, 
+    @Param('agentId') agentId: number, 
+    @Query('eoId') eoId: number, 
+    @Body() body: { role?: string; rating_given?: number }
+  ) {
+    return await this.appService.updateAgent(eventId, eoId, agentId, body);
+  }
+
+  @ApiTags('Agents (Kepanitiaan)')
+  @ApiOperation({ summary: 'Menghapus/memecat agen dari event' })
+  @Delete('events/:id/agents/:agentId')
+  async removeAgent(
+    @Param('id') eventId: number, 
+    @Param('agentId') agentId: number, 
+    @Query('eoId') eoId: number
+  ) {
+    return await this.appService.removeAgent(eventId, eoId, agentId);
+  }
+
+  @ApiTags('Agents (Kepanitiaan)')
+  @ApiOperation({ summary: 'Mendapatkan daftar event di mana user ditugaskan sebagai agen (Dashboard Agen)' })
+  @Get('users/:id/assigned-events')
+  async getAssignedEvents(@Param('id') agentId: number) {
+    return await this.appService.getAssignedEvents(agentId);
+  }
+  // 👆👆👆 BATAS API AGENTS 👆👆👆
   
   // --- AUTH & USERS ---
   @ApiTags('Authentication & Users')
