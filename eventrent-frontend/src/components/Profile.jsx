@@ -14,7 +14,9 @@ export default function Profile() {
   const [passData, setPassData] = useState({ oldPass: '', newPass: '', confirmPass: '' });
   const [isLoadingPass, setIsLoadingPass] = useState(false);
 
-  // --- STATE UNTUK POP-UP MODERN ---
+  const [bankData, setBankData] = useState({ bank_name: '', bank_account: '', bank_account_name: '' });
+  const [assignedEvents, setAssignedEvents] = useState([]);
+
   const [popup, setPopup] = useState({ isOpen: false, message: '', type: 'info', action: null });
 
   const showPopup = (message, type = 'info', action = null) => {
@@ -22,18 +24,43 @@ export default function Profile() {
   };
 
   const closePopup = () => {
-    if (popup.action) popup.action(); // Eksekusi fungsi tambahan kalau ada (misal reload)
+    if (popup.action) popup.action(); 
     setPopup({ isOpen: false, message: '', type: 'info', action: null });
   };
 
+  // 👇 FIX: HANYA JALAN SEKALI SAAT HALAMAN DIBUKA (Mencegah Infinite Loop Egress) 👇
   useEffect(() => {
     if (!user) {
       navigate('/'); 
       return;
     }
-    setName(user.name);
-    setImagePreview(user.picture);
-  }, [navigate, user]);
+    
+    setName(user.name || '');
+    setImagePreview(user.picture || null);
+    
+    if (user.bank_name) {
+      setBankData({
+        bank_name: user.bank_name || '',
+        bank_account: user.bank_account || '',
+        bank_account_name: user.bank_account_name || ''
+      });
+    }
+
+    const fetchAssignedEvents = async () => {
+      try {
+        // FIX: URL nembak ke Vercel, bukan localhost
+        const res = await fetch(`https://my-event-rent.vercel.app/api/users/${user.id}/assigned-events`);
+        if (res.ok) {
+          const data = await res.json();
+          setAssignedEvents(data);
+        }
+      } catch (err) {
+        console.error("Gagal mengambil data tugas agen");
+      }
+    };
+
+    fetchAssignedEvents();
+  }, []); // <-- Array kosong ini kunci biar nggak nge-loop narik data terus
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -80,16 +107,30 @@ export default function Profile() {
     e.preventDefault();
     setIsLoadingProfile(true);
     try {
+      // FIX: URL nembak ke Vercel
       const res = await fetch(`https://my-event-rent.vercel.app/api/users/${user.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, img: imageBase64 })
+        body: JSON.stringify({ 
+          name, 
+          img: imageBase64,
+          bank_name: bankData.bank_name,
+          bank_account: bankData.bank_account,
+          bank_account_name: bankData.bank_account_name
+        })
       });
       const data = await res.json();
       
       if (res.ok) {
         const newPicture = data.picture || imagePreview; 
-        const updatedUser = { ...user, name: data.name, picture: newPicture };
+        const updatedUser = { 
+          ...user, 
+          name: data.name, 
+          picture: newPicture,
+          bank_name: data.bank_name,
+          bank_account: data.bank_account,
+          bank_account_name: data.bank_account_name
+        };
         
         try {
           localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -101,8 +142,7 @@ export default function Profile() {
         setUser(updatedUser); 
         setImageBase64(null); 
         
-        // Munculin Pop-up Success, dan reload page cuma PAS tombol Tutup diklik
-        showPopup("Profil berhasil diperbarui!", "success", () => window.location.reload());
+        showPopup("Profil & Data Bank berhasil diperbarui!", "success", () => window.location.reload());
       } else {
         showPopup("Gagal memperbarui profil", "error");
       }
@@ -127,6 +167,7 @@ export default function Profile() {
 
     setIsLoadingPass(true);
     try {
+      // FIX: URL nembak ke Vercel
       const res = await fetch(`https://my-event-rent.vercel.app/api/users/${user.id}/password`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -206,10 +247,10 @@ export default function Profile() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* BAGIAN KIRI: PROFIL UTAMA */}
+          {/* BAGIAN KIRI: PROFIL UTAMA & BANK */}
           <div className="lg:col-span-7">
             <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100">
-              <h2 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-wide border-b border-gray-100 pb-4">Personal Info</h2>
+              <h2 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-wide border-b border-gray-100 pb-4">Personal & Bank Info</h2>
               
               <form onSubmit={handleUpdateProfile}>
                 <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8 bg-gray-50 p-6 rounded-2xl border border-gray-100">
@@ -247,13 +288,34 @@ export default function Profile() {
                     <p className="text-[10px] text-red-400 font-bold mt-2 ml-1 uppercase tracking-widest">*Email tidak dapat diubah</p>
                   </div>
 
-                  <div className="pt-4">
+                  {/* 👇 FIX: INPUT DATA BANK DIBIKIN 1 BARIS (GRID-COLS-3) 👇 */}
+                  <div className="pt-4 mt-6 border-t border-gray-100">
+                    <h3 className="text-[10px] font-black mb-4 uppercase tracking-widest bg-orange-50 w-max px-3 py-1.5 rounded-lg border border-orange-100 text-[#FF6B35]">🏦 Data Rekening (Untuk Agen)</h3>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className={labelStyle}>Nama Bank</label>
+                        <input type="text" value={bankData.bank_name} onChange={e => setBankData({...bankData, bank_name: e.target.value})} className={inputStyle} placeholder="BCA / Mandiri" />
+                      </div>
+                      <div>
+                        <label className={labelStyle}>Nomor Rekening</label>
+                        <input type="text" value={bankData.bank_account} onChange={e => setBankData({...bankData, bank_account: e.target.value})} className={inputStyle} placeholder="1234567890" />
+                      </div>
+                      <div>
+                        <label className={labelStyle}>A.N (Nama Pemilik)</label>
+                        <input type="text" value={bankData.bank_account_name} onChange={e => setBankData({...bankData, bank_account_name: e.target.value})} className={inputStyle} placeholder="Budi Santoso" />
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-gray-400 font-bold mt-2 ml-1">*Lengkapi data ini agar EO mudah mentransfer upah Anda.</p>
+                  </div>
+
+                  <div className="pt-6">
                     <button 
                       type="submit" 
                       disabled={isLoadingProfile}
                       className="w-full sm:w-auto bg-[#FF6B35] text-white px-10 py-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-orange-100 hover:bg-[#E85526] transition-all active:scale-95 disabled:opacity-50"
                     >
-                      {isLoadingProfile ? 'Menyimpan...' : 'Simpan Profil'}
+                      {isLoadingProfile ? 'Menyimpan...' : 'Simpan Perubahan'}
                     </button>
                   </div>
                 </div>
@@ -261,23 +323,23 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* BAGIAN KANAN: SECURITY */}
-          <div className="lg:col-span-5">
-            <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 h-full">
+          {/* BAGIAN KANAN: SECURITY & TUGAS AGEN */}
+          <div className="lg:col-span-5 flex flex-col gap-8">
+            <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100">
               <h2 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-wide border-b border-gray-100 pb-4">Keamanan</h2>
               
               {isGoogleUser ? (
-                <div className="text-center py-12 px-4 bg-blue-50/50 rounded-2xl border border-blue-100">
-                  <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-5 text-blue-500">
-                    <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 24 24"><path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/></svg>
+                <div className="text-center py-10 px-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-500">
+                    <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/></svg>
                   </div>
-                  <h3 className="text-lg text-gray-900 font-black mb-2 uppercase tracking-wide">Login via Google</h3>
-                  <p className="text-gray-500 text-xs font-semibold leading-relaxed">
-                    Akun kamu terhubung secara aman dengan Google. Tidak perlu mengingat atau mengganti password di sini.
+                  <h3 className="text-sm text-gray-900 font-black mb-1 uppercase tracking-wide">Login via Google</h3>
+                  <p className="text-gray-500 text-[10px] font-bold leading-relaxed px-4">
+                    Akun kamu terhubung secara aman dengan Google. Tidak perlu mengingat password.
                   </p>
                 </div>
               ) : (
-                <form onSubmit={handleChangePassword} className="space-y-6">
+                <form onSubmit={handleChangePassword} className="space-y-5">
                   <div>
                     <label className={labelStyle}>Password Lama</label>
                     <input type="password" value={passData.oldPass} onChange={e => setPassData({...passData, oldPass: e.target.value})} className={inputStyle} placeholder="••••••••" required />
@@ -298,6 +360,40 @@ export default function Profile() {
                 </form>
               )}
             </div>
+
+            {/* 👇 KOTAK TUGAS AGEN (ASSIGNED EVENTS) 👇 */}
+            <div className="bg-gradient-to-br from-slate-900 to-black p-8 rounded-[32px] shadow-2xl border border-slate-800">
+              <div className="flex items-center gap-3 mb-6 border-b border-slate-800 pb-4">
+                <span className="text-2xl">📋</span>
+                <h2 className="text-xl font-black text-white uppercase tracking-wide">Tugas Kepanitiaan</h2>
+              </div>
+              
+              {assignedEvents.length > 0 ? (
+                <div className="space-y-4">
+                  {assignedEvents.map(ev => (
+                    <div key={ev.id} className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700 hover:bg-slate-800 transition-colors">
+                      <p className="text-[9px] font-black text-orange-400 uppercase tracking-widest mb-1">Role: {ev.role}</p>
+                      <h3 className="text-white font-bold text-base mb-1 truncate">{ev.title}</h3>
+                      <p className="text-slate-400 text-xs mb-4">Oleh: {ev.organizer_name}</p>
+                      <button 
+                        onClick={() => navigate(`/scanner/${ev.id}`)}
+                        className="w-full bg-[#FF6B35] text-white py-2.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-all flex items-center justify-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+                        Buka Scanner
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6">
+                  <p className="text-slate-500 text-xs font-bold leading-relaxed">
+                    Kamu belum ditugaskan sebagai panitia/agen di event mana pun.
+                  </p>
+                </div>
+              )}
+            </div>
+
           </div>
 
         </div>
