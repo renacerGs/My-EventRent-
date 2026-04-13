@@ -592,11 +592,26 @@ export class AppService implements OnModuleInit {
     }
   }
 
+  // 👇 FIX: SEKARANG BISA DIAKSES OLEH EO ATAU AGEN 👇
   async getEventAttendees(eventId: number, userId: number) {
     try {
+      // 1. Cek apakah dia Pemilik Event (EO)
       const eventCheck = await this.pool.query('SELECT created_by FROM events WHERE id = $1', [eventId]);
       if (eventCheck.rows.length === 0) throw new BadRequestException('Event tidak ditemukan');
-      if (eventCheck.rows[0].created_by != userId) throw new UnauthorizedException('Bukan pemilik event!');
+      
+      const isOwner = eventCheck.rows[0].created_by == userId;
+
+      // 2. Cek apakah dia Agen di event ini (Jika bukan owner)
+      let isAgent = false;
+      if (!isOwner) {
+        const agentCheck = await this.pool.query('SELECT id FROM event_agents WHERE event_id = $1 AND user_id = $2', [eventId, userId]);
+        isAgent = agentCheck.rows.length > 0;
+      }
+
+      // 3. Tolak kalau bukan EO dan bukan Agen
+      if (!isOwner && !isAgent) {
+        throw new UnauthorizedException('Akses ditolak! Bukan panitia atau pemilik event.');
+      }
 
       const query = `
         SELECT t.ticket_code as ticket_id, t.purchase_date, t.price,
@@ -617,7 +632,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 👇 FIX: SEKARANG SCANNER BISA DIAKSES OLEH EO ATAU AGEN
   async scanTicket(ticketCode: string, eventId: number, userId: number) {
     try {
       // 1. Cek apakah dia Pemilik Event (EO)
