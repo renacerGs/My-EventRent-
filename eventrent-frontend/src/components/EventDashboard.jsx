@@ -17,6 +17,10 @@ export default function EventDashboard() {
   const [popup, setPopup] = useState({ show: false, message: '', type: 'success' });
   const [confirmDialog, setConfirmDialog] = useState({ show: false, ticketId: null });
 
+  // 👇 STATE BARU UNTUK PAGINASI 👇
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10; // Jumlah data per halaman
+
   const fetchData = async (isBackground = false) => {
     try {
       if (isBackground) setIsRefreshing(true);
@@ -37,7 +41,6 @@ export default function EventDashboard() {
             order_id: t.ticket_id, 
             buyer_name: t.attendee_name || t.buyer_name || 'Guest', 
             buyer_email: t.attendee_email || t.buyer_email,
-            // Kita simpan array nama sesi unik yang dibeli dalam 1 transaksi ini
             session_names: new Set(), 
             total_qty: 0,
             scanned_qty: 0,
@@ -47,17 +50,16 @@ export default function EventDashboard() {
         }
         const group = groupedMap.get(key);
         group.total_qty += 1;
-        group.session_names.add(t.session_name); // Tambah nama sesi ke daftar
+        group.session_names.add(t.session_name); 
         
         if (t.is_scanned) group.scanned_qty += 1;
         if (t.is_attending === false) group.is_attending_all = false; 
         group.tickets.push(t);
       });
 
-      // Konversi Map ke Array dan ubah Set session_names jadi string yang dibatasi koma
       const finalAttendees = Array.from(groupedMap.values()).map(g => ({
         ...g,
-        session_name: Array.from(g.session_names).join(' & ') // Contoh output: "Akad Nikah & Resepsi"
+        session_name: Array.from(g.session_names).join(' & ') 
       }));
 
       setEvent(prev => JSON.stringify(prev) === JSON.stringify(eventData) ? prev : eventData);
@@ -77,6 +79,11 @@ export default function EventDashboard() {
     const intervalId = setInterval(() => { fetchData(true); }, 5000);
     return () => clearInterval(intervalId); 
   }, [id, user, navigate]);
+
+  // 👇 RESET HALAMAN KE 1 KALAU USER NGETIK DI KOLOM PENCARIAN 👇
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const toggleExpand = (orderId) => {
     setExpandedRow(expandedRow === orderId ? null : orderId);
@@ -164,6 +171,14 @@ export default function EventDashboard() {
       (t.greeting && t.greeting.toLowerCase().includes(searchQuery.toLowerCase())) 
     );
   });
+
+  // 👇 LOGIKA MATEMATIKA UNTUK PAGINASI 👇
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredOrders.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   if (loading && !event) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-400 font-bold">
@@ -283,7 +298,7 @@ export default function EventDashboard() {
         </div>
 
         {/* TABEL DATA PENGUNJUNG */}
-        <div className="bg-white rounded-[24px] md:rounded-[32px] shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-[24px] md:rounded-[32px] shadow-sm border border-gray-200 overflow-hidden mb-10">
           <div className="px-5 py-5 md:px-8 md:py-6 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <h3 className="text-lg md:text-xl font-bold text-gray-900">{isWed ? 'Buku Tamu & RSVP' : 'Peserta Event'}</h3>
             <div className="flex flex-row items-center gap-2 md:gap-3 w-full md:w-auto">
@@ -318,13 +333,13 @@ export default function EventDashboard() {
                 </tr>
               </thead>
               
-              {filteredOrders.length > 0 ? (
-                filteredOrders.map((order) => (
+              {/* 👇 GANTI map pakai currentItems hasil Paginasi 👇 */}
+              {currentItems.length > 0 ? (
+                currentItems.map((order) => (
                   <tbody key={`desktop-${order.order_id}`} className="border-b border-gray-50 last:border-none">
                     <tr className="hover:bg-gray-50/30 transition-colors">
                       <td className="px-8 py-5 text-xs font-bold text-gray-400">#{order.order_id}</td>
                       <td className="px-8 py-5 font-bold text-sm">{order.buyer_name} <br/><span className="text-xs font-normal text-gray-400">{order.buyer_email}</span></td>
-                      {/* Tampilkan Semua Sesi yang Dibeli */}
                       <td className="px-8 py-5 max-w-[200px] truncate" title={order.session_name}>
                         <span className="px-3 py-1 bg-gray-100 rounded-lg text-[10px] font-bold uppercase truncate inline-block max-w-full">
                           {order.session_name}
@@ -349,7 +364,6 @@ export default function EventDashboard() {
                       </td>
                     </tr>
                     
-                    {/* 👇 BAGIAN DETAIL KARTU TIKET 👇 */}
                     {expandedRow === order.order_id && (
                       <tr className="bg-orange-50/30">
                         <td colSpan="6" className="px-8 py-6 border-l-4 border-[#FF6B35]">
@@ -369,7 +383,6 @@ export default function EventDashboard() {
                                         <p className={`text-[10px] font-black uppercase mb-1 ${isWed ? 'text-[#D4AF37]' : 'text-[#FF6B35]'}`}>
                                           {isWed ? 'Data Tamu' : `Tiket #${t.ticket_id}`}
                                         </p>
-                                        {/* 🔥 FIX: Menampilkan Nama Sesi Spesifik untuk Tiket Ini 🔥 */}
                                         <span className="bg-gray-100 text-gray-600 text-[8px] px-2 py-0.5 rounded uppercase font-bold tracking-wider inline-block">
                                           {t.session_name}
                                         </span>
@@ -431,8 +444,8 @@ export default function EventDashboard() {
 
             {/* 👇👇 MODE HP: CARD LIST 👇👇 */}
             <div className="md:hidden flex flex-col gap-3">
-              {filteredOrders.length > 0 ? (
-                filteredOrders.map((order) => (
+              {currentItems.length > 0 ? (
+                currentItems.map((order) => (
                   <div key={`mobile-${order.order_id}`} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
                     <div className="flex justify-between items-start mb-3 border-b border-gray-50 pb-3">
                       <div className="max-w-[60%]">
@@ -441,7 +454,6 @@ export default function EventDashboard() {
                         <p className="text-[10px] text-gray-500 truncate w-40">{order.buyer_email}</p>
                       </div>
                       <div className="text-right max-w-[40%]">
-                        {/* Menampilkan Semua Session yang dibeli di Header Card HP */}
                         <span className="px-2 py-0.5 bg-gray-100 rounded-md text-[8px] font-bold uppercase mb-1.5 inline-block truncate max-w-full">
                           {order.session_name}
                         </span>
@@ -480,7 +492,6 @@ export default function EventDashboard() {
                                   <p className={`text-[9px] font-black uppercase mb-1 ${isWed ? 'text-[#D4AF37]' : 'text-gray-500'}`}>
                                     {isWed ? 'Data Tamu' : `TIKET #${t.ticket_id.toString().slice(-5)}`}
                                   </p>
-                                  {/* 🔥 FIX: Nama sesi spesifik di HP 🔥 */}
                                   <span className="bg-gray-100 text-gray-600 text-[8px] px-2 py-0.5 rounded uppercase font-bold tracking-wider inline-block">
                                     {t.session_name}
                                   </span>
@@ -534,6 +545,45 @@ export default function EventDashboard() {
             </div>
 
           </div>
+          
+          {/* 👇👇 TOMBOL NAVIGASI PAGINASI 👇👇 */}
+          {totalPages > 1 && (
+            <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <span className="text-[10px] md:text-xs font-bold text-gray-500">
+                Menampilkan <span className="text-gray-900">{indexOfFirstItem + 1}</span> - <span className="text-gray-900">{Math.min(indexOfLastItem, filteredOrders.length)}</span> dari <span className="text-gray-900">{filteredOrders.length}</span> data
+              </span>
+              
+              <div className="flex gap-1 md:gap-2">
+                <button 
+                  onClick={() => paginate(currentPage - 1)} 
+                  disabled={currentPage === 1}
+                  className={`px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-[10px] md:text-xs font-bold transition-colors ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:text-[#FF6B35]'}`}
+                >
+                  Prev
+                </button>
+                
+                {/* Looping Angka Halaman */}
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <button 
+                    key={i + 1} 
+                    onClick={() => paginate(i + 1)}
+                    className={`hidden md:inline-block w-8 h-8 rounded-lg text-xs font-bold transition-colors ${currentPage === i + 1 ? 'bg-[#FF6B35] text-white shadow-md' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'}`}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+                
+                <button 
+                  onClick={() => paginate(currentPage + 1)} 
+                  disabled={currentPage === totalPages}
+                  className={`px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-[10px] md:text-xs font-bold transition-colors ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 hover:text-[#FF6B35]'}`}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     </div>

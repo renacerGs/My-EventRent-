@@ -194,14 +194,11 @@ const HeroSection = ({ onOpen, name1, name2, guestName, coverImg }) => (
 );
 
 const OpeningSection = ({ message }) => (
-  <AnimatedSection className="py-24 px-6 text-center max-w-2xl mx-auto text-stone-400">
-    <p className="text-rose-700 text-xs tracking-[0.4em] uppercase mb-6 font-bold">Bismillahirrahmanirrahim</p>
+  <AnimatedSection className="py-24 px-6 text-center max-w-3xl mx-auto text-stone-400">
     <SectionDivider />
-    <p className="text-xl sm:text-2xl text-rose-200 leading-relaxed font-serif italic mb-6 mt-4">
-      Assalamu'alaikum Warahmatullahi Wabarakatuh
-    </p>
-    <p className="text-sm sm:text-base leading-loose font-light">
-      {message || "Dengan memohon rahmat dan ridho Allah Subhanahu Wa Ta'ala, kami bermaksud menyelenggarakan pernikahan putra-putri kami. Merupakan suatu kehormatan dan kebahagiaan apabila Bapak/Ibu/Saudara/i berkenan hadir."}
+    {/* 👇 FONT LEBIH ELEGAN DAN UNIVERSAL 👇 */}
+    <p className="text-lg sm:text-2xl text-rose-200 leading-loose font-serif italic mt-8 whitespace-pre-line">
+      {message || "Dengan penuh rasa syukur dan bahagia, kami bermaksud menyelenggarakan acara pernikahan putra-putri kami. Merupakan suatu kehormatan apabila Bapak/Ibu/Saudara/i berkenan hadir dan memberikan doa restu."}
     </p>
   </AnimatedSection>
 );
@@ -331,7 +328,7 @@ const EventsSection = ({ sessions, eventId, navigate }) => {
 
       <AnimatedSection delay={0.4} className="mt-20 text-center">
           <button 
-              onClick={() => navigate(`/rsvp/${eventId}`)}
+              onClick={() => navigate(`/party-rsvp/${eventId}`)}
               className="px-12 py-5 bg-rose-900 text-rose-100 font-bold uppercase tracking-widest hover:bg-rose-800 transition-all hover:scale-105 text-xs shadow-xl shadow-rose-900/20"
           >
               Konfirmasi Kehadiran (RSVP)
@@ -392,7 +389,8 @@ const WishesSection = ({ quote, greetings }) => {
       
       <AnimatedSection delay={0.2} className="bg-stone-900/50 border border-rose-900/20 p-8 sm:p-12 mt-8 relative">
         <Heart className="w-6 h-6 text-rose-900 mx-auto mb-6" />
-        <p className="font-serif text-lg text-stone-400 leading-loose italic whitespace-pre-line mb-12">
+        {/* 👇 QUOTE LEBIH ELEGAN DAN UNIVERSAL 👇 */}
+        <p className="font-serif text-lg md:text-xl text-stone-400 leading-loose italic whitespace-pre-line mb-12">
           "{quote || 'Mencintai bukan sekadar saling memandang, melainkan memandang ke arah yang sama bersama-sama.'}"
         </p>
 
@@ -463,13 +461,13 @@ const GiftSection = ({ gifts }) => {
 const ClosingSection = ({ message, name1, name2 }) => (
   <div className="py-24 px-6 text-center max-w-2xl mx-auto relative overflow-hidden">
     <AnimatedSection animation="scale">
-      <h2 className="font-serif text-4xl sm:text-5xl text-rose-200 italic mb-8">Terima Kasih</h2>
-      <p className="text-stone-400 text-sm sm:text-base leading-loose mb-12 max-w-lg mx-auto font-light">
+      <h2 className="font-serif text-4xl sm:text-5xl text-rose-200 italic mb-8 mt-4">Terima Kasih</h2>
+      {/* 👇 CLOSING LEBIH ELEGAN DAN UNIVERSAL 👇 */}
+      <p className="font-serif text-lg sm:text-xl text-stone-400 leading-relaxed italic mb-10 max-w-lg mx-auto whitespace-pre-line">
         {message || "Merupakan suatu kebahagiaan dan kehormatan bagi kami apabila Bapak/Ibu/Saudara/i berkenan hadir dan memberikan doa restu."}
       </p>
       <div className="mt-8">
-        <p className="text-[10px] text-rose-900 font-bold tracking-[0.3em] uppercase mb-4">Wassalamu'alaikum Warahmatullahi Wabarakatuh</p>
-        <p className="font-serif text-4xl text-white italic">{name1} & {name2}</p>
+        <p className="font-serif text-4xl text-white italic mt-6">{name1} & {name2}</p>
       </div>
     </AnimatedSection>
     <motion.div className="mt-32 pt-8 border-t border-stone-900" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}>

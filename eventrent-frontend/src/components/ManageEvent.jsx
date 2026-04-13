@@ -88,6 +88,30 @@ export default function ManageEvent() {
     }
   };
 
+  // 👇👇👇 FUNGSI BARU: SHARE LINK DINAMIS 👇👇👇
+  const handleShare = (e, event) => {
+    e.stopPropagation();
+    setActiveMenuId(null);
+    
+    let path = '';
+    // Tentukan rute yang benar berdasarkan tipe event
+    if (event.category === 'Personal') {
+      path = `/party/${event.id}`;
+    } else if (event.category === 'Wedding' || event.is_private === true || event.is_private === 'true') {
+      path = `/invitation/${event.id}`;
+    } else {
+      path = `/event/${event.id}`;
+    }
+
+    // Gabungkan domain origin dengan path
+    const fullUrl = `${window.location.origin}${path}`;
+    
+    // Copy ke clipboard
+    navigator.clipboard.writeText(fullUrl)
+      .then(() => toast.success('Link event berhasil disalin! Silakan share.'))
+      .catch(() => toast.error('Gagal menyalin link.'));
+  };
+
   const handleEdit = (e, event) => {
     e.stopPropagation();
     setActiveMenuId(null);
@@ -125,27 +149,19 @@ export default function ManageEvent() {
     }
   };
 
-  // 👇👇👇 FUNGSI BARU: TOGGLE VISIBILITY (OPTIMISTIC UPDATE) 👇👇👇
   const handleToggleVisibility = async (e, eventId, currentPrivateStatus) => {
-    e.stopPropagation(); // Biar pas klik toggle, gak masuk ke halaman detail
-    
-    // 1. Ubah state UI langsung biar instan (gak nunggu loading)
+    e.stopPropagation(); 
     setMyEvents(prev => prev.map(event => 
       event.id === eventId ? { ...event, is_private: !currentPrivateStatus } : event
     ));
 
     try {
-      // 2. Tembak API backend secara background
       const res = await fetch(`https://my-event-rent.vercel.app/api/events/${eventId}/visibility?userId=${user.id}`, {
         method: 'PATCH',
       });
-      
-      if (!res.ok) {
-        throw new Error("Gagal update di server");
-      }
+      if (!res.ok) throw new Error("Gagal update di server");
     } catch (err) {
       console.error(err);
-      // 3. Kalau gagal, balikin statenya ke awal (Revert)
       toast.error("Oops! Gagal merubah visibilitas. Coba lagi.");
       setMyEvents(prev => prev.map(event => 
         event.id === eventId ? { ...event, is_private: currentPrivateStatus } : event
@@ -179,8 +195,6 @@ export default function ManageEvent() {
               sortedEvents.map((event) => {
                 const isPast = isEventPassed(event.date_start);
                 const isMenuActive = activeMenuId === event.id;
-                
-                // Cek status private (bisa boolean atau string dari DB)
                 const isPrivate = event.is_private === true || event.is_private === 'true';
                 const isWed = event.category === 'Wedding' || event.category === 'Personal' || isPrivate; 
 
@@ -190,7 +204,6 @@ export default function ManageEvent() {
                     onClick={() => handleCardClick(event.id)} 
                     className={`flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 p-5 md:px-8 md:py-5 md:items-center hover:bg-gray-50 transition-colors group cursor-pointer relative ${isMenuActive ? 'z-50' : 'z-0'} ${isPast ? 'opacity-80' : ''}`}
                   >
-                    {/* FOTO & JUDUL EVENT */}
                     <div className="md:col-span-5 flex items-center gap-3 md:gap-5 pr-8 md:pr-0 w-full mb-2 md:mb-0">
                       <div className={`w-16 h-12 md:w-20 md:h-14 rounded-lg overflow-hidden flex-shrink-0 border border-gray-100 ${isPast ? 'grayscale-[60%]' : 'bg-gray-100'}`}>
                          <img src={event.img} alt={event.title} className="w-full h-full object-cover" />
@@ -208,10 +221,9 @@ export default function ManageEvent() {
                           <span className="truncate">{formatPrettyDate(event.date_start)}</span>
                         </div>
                         
-                        {/* 👇👇👇 UI TOGGLE SWITCH PUBLIC/PRIVATE 👇👇👇 */}
                         <div 
                           className="flex items-center gap-2 mt-2" 
-                          onClick={(e) => e.stopPropagation()} // Biar nggak ikut ke-klik pindah halaman
+                          onClick={(e) => e.stopPropagation()} 
                         >
                           <button
                             onClick={(e) => handleToggleVisibility(e, event.id, isPrivate)}
@@ -225,12 +237,9 @@ export default function ManageEvent() {
                             {!isPrivate ? 'Publik' : 'Private'}
                           </span>
                         </div>
-                        {/* 👆👆👆 BATAS UI TOGGLE SWITCH 👆👆👆 */}
-
                       </div>
                     </div>
 
-                    {/* BUNGKUSAN STATS KHUSUS MOBILE */}
                     <div className="flex md:hidden items-center flex-wrap gap-2 w-full mt-1">
                       <span className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border ${
                         isPast ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-green-50 text-green-600 border-green-100'
@@ -245,7 +254,6 @@ export default function ManageEvent() {
                       </span>
                     </div>
 
-                    {/* BUNGKUSAN STATS KHUSUS DESKTOP */}
                     <div className="hidden md:block md:col-span-2 text-center">
                       <span className={`inline-block px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
                         isPast ? 'bg-gray-100 text-gray-500 border-gray-200' : 'bg-green-50 text-green-600 border-green-100'
@@ -262,7 +270,6 @@ export default function ManageEvent() {
                        {Number(event.price) === 0 ? (isWed ? 'Free RSVP' : 'Free') : `Rp ${parseInt(event.price).toLocaleString()}`}
                     </div>
 
-                    {/* TOMBOL ACTION (Titik Tiga) */}
                     <div className="absolute top-4 right-4 md:relative md:top-0 md:right-0 md:col-span-1 flex justify-end">
                       <button 
                         onClick={(e) => {
@@ -278,6 +285,12 @@ export default function ManageEvent() {
                         <div ref={menuRef} className="absolute right-0 top-10 w-48 bg-white rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.15)] border border-gray-100 z-[100] overflow-hidden animate-fadeIn origin-top-right">
                           <div className="py-1">
                             <button onClick={(e) => handleView(e, event)} className="w-full text-left px-4 py-3 md:py-2.5 text-xs md:text-sm font-bold text-gray-700 hover:bg-gray-50 hover:text-[#FF6B35] flex items-center gap-2">View Event Page</button>
+                            
+                            {/* 👇 TOMBOL BARU UNTUK SHARE LINK 👇 */}
+                            <button onClick={(e) => handleShare(e, event)} className="w-full text-left px-4 py-3 md:py-2.5 text-xs md:text-sm font-bold text-gray-700 hover:bg-gray-50 hover:text-[#FF6B35] flex items-center gap-2">
+                              Share Link
+                            </button>
+
                             <button onClick={(e) => handleEdit(e, event)} className="w-full text-left px-4 py-3 md:py-2.5 text-xs md:text-sm font-bold text-gray-700 hover:bg-gray-50 hover:text-[#FF6B35] flex items-center gap-2">Edit Event</button>
                             <div className="border-t border-gray-100 mt-1">
                               <button onClick={(e) => triggerDelete(e, event.id)} className="w-full text-left px-4 py-3 md:py-2.5 text-xs md:text-sm text-red-500 hover:bg-red-50 font-bold flex items-center gap-2">Delete Event</button>

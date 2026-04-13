@@ -140,7 +140,6 @@ const HeroSection = ({ onOpen, name1, name2, guestName, coverImg }) => (
     transition={{ duration: 0.8 }}
   >
     <div className="absolute inset-0">
-        {/* 👇 SABUK PENGAMAN GAMBAR 1 👇 */}
         <img 
           src={coverImg} 
           alt="Cover" 
@@ -157,7 +156,6 @@ const HeroSection = ({ onOpen, name1, name2, guestName, coverImg }) => (
       className="relative z-10"
     >
       <div className="w-64 h-64 sm:w-80 sm:h-80 md:w-[400px] md:h-[400px] mx-auto rounded-t-full overflow-hidden border-[8px] border-white p-1 shadow-xl relative z-10 bg-rose-50">
-         {/* 👇 SABUK PENGAMAN GAMBAR 2 👇 */}
          <img 
            src={coverImg} 
            alt="Couple" 
@@ -195,14 +193,11 @@ const HeroSection = ({ onOpen, name1, name2, guestName, coverImg }) => (
 );
 
 const OpeningSection = ({ message }) => (
-  <AnimatedSection className="py-24 px-6 text-center max-w-2xl mx-auto text-slate-800">
-    <p className="text-rose-400 text-xs tracking-[0.4em] uppercase mb-6 font-bold">Bismillahirrahmanirrahim</p>
+  <AnimatedSection className="py-24 px-6 text-center max-w-3xl mx-auto text-slate-800">
     <SectionDivider />
-    <p className="text-xl sm:text-2xl text-slate-700 leading-relaxed font-serif italic mb-6 mt-4">
-      Assalamu'alaikum Warahmatullahi Wabarakatuh
-    </p>
-    <p className="text-sm sm:text-base text-slate-500 leading-loose">
-      {message || "Dengan memohon rahmat dan ridho Allah Subhanahu Wa Ta'ala, kami bermaksud menyelenggarakan pernikahan putra-putri kami. Merupakan suatu kehormatan dan kebahagiaan apabila Bapak/Ibu/Saudara/i berkenan hadir."}
+    {/* 👇 FONT LEBIH ELEGAN DAN BISA BACA ENTER/BARIS BARU 👇 */}
+    <p className="text-lg sm:text-2xl text-slate-700 leading-loose font-serif italic mt-8 whitespace-pre-line">
+      {message || "Dengan penuh rasa syukur dan bahagia, kami bermaksud menyelenggarakan acara pernikahan putra-putri kami. Merupakan suatu kehormatan apabila Bapak/Ibu/Saudara/i berkenan hadir dan memberikan doa restu."}
     </p>
   </AnimatedSection>
 );
@@ -224,7 +219,6 @@ const CoupleSection = ({ profiles }) => (
             >
                 {person.photoUrl || person.photo_url ? (
                   <div className="w-48 h-64 sm:w-56 sm:h-72 mx-auto rounded-t-full overflow-hidden border-[6px] border-white mb-6 shadow-xl relative">
-                    {/* 👇 SABUK PENGAMAN GAMBAR 3 👇 */}
                     <img 
                       src={person.photoUrl || person.photo_url} 
                       alt={person.fullName || person.full_name} 
@@ -362,7 +356,6 @@ const GallerySection = ({ images }) => {
       <AnimatedSection className="relative">
         <div className="relative overflow-hidden rounded-2xl aspect-[4/3] bg-white border-[12px] border-white shadow-2xl">
           <AnimatePresence mode="wait">
-            {/* 👇 SABUK PENGAMAN GAMBAR 4 👇 */}
             <motion.img 
               key={current} 
               src={images[current]} 
@@ -399,8 +392,9 @@ const WishesSection = ({ quote, greetings }) => {
       
       <AnimatedSection delay={0.2} className="bg-white rounded-[2rem] p-8 sm:p-12 border border-rose-50 shadow-xl mt-8 relative">
         <Heart className="w-8 h-8 text-rose-300 mx-auto mb-6" />
+        {/* 👇 QUOTE LEBIH ELEGAN DAN UNIVERSAL 👇 */}
         <p className="font-serif text-lg md:text-xl text-slate-600 leading-loose italic whitespace-pre-line font-medium mb-12">
-          "{quote || 'Dan di antara tanda-tanda kekuasaan-Nya ialah Dia menciptakan untukmu pasangan hidup dari jenismu sendiri...'}"
+          "{quote || 'Cinta tidak berupa tatapan satu sama lain, tetapi memandang ke luar bersama ke arah yang sama.'}"
         </p>
 
         <div className="text-left bg-[#FDFCFB] p-6 rounded-3xl border border-slate-100 shadow-inner">
@@ -473,14 +467,13 @@ const GiftSection = ({ gifts }) => {
 const ClosingSection = ({ message, name1, name2 }) => (
   <div className="py-24 px-6 text-center max-w-2xl mx-auto relative overflow-hidden">
     <AnimatedSection animation="scale">
-      <p className="text-rose-400 text-xs font-bold tracking-[0.3em] uppercase mb-4 font-sans">Alhamdulillah</p>
-      <h2 className="font-serif text-4xl sm:text-5xl text-slate-800 italic mb-8">Terima Kasih</h2>
-      <p className="text-slate-500 text-sm sm:text-base leading-loose mb-10 max-w-lg mx-auto">
+      <h2 className="font-serif text-4xl sm:text-5xl text-slate-800 italic mb-8 mt-4">Terima Kasih</h2>
+      {/* 👇 CLOSING LEBIH ELEGAN DAN UNIVERSAL 👇 */}
+      <p className="font-serif text-lg sm:text-xl text-slate-600 leading-relaxed italic mb-10 max-w-lg mx-auto whitespace-pre-line">
         {message || "Merupakan suatu kebahagiaan dan kehormatan bagi kami apabila Bapak/Ibu/Saudara/i berkenan hadir dan memberikan doa restu."}
       </p>
       <div className="mt-8 font-sans">
-        <p className="text-[10px] text-slate-400 font-bold tracking-[0.2em] uppercase mb-3">Wassalamu'alaikum Warahmatullahi Wabarakatuh</p>
-        <p className="font-serif text-3xl text-rose-500 italic">{name1} & {name2}</p>
+        <p className="font-serif text-3xl text-rose-500 italic mt-6">{name1} & {name2}</p>
       </div>
     </AnimatedSection>
     <motion.div className="mt-24 pt-8 border-t border-slate-100" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}>

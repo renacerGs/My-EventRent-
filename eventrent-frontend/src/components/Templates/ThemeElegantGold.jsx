@@ -143,7 +143,6 @@ const HeroSection = ({ onOpen, name1, name2, guestName, coverImg }) => (
     transition={{ duration: 0.8 }}
   >
     <div className="absolute inset-0 opacity-30">
-        {/* 👇 SABUK PENGAMAN GAMBAR 1 👇 */}
         <img 
           src={coverImg} 
           alt="Cover" 
@@ -167,7 +166,6 @@ const HeroSection = ({ onOpen, name1, name2, guestName, coverImg }) => (
       </motion.div>
 
       <div className="w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 mx-auto rounded-full overflow-hidden border-4 border-[#D4AF37]/50 p-2 shadow-2xl relative z-10 bg-slate-950">
-         {/* 👇 SABUK PENGAMAN GAMBAR 2 👇 */}
          <img 
            src={coverImg} 
            alt="Couple" 
@@ -204,18 +202,18 @@ const HeroSection = ({ onOpen, name1, name2, guestName, coverImg }) => (
   </motion.section>
 );
 
-const OpeningSection = ({ message }) => (
-  <AnimatedSection className="py-20 px-6 text-center max-w-2xl mx-auto text-slate-800">
-    <p className="text-[#D4AF37] text-sm tracking-[0.3em] uppercase mb-6 font-bold">Bismillahirrahmanirrahim</p>
-    <SectionDivider />
-    <p className="text-lg sm:text-xl text-slate-600 leading-relaxed font-serif italic mb-6">
-      Assalamu'alaikum Warahmatullahi Wabarakatuh
-    </p>
-    <p className="text-base sm:text-lg text-slate-600 leading-relaxed">
-      {message || "Dengan memohon rahmat dan ridho Allah Subhanahu Wa Ta'ala, kami bermaksud menyelenggarakan pernikahan putra-putri kami. Merupakan suatu kehormatan dan kebahagiaan apabila Bapak/Ibu/Saudara/i berkenan hadir."}
-    </p>
-  </AnimatedSection>
-);
+// 🔥 BAWAAN "BISMILLAH" & "ASSALAMUALAIKUM" UDAH DIHAPUS 🔥
+const OpeningSection = ({ message }) => {
+  if (!message) return null; 
+  return (
+    <AnimatedSection className="py-20 px-6 text-center max-w-2xl mx-auto text-slate-800">
+      <SectionDivider />
+      <p className="text-base sm:text-lg text-slate-600 leading-relaxed whitespace-pre-line mt-6">
+        {message}
+      </p>
+    </AnimatedSection>
+  );
+};
 
 const CoupleSection = ({ profiles }) => (
   <ParallaxSection speed={0.15}>
@@ -234,7 +232,6 @@ const CoupleSection = ({ profiles }) => (
             >
                 {person.photoUrl || person.photo_url ? (
                   <div className="w-44 h-44 sm:w-52 sm:h-52 mx-auto rounded-full overflow-hidden border-4 border-[#D4AF37]/30 p-1 mb-6 shadow-inner">
-                    {/* 👇 SABUK PENGAMAN GAMBAR 3 👇 */}
                     <img 
                       src={person.photoUrl || person.photo_url} 
                       alt={person.fullName || person.full_name} 
@@ -357,17 +354,12 @@ const EventsSection = ({ sessions, eventId, navigate }) => {
   );
 };
 
+// 🔥 QUOTE GALERI BAWAAN UDAH DIHAPUS 🔥
 const GallerySection = ({ images }) => {
   if (!images || !Array.isArray(images) || images.length === 0) return null;
   const [current, setCurrent] = useState(0);
   const prev = () => setCurrent((c) => (c === 0 ? images.length - 1 : c - 1));
   const next = () => setCurrent((c) => (c === images.length - 1 ? 0 : c + 1));
-
-  const captions = [
-    "Cinta itu seperti angin, kamu tidak bisa melihatnya tapi kamu bisa merasakannya.",
-    "Setiap langkah bersamamu terasa seperti perjalanan yang paling indah.",
-    "Kebahagiaan yang sempurna adalah berbagi hidup denganmu."
-  ];
 
   return (
     <div className="py-20 px-6 max-w-3xl mx-auto">
@@ -378,7 +370,6 @@ const GallerySection = ({ images }) => {
       <AnimatedSection className="relative">
         <div className="relative overflow-hidden rounded-3xl aspect-[4/3] bg-slate-100 shadow-2xl">
           <AnimatePresence mode="wait">
-            {/* 👇 SABUK PENGAMAN GAMBAR 4 👇 */}
             <motion.img 
               key={current} 
               src={images[current]} 
@@ -399,11 +390,6 @@ const GallerySection = ({ images }) => {
             <button key={i} onClick={() => setCurrent(i)} className={`h-2 rounded-full transition-all ${i === current ? "bg-[#D4AF37] w-8" : "bg-slate-300 w-2"}`} aria-label={`Go to slide ${i + 1}`} />
           ))}
         </div>
-        <AnimatePresence mode="wait">
-          <motion.p key={current} className="text-center font-serif italic text-slate-500 text-base sm:text-lg mt-6 px-4" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.3 }}>
-            "{captions[current % captions.length]}"
-          </motion.p>
-        </AnimatePresence>
       </AnimatedSection>
     </div>
   );
@@ -420,9 +406,11 @@ const WishesSection = ({ quote, greetings }) => {
       
       <AnimatedSection delay={0.2} className="bg-white rounded-3xl p-6 sm:p-10 border border-slate-100 shadow-xl mt-8 relative">
         <Heart className="w-10 h-10 text-[#D4AF37] mx-auto mb-8 animate-pulse" />
-        <p className="font-serif text-xl md:text-2xl text-slate-700 leading-relaxed italic whitespace-pre-line font-medium mb-10">
-          "{quote || 'Dan di antara tanda-tanda kekuasaan-Nya ialah Dia menciptakan untukmu pasangan hidup dari jenismu sendiri...'}"
-        </p>
+        {quote && (
+          <p className="font-serif text-xl md:text-2xl text-slate-700 leading-relaxed italic whitespace-pre-line font-medium mb-10">
+            "{quote}"
+          </p>
+        )}
 
         <div className="text-left bg-slate-50 p-6 rounded-2xl border border-slate-200">
           <div className="flex items-center gap-3 mb-6 border-b border-slate-200 pb-4">
@@ -497,15 +485,19 @@ const GiftSection = ({ gifts }) => {
   );
 };
 
+// 🔥 BAWAAN "WASSALAMUALAIKUM" UDAH DIHAPUS 🔥
 const ClosingSection = ({ message, name1, name2 }) => (
   <div className="py-20 px-6 text-center max-w-2xl mx-auto relative overflow-hidden">
     <AnimatedSection animation="scale">
       <h2 className="font-serif text-4xl text-[#D4AF37] italic mb-8">Terima Kasih</h2>
-      <p className="text-slate-600 text-lg leading-relaxed mb-8">
-        {message || "Merupakan suatu kebahagiaan dan kehormatan bagi kami apabila Bapak/Ibu/Saudara/i berkenan hadir dan memberikan doa restu."}
-      </p>
+      
+      {message && (
+        <p className="text-slate-600 text-lg leading-relaxed mb-8 whitespace-pre-line">
+          {message}
+        </p>
+      )}
+
       <div className="mt-12 font-sans">
-        <p className="text-xs text-slate-400 font-bold tracking-[0.3em] uppercase mb-4">Wassalamu'alaikum Warahmatullahi Wabarakatuh</p>
         <p className="font-serif text-3xl text-slate-800 italic font-medium">{name1} & {name2}</p>
       </div>
     </AnimatedSection>
@@ -519,7 +511,6 @@ const ClosingSection = ({ message, name1, name2 }) => (
 export default function ThemeElegantGold({ eventData, guestName, isOpen, onOpen }) {
   const navigate = useNavigate();
 
-  // Safe parsing untuk event details
   let details = eventData?.eventDetails || eventData?.event_details || {};
   if (typeof details === 'string') {
     try { details = JSON.parse(details); } catch (e) { details = {}; }
@@ -536,7 +527,6 @@ export default function ThemeElegantGold({ eventData, guestName, isOpen, onOpen 
   const name1 = profilesList[0]?.nickName || profilesList[0]?.fullName?.split(' ')[0] || 'Mempelai 1';
   const name2 = profilesList[1]?.nickName || profilesList[1]?.fullName?.split(' ')[0] || 'Mempelai 2';
 
-  // 🔥 BACKSOUND MUSIC OTOMATIS: Ambil dari database kalau klien ngisi, kalau kosong pakai lagu default.
   const audioSrc = details.bgMusicUrl || "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"; 
 
   return (
@@ -556,14 +546,14 @@ export default function ThemeElegantGold({ eventData, guestName, isOpen, onOpen 
             <FloatingPetals />
             <MusicPlayer src={audioSrc} autoPlay /> 
             
-            <OpeningSection message={details.openingMessage} />
+            <OpeningSection message={details.openingMessage || details.opening_message} />
             {profilesList.length > 0 && <CoupleSection profiles={profilesList} />}
             <CountdownSection targetDate={eventData?.date_start} />
             <EventsSection sessions={eventData?.sessions || []} eventId={eventData?.id} navigate={navigate} />
             <GallerySection images={gallery} />
             <WishesSection quote={details.quote} greetings={eventData?.greetings} />
             <GiftSection gifts={gifts} />
-            <ClosingSection message={details.closingMessage} name1={name1} name2={name2} />
+            <ClosingSection message={details.closingMessage || details.closing_message} name1={name1} name2={name2} />
           </motion.div>
         )}
       </AnimatePresence>

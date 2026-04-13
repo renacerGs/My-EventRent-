@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'; 
 import { Link } from 'react-router-dom';
+import { motion, LayoutGroup } from 'framer-motion'; // 🔥 Tambahin LayoutGroup di sini
 
 const displayDate = (event) => {
   if (event.date_start && event.date_end && event.date_start !== event.date_end) {
@@ -34,7 +35,6 @@ const isEventPassed = (event) => {
   }
 };
 
-// 👇 FIX: FUNGSI PINTAR UNTUK MENENTUKAN URL LANDING PAGE 👇
 const getEventLink = (event) => {
   const isPrivate = event.is_private === true || event.is_private === 'true';
   
@@ -43,7 +43,7 @@ const getEventLink = (event) => {
   } else if (event.category === 'Wedding' || isPrivate) {
     return `/invitation/${event.id}`;
   } else {
-    return `/event/${event.id}`; // Default Public Event
+    return `/event/${event.id}`; 
   }
 };
 
@@ -51,24 +51,19 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
   const [activeCategory, setActiveCategory] = useState('All');
   const categories = ['All', 'Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports'];
   
-  // --- PERBAIKAN: BENDERA PENANDA (Flag) ---
   const isCategoryClicked = useRef(false);
 
-  // LOGIC 1: DETEKSI KATEGORI OTOMATIS
   useEffect(() => {
-    // Kalau Search Bar kosong gara-gara kita klik tombol Kategori, SKIP LOGIC INI!
     if (isCategoryClicked.current) {
-      isCategoryClicked.current = false; // Turunin benderanya lagi
+      isCategoryClicked.current = false; 
       return; 
     }
 
-    // Kalau user nge-HAPUS teks manual pakai backspace sampai kosong -> Balik ke All
     if (!searchQuery || searchQuery.trim() === '') {
       setActiveCategory('All');
       return; 
     }
 
-    // Jika ada teks, baru jalankan deteksi pinter
     const queryLower = searchQuery.trim().toLowerCase();
     const matchedEvent = events.find(e => e.title.toLowerCase().includes(queryLower));
     
@@ -90,23 +85,16 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
     }
   }, [searchQuery, events]); 
 
-  // LOGIC 2: KLIK KATEGORI SECARA MANUAL
   const handleCategoryClick = (cat) => {
-    // Kalau kotak search ada isinya, kita naikkan bendera sebelum dihapus
     if (searchQuery && searchQuery.trim() !== '') {
       isCategoryClicked.current = true; 
     }
-    
-    // Ubah ke kategori yang diklik
     setActiveCategory(cat); 
-    
-    // Bersihkan search bar
     if (onClearSearch) {
       onClearSearch(''); 
     }
   };
 
-  // LOGIC 3: FILTER CARD EVENT
   const filteredEvents = events.filter(event => {
     if (isEventPassed(event)) return false;
 
@@ -124,11 +112,8 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
     <main className="max-w-6xl mx-auto px-6 py-10 font-sans">
       
       <div className="mb-10">
-        {/* 👇👇 JURUS UX AFFORDANCE DI SINI 👇👇 */}
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-bold text-gray-900">Browse by category</h2>
-          
-          {/* Tulisan "Geser" yang goyang-goyang, CUMA MUNCUL DI HP (sm:hidden) */}
           <div className="sm:hidden flex items-center gap-1.5 text-[10px] font-black text-[#FF6B35] uppercase tracking-widest animate-pulse">
             <span>Geser</span>
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -136,25 +121,40 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
             </svg>
           </div>
         </div>
-        {/* 👆👆 BATAS JURUS UX 👆👆 */}
         
-        <div className="flex flex-nowrap sm:flex-wrap overflow-x-auto gap-2 pb-3 sm:pb-0 snap-x pr-8 sm:pr-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          {categories.map(cat => (
-            <button 
-              key={cat} 
-              onClick={() => handleCategoryClick(cat)} 
-              className={`shrink-0 snap-start px-5 py-2 rounded-2xl text-xs font-bold transition-all ${activeCategory === cat ? 'bg-[#FF6B35] text-white shadow-md' : 'bg-white text-gray-500 border border-gray-100 hover:bg-gray-50'}`}>
-              {cat}
-            </button>
-          ))}
-        </div>
+        {/* 🔥 BUNGKUS DENGAN LAYOUTGROUP BIAR SLIDINGNYA KONEK 🔥 */}
+        <LayoutGroup>
+          <div className="flex flex-nowrap sm:flex-wrap overflow-x-auto gap-2 pb-3 sm:pb-0 snap-x pr-8 sm:pr-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {categories.map(cat => (
+              <button 
+                key={cat} 
+                onClick={() => handleCategoryClick(cat)} 
+                className={`relative shrink-0 snap-start px-6 py-2.5 rounded-full text-xs font-bold transition-colors duration-300 ${
+                  activeCategory === cat 
+                    ? 'text-white' 
+                    : 'bg-white text-gray-500 border border-gray-100 hover:bg-gray-50 shadow-sm'
+                }`}
+              >
+                {activeCategory === cat && (
+                  <motion.div
+                    layoutId="activeCategoryPill"
+                    className="absolute inset-0 bg-[#FF6B35] rounded-full shadow-md"
+                    // 🔥 ANIMASI DIBIKIN LEBIH LAMA & MANTUL DIKIT BIAR KELIHATAN SLIDINGNYA 🔥
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    style={{ zIndex: 0 }}
+                  />
+                )}
+                <span className="relative z-10">{cat}</span>
+              </button>
+            ))}
+          </div>
+        </LayoutGroup>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
         {filteredEvents.length > 0 ? (
           filteredEvents.map(event => (
             <Link 
-              // 👇 FIX: URL SEKARANG DINAMIS SESUAI TIPE EVENT 👇
               to={getEventLink(event)} 
               key={event.id} 
               className="bg-white rounded-[24px] shadow-sm border border-gray-100 overflow-hidden hover:-translate-y-1 hover:shadow-lg transition-all duration-300 group flex flex-col"
