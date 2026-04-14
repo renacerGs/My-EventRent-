@@ -250,4 +250,9 @@ export class AppController {
   async changePassword(@Param('id') id: number, @Body() data: any) {
     return await this.appService.changePassword(id, data);
   }
+
+  @Get('users/:id/scan-history')
+  async getScanHistory(@Param('id') id: string) {
+    return this.appService.getAgentScanHistory(Number(id));
+  }
 }

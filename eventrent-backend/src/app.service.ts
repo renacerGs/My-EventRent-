@@ -980,4 +980,31 @@ export class AppService implements OnModuleInit {
     await this.pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedNew, userId]);
     return { message: 'Berhasil diubah' };
   }
+
+  // --- RIWAYAT SCAN AGEN ---
+  async getAgentScanHistory(userId: number) {
+    try {
+      const query = `
+        SELECT 
+          t.ticket_code as ticket_id, 
+          t.attendee_name, 
+          e.title as event_title, 
+          s.name as session_name, 
+          TO_CHAR(t.scanned_at, 'HH24:MI') as scan_time, 
+          TO_CHAR(t.scanned_at, 'DD Mon YYYY') as scan_date,
+          t.scanned_at as raw_date,
+          'success' as status
+        FROM tickets t
+        JOIN events e ON t.event_id = e.id
+        JOIN event_sessions s ON t.session_id = s.id
+        WHERE t.scanned_by = $1
+        ORDER BY t.scanned_at DESC
+      `;
+      const { rows } = await this.pool.query(query, [userId]);
+      return rows;
+    } catch (err) {
+      console.error(err);
+      throw new InternalServerErrorException('Gagal mengambil riwayat scan agen');
+    }
+  }
 }
