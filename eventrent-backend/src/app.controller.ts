@@ -255,4 +255,27 @@ export class AppController {
   async getScanHistory(@Param('id') id: string) {
     return this.appService.getAgentScanHistory(Number(id));
   }
+
+  // --- NOTIFICATIONS ---
+  @ApiTags('Notifications')
+  @Get('users/:id/notifications')
+  async getNotifications(@Param('id') id: number) {
+    return await this.appService.getNotifications(id);
+  }
+
+  @ApiTags('Notifications')
+  @Post('notifications/:id/respond')
+  async respondInvitation(
+    @Param('id') notifId: number,
+    @Query('userId') userId: number,
+    @Body() body: { action: 'accept' | 'reject' }
+  ) {
+    return await this.appService.respondAgentInvitation(notifId, userId, body.action);
+  }
+
+  @ApiTags('Notifications')
+  @Patch('notifications/:id/read')
+  async markNotifRead(@Param('id') notifId: number, @Query('userId') userId: number) {
+    return await this.appService.markNotificationRead(notifId, userId);
+  }
 }

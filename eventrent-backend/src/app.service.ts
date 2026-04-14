@@ -604,7 +604,10 @@ export class AppService implements OnModuleInit {
       // 2. Cek apakah dia Agen di event ini (Jika bukan owner)
       let isAgent = false;
       if (!isOwner) {
-        const agentCheck = await this.pool.query('SELECT id FROM event_agents WHERE event_id = $1 AND user_id = $2', [eventId, userId]);
+        const agentCheck = await this.pool.query(
+          'SELECT id FROM event_agents WHERE event_id = $1 AND user_id = $2 AND is_accepted = TRUE',
+          [eventId, userId]
+        );
         isAgent = agentCheck.rows.length > 0;
       }
 
@@ -695,7 +698,8 @@ export class AppService implements OnModuleInit {
 
   async addAgent(eventId: number, eoId: number, agentEmail: string, role: string = 'Agen') {
     try {
-      const eventCheck = await this.pool.query('SELECT id FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
+      // PERBAIKAN: Ambil title event sekalian buat isi notif
+      const eventCheck = await this.pool.query('SELECT id, title FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
       if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
 
       const userRes = await this.pool.query('SELECT id FROM users WHERE email = $1', [agentEmail]);
@@ -707,12 +711,21 @@ export class AppService implements OnModuleInit {
       const checkAgent = await this.pool.query('SELECT id FROM event_agents WHERE event_id = $1 AND user_id = $2', [eventId, agentId]);
       if (checkAgent.rows.length > 0) throw new BadRequestException('Agen ini sudah terdaftar di event ini!');
 
+      // PERBAIKAN: is_accepted di-set FALSE by default
       const insertRes = await this.pool.query(
-        'INSERT INTO event_agents (event_id, user_id, role) VALUES ($1, $2, $3) RETURNING *',
+        'INSERT INTO event_agents (event_id, user_id, role, is_accepted) VALUES ($1, $2, $3, FALSE) RETURNING *',
         [eventId, agentId, role]
       );
       
-      return { message: 'Agen berhasil ditambahkan!', data: insertRes.rows[0] };
+      // TAMBAHAN: Kirim Notifikasi ke Agen
+      const eventTitle = eventCheck.rows[0].title;
+      await this.pool.query(
+        `INSERT INTO notifications (user_id, title, message, type, related_event_id)
+         VALUES ($1, $2, $3, 'INVITATION_AGENT', $4)`,
+        [agentId, 'Undangan Kepanitiaan Baru 🎫', `Anda diundang menjadi ${role} untuk event: ${eventTitle}.`, eventId]
+      );
+
+      return { message: 'Undangan kepanitiaan berhasil dikirim ke agen!', data: insertRes.rows[0] };
     } catch (err) {
       if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
       console.error(err);
@@ -726,7 +739,7 @@ export class AppService implements OnModuleInit {
       if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
 
       const query = `
-        SELECT ea.user_id as id, ea.role, ea.rating_given, ea.created_at, 
+        SELECT ea.user_id as id, ea.role, ea.rating_given, ea.created_at, ea.is_accepted, -- 👈 TAMBAHIN ea.is_accepted
                u.name, u.email, u.picture, u.bank_name, u.bank_account, u.bank_account_name, u.phone
         FROM event_agents ea
         JOIN users u ON ea.user_id = u.id
@@ -785,7 +798,7 @@ export class AppService implements OnModuleInit {
         FROM event_agents ea
         JOIN events e ON ea.event_id = e.id
         JOIN users u ON e.created_by = u.id
-        WHERE ea.user_id = $1
+        WHERE ea.user_id = $1 AND ea.is_accepted = TRUE -- 
         ORDER BY e.event_start ASC
       `;
       const { rows } = await this.pool.query(query, [agentId]);
@@ -1006,5 +1019,43 @@ export class AppService implements OnModuleInit {
       console.error(err);
       throw new InternalServerErrorException('Gagal mengambil riwayat scan agen');
     }
+  }
+
+  // --- NOTIFICATIONS SYSTEM ---
+  async getNotifications(userId: number) {
+    try {
+      const { rows } = await this.pool.query('SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+      return rows;
+    } catch (err) {
+      throw new InternalServerErrorException('Gagal mengambil notifikasi');
+    }
+  }
+
+  async respondAgentInvitation(notifId: number, userId: number, action: 'accept' | 'reject') {
+    try {
+      const notifRes = await this.pool.query('SELECT related_event_id FROM notifications WHERE id = $1 AND user_id = $2', [notifId, userId]);
+      if (notifRes.rows.length === 0) throw new BadRequestException('Notifikasi tidak valid');
+      
+      const eventId = notifRes.rows[0].related_event_id;
+
+      if (action === 'accept') {
+        await this.pool.query('UPDATE event_agents SET is_accepted = TRUE WHERE event_id = $1 AND user_id = $2', [eventId, userId]);
+      } else {
+        await this.pool.query('DELETE FROM event_agents WHERE event_id = $1 AND user_id = $2', [eventId, userId]);
+      }
+
+      // Tandai notif sudah dibaca dan ubah tipe biar tombolnya hilang di frontend
+      await this.pool.query('UPDATE notifications SET is_read = TRUE, type = $1 WHERE id = $2', [action === 'accept' ? 'INVITATION_ACCEPTED' : 'INVITATION_REJECTED', notifId]);
+
+      return { message: action === 'accept' ? 'Undangan berhasil diterima! Selamat bertugas.' : 'Undangan berhasil ditolak.' };
+    } catch (err) {
+      if (err instanceof BadRequestException) throw err;
+      throw new InternalServerErrorException('Gagal memproses undangan');
+    }
+  }
+
+  async markNotificationRead(notifId: number, userId: number) {
+    await this.pool.query('UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2', [notifId, userId]);
+    return { success: true };
   }
 }
