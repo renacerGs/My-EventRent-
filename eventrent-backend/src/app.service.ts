@@ -1033,18 +1033,42 @@ export class AppService implements OnModuleInit {
 
   async respondAgentInvitation(notifId: number, userId: number, action: 'accept' | 'reject') {
     try {
+      // 1. Cek notifikasi dan ambil Event ID
       const notifRes = await this.pool.query('SELECT related_event_id FROM notifications WHERE id = $1 AND user_id = $2', [notifId, userId]);
       if (notifRes.rows.length === 0) throw new BadRequestException('Notifikasi tidak valid');
       
       const eventId = notifRes.rows[0].related_event_id;
 
+      // 2. 👇 TAMBAHAN: Ambil data EO (created_by), Judul Event, dan Nama Agen buat isi Notif
+      const eventInfo = await this.pool.query('SELECT created_by, title FROM events WHERE id = $1', [eventId]);
+      const eoId = eventInfo.rows[0].created_by;
+      const eventTitle = eventInfo.rows[0].title;
+
+      const agentInfo = await this.pool.query('SELECT name FROM users WHERE id = $1', [userId]);
+      const agentName = agentInfo.rows[0].name;
+
+      // 3. Eksekusi Accept / Reject & Tembak Notif ke EO
       if (action === 'accept') {
         await this.pool.query('UPDATE event_agents SET is_accepted = TRUE WHERE event_id = $1 AND user_id = $2', [eventId, userId]);
+        
+        // Kirim Notif ke EO (Diterima)
+        await this.pool.query(
+          `INSERT INTO notifications (user_id, title, message, type, related_event_id)
+           VALUES ($1, $2, $3, 'INFO', $4)`,
+          [eoId, 'Undangan Agen Diterima! 🎉', `Agen ${agentName} telah menerima undangan untuk menjadi panitia di event: ${eventTitle}.`, eventId]
+        );
       } else {
         await this.pool.query('DELETE FROM event_agents WHERE event_id = $1 AND user_id = $2', [eventId, userId]);
+
+        // Kirim Notif ke EO (Ditolak)
+        await this.pool.query(
+          `INSERT INTO notifications (user_id, title, message, type, related_event_id)
+           VALUES ($1, $2, $3, 'INFO', $4)`,
+          [eoId, 'Undangan Agen Ditolak ❌', `Agen ${agentName} menolak tawaran untuk menjadi panitia di event: ${eventTitle}.`, eventId]
+        );
       }
 
-      // Tandai notif sudah dibaca dan ubah tipe biar tombolnya hilang di frontend
+      // 4. Tandai notif si agen udah dibaca dan ubah tipe biar tombol pop-upnya hilang
       await this.pool.query('UPDATE notifications SET is_read = TRUE, type = $1 WHERE id = $2', [action === 'accept' ? 'INVITATION_ACCEPTED' : 'INVITATION_REJECTED', notifId]);
 
       return { message: action === 'accept' ? 'Undangan berhasil diterima! Selamat bertugas.' : 'Undangan berhasil ditolak.' };
