@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import toast from 'react-hot-toast'; // Pakai modern toast!
 
 const AnimatedSearchNavbar = ({ events, searchQuery, onSearchSelect }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -92,23 +93,73 @@ const AnimatedSearchNavbar = ({ events, searchQuery, onSearchSelect }) => {
 export default function Navbar({ user, events, searchQuery, onSearchSelect, onOpenLogin, onLogout }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  
+  // 👇 STATE NOTIFIKASI 👇
+  const [notifications, setNotifications] = useState([]);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const notifRef = useRef(null);
+
   const profileRef = useRef(null);
   const navigate = useNavigate();
 
-  // 👇 BACA ROLE USER 👇
   const isAgentMode = user?.role === 'agent';
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (profileRef.current && !profileRef.current.contains(event.target)) {
-        setIsDropdownOpen(false);
-      }
+      if (profileRef.current && !profileRef.current.contains(event.target)) setIsDropdownOpen(false);
+      if (notifRef.current && !notifRef.current.contains(event.target)) setShowNotifDropdown(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // 👇 FUNGSI SWITCH ROLE TANPA LOGOUT 👇
+  // Fetch Notifikasi
+  useEffect(() => {
+    if (user) fetchNotifications();
+  }, [user]);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await fetch(`https://my-event-rent.vercel.app/api/users/${user.id}/notifications`);
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleRespondNotif = async (notifId, action) => {
+    try {
+      const res = await fetch(`https://my-event-rent.vercel.app/api/notifications/${notifId}/respond?userId=${user.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(data.message);
+        fetchNotifications(); // Reload data
+      } else {
+        toast.error(data.message);
+      }
+    } catch (err) {
+      toast.error('Kesalahan jaringan, coba lagi bro.');
+    }
+  };
+
+  const markAsRead = async (notifId) => {
+    try {
+      await fetch(`https://my-event-rent.vercel.app/api/notifications/${notifId}/read?userId=${user.id}`, { method: 'PATCH' });
+      fetchNotifications();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
   const toggleRole = () => {
     const newRole = isAgentMode ? 'user' : 'agent';
     const updatedUser = { ...user, role: newRole };
@@ -131,7 +182,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
         </div>
 
         <div className="flex-1 max-w-sm md:max-w-md lg:max-w-lg mx-auto flex justify-center">
-           {/* 👇 HIDE SEARCH BAR KALO LAGI MODE AGEN 👇 */}
            {!isAgentMode ? (
              <AnimatedSearchNavbar events={events} searchQuery={searchQuery} onSearchSelect={onSearchSelect} />
            ) : (
@@ -143,8 +193,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
         </div>
 
         <div className="flex items-center gap-2 md:gap-3 shrink-0">
-          
-          {/* 👇 HIDE TOMBOL REGULER KALO LAGI MODE AGEN 👇 */}
           {!isAgentMode && (
             <>
               <Link to="/cek-tiket" className="flex items-center justify-center gap-1.5 bg-white border border-gray-200 text-gray-500 w-9 h-9 md:w-auto md:px-5 md:py-2.5 rounded-full font-bold text-[10px] md:text-xs uppercase tracking-wider hover:text-[#FF6B35] hover:border-orange-200 hover:bg-orange-50 transition shadow-sm shrink-0">
@@ -153,7 +201,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                 </svg>
                 <span className="hidden md:inline">Cek Tiket</span>
               </Link>
-
               <Link to="/create" className="flex items-center justify-center gap-1.5 bg-[#FF6B35] text-white w-9 h-9 md:w-auto md:px-5 md:py-2.5 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-orange-600 transition shadow-md shadow-orange-100 shrink-0">
                 <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 <span className="hidden md:inline">Create</span>
@@ -163,12 +210,52 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
 
           {user ? (
             <>
-              {/* TOMBOL LIKES (HIDE DI AGEN) */}
+              {/* 👇 TOMBOL LIKES (KEMBALI HADIR, HIDE DI AGEN) 👇 */}
               {!isAgentMode && (
                 <Link to="/likes" className="flex items-center justify-center w-9 h-9 md:w-[42px] md:h-[42px] border border-gray-100 text-gray-400 bg-white rounded-full hover:bg-orange-50 hover:text-[#FF6B35] hover:border-orange-100 transition shadow-sm shrink-0">
                    <svg className="w-5 h-5 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
                 </Link>
               )}
+
+              {/* 👇 BELL NOTIFIKASI 👇 */}
+              <div className="relative shrink-0" ref={notifRef}>
+                <button onClick={() => setShowNotifDropdown(!showNotifDropdown)} className={`relative flex items-center justify-center w-9 h-9 md:w-[42px] md:h-[42px] border rounded-full transition shadow-sm shrink-0 ${isAgentMode ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700' : 'border-gray-100 bg-white text-gray-400 hover:bg-orange-50 hover:text-[#FF6B35] hover:border-orange-100'}`}>
+                  <svg className="w-5 h-5 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                  {unreadCount > 0 && (
+                    <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] font-black leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-red-500 rounded-full">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Dropdown Notifikasi */}
+                <div className={`absolute right-0 top-full mt-3 w-[280px] md:w-[350px] bg-white rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 transform origin-top-right transition-all duration-300 z-[60] overflow-hidden ${showNotifDropdown ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
+                  <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <h3 className="font-black text-gray-900 text-xs uppercase tracking-widest">Notifikasi</h3>
+                    {unreadCount > 0 && <span className="bg-[#FF6B35] text-white px-2 py-0.5 rounded-md text-[9px] font-bold">{unreadCount} Baru</span>}
+                  </div>
+                  <div className="max-h-[300px] overflow-y-auto">
+                    {notifications.length > 0 ? (
+                      notifications.map(notif => (
+                        <div key={notif.id} className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!notif.is_read ? 'bg-orange-50/30' : ''}`} onClick={() => !notif.is_read && notif.type !== 'INVITATION_AGENT' && markAsRead(notif.id)}>
+                          <p className="font-bold text-gray-900 text-sm mb-1">{notif.title}</p>
+                          <p className="text-xs text-gray-500 mb-2 leading-relaxed">{notif.message}</p>
+                          
+                          {/* Tombol Terima/Tolak Khusus Undangan Agen */}
+                          {notif.type === 'INVITATION_AGENT' && !notif.is_read && (
+                            <div className="flex gap-2 mt-3">
+                              <button onClick={() => handleRespondNotif(notif.id, 'reject')} className="flex-1 bg-red-50 text-red-500 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-colors">Tolak</button>
+                              <button onClick={() => handleRespondNotif(notif.id, 'accept')} className="flex-1 bg-[#FF6B35] text-white py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-colors shadow-md">Terima</button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-6 text-center text-gray-400 text-xs font-bold">Belum ada notifikasi bro.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
 
               <div className="relative shrink-0" ref={profileRef}>
                 <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className={`flex items-center gap-3 p-0 md:p-1 md:pr-3 rounded-full border hover:bg-gray-50 transition-all shadow-none md:shadow-sm focus:outline-none shrink-0 ${isAgentMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-700' : 'bg-transparent md:bg-white border-transparent md:border-gray-100'}`}>
@@ -185,7 +272,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                 <div className={`absolute right-0 top-full mt-3 w-[220px] md:w-[260px] bg-white rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 transform origin-top-right transition-all duration-300 z-[60] overflow-hidden ${isDropdownOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                   <div className="p-2 flex flex-col gap-1">
                     
-                    {/* 👇 MENU BERBEDA TERGANTUNG ROLE 👇 */}
                     {!isAgentMode ? (
                       <>
                         <button onClick={() => { navigate('/'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35] rounded-xl transition-all group">
@@ -211,14 +297,10 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                           <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                           DAFTAR TUGAS
                         </button>
-                        
-                        {/* 👇 UBAH TEKS JADI PROFIL & REKENING 👇 */}
                         <button onClick={() => { navigate('/profile'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-blue-500 rounded-xl transition-all group">
                           <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
                           PROFIL & REKENING
                         </button>
-
-                        {/* 👇 MENU TAMBAHAN BARU: RIWAYAT SCAN 👇 */}
                         <button onClick={() => { navigate('/agent/history'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-blue-500 rounded-xl transition-all group">
                           <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                           RIWAYAT SCAN
@@ -228,7 +310,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
 
                     <div className="h-px bg-gray-100 my-1 mx-2"></div>
                     
-                    {/* 👇 UBAH TEKS JADI MODE PEMBELI 👇 */}
                     <button onClick={toggleRole} className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 text-gray-900 rounded-xl hover:bg-gray-100 transition-all group">
                       <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 group-hover:text-gray-900 transition-colors">
                         {isAgentMode ? 'Mode Pembeli' : 'Mode Agen'}
@@ -255,7 +336,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
         </div>
       </nav>
 
-      {/* 👇👇👇 POP-UP CONFIRMATION LOGOUT 👇👇👇 */}
       {showLogoutModal && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-[24px] p-6 sm:p-8 max-w-sm w-full shadow-2xl text-center transform transition-all animate-in zoom-in-95 duration-200">

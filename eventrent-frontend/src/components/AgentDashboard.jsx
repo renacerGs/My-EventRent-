@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function AgentDashboard() {
   const navigate = useNavigate();
@@ -19,6 +20,11 @@ export default function AgentDashboard() {
   const itemsPerPage = 10;
 
   const [activeTab, setActiveTab] = useState('active');
+
+  // 👇 STATE KHUSUS UNTUK POP-UP EMERGENCY 👇
+  const [isEmergencyOpen, setIsEmergencyOpen] = useState(false);
+  const [emergencyMessage, setEmergencyMessage] = useState('');
+  const [isSendingEmergency, setIsSendingEmergency] = useState(false);
 
   useEffect(() => {
     if (!user || user.role !== 'agent') {
@@ -93,6 +99,40 @@ export default function AgentDashboard() {
     }
   };
 
+  // 👇 FUNGSI KIRIM LAPORAN EMERGENCY KE DATABASE 👇
+  const handleSendEmergency = async () => {
+    if (!emergencyMessage.trim()) {
+      toast.error("Tulis pesan kendala lu dulu bro!");
+      return;
+    }
+
+    try {
+      setIsSendingEmergency(true);
+      // Nembak API Laporan Darurat
+      const res = await fetch('https://my-event-rent.vercel.app/api/reports/emergency', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentId: user.id,
+          eventId: selectedEvent ? selectedEvent.id : null,
+          message: emergencyMessage
+        })
+      });
+
+      if (res.ok) {
+        toast.success('Laporan berhasil terkirim ke panitia pusat!');
+        setIsEmergencyOpen(false);
+        setEmergencyMessage('');
+      } else {
+        toast.error('Gagal mengirim laporan darurat. Coba lagi.');
+      }
+    } catch (error) {
+      toast.error('Terjadi kesalahan jaringan saat mengirim laporan.');
+    } finally {
+      setIsSendingEmergency(false);
+    }
+  };
+
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#0f172a]">
       <div className="w-12 h-12 border-4 border-slate-700 border-t-orange-500 rounded-full animate-spin mb-4"></div>
@@ -134,7 +174,7 @@ export default function AgentDashboard() {
     ? (ratedEvents.reduce((sum, ev) => sum + ev.rating_given, 0) / ratedEvents.length).toFixed(1) 
     : 'N/A';
 
-  // 👇 LOGIKA FILTER EVENT AKTIF & HISTORY BERDASARKAN TANGGAL SEKARANG 👇
+  // LOGIKA FILTER EVENT AKTIF & HISTORY BERDASARKAN TANGGAL SEKARANG
   const now = new Date();
   
   const activeEvents = assignedEvents.filter(ev => {
@@ -151,9 +191,70 @@ export default function AgentDashboard() {
 
   const displayedEvents = activeTab === 'active' ? activeEvents : historyEvents;
 
+  // PERHITUNGAN STATISTIK CHECK-IN UNTUK PROGRESS BAR
+  const totalGuests = attendees.length;
+  const checkedInGuests = attendees.filter(t => t.is_scanned === true).length;
+  const progressPercentage = totalGuests === 0 ? 0 : Math.round((checkedInGuests / totalGuests) * 100);
+
   return (
     <div className="bg-[#0f172a] min-h-screen font-sans pb-20 relative">
       <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-orange-500/10 to-transparent pointer-events-none"></div>
+
+      {/* 👇 MODAL POP-UP EMERGENCY 👇 */}
+      <AnimatePresence>
+        {isEmergencyOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-slate-800 w-full max-w-md rounded-[32px] border border-slate-700 shadow-2xl overflow-hidden"
+            >
+              <div className="bg-red-500/10 p-6 border-b border-red-500/20 text-center">
+                <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                </div>
+                <h3 className="text-xl font-black text-red-500 uppercase tracking-tight">Lapor Kendala</h3>
+                <p className="text-xs font-medium text-slate-400 mt-1">Laporan lo bakal langsung masuk ke dashboard EO pusat.</p>
+              </div>
+              
+              <div className="p-6">
+                <textarea 
+                  value={emergencyMessage}
+                  onChange={(e) => setEmergencyMessage(e.target.value)}
+                  placeholder={`Ceritain kendalanya di event ${selectedEvent?.title} bro...`}
+                  className="w-full h-32 bg-slate-900 border border-slate-700 rounded-xl p-4 text-sm text-white focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 resize-none transition-all mb-6"
+                ></textarea>
+                
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setIsEmergencyOpen(false)}
+                    disabled={isSendingEmergency}
+                    className="flex-1 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors"
+                  >
+                    Batal
+                  </button>
+                  <button 
+                    onClick={handleSendEmergency}
+                    disabled={isSendingEmergency}
+                    className="flex-1 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2 shadow-lg shadow-red-500/20"
+                  >
+                    {isSendingEmergency ? (
+                      <>
+                        <svg className="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        Mengirim...
+                      </>
+                    ) : (
+                      'Kirim Laporan'
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 pt-6 md:pt-16 relative z-10">
         
@@ -294,58 +395,94 @@ export default function AgentDashboard() {
           /* TAMPILAN 2: DAFTAR TAMU SPESIFIK EVENT */
           <div className="animate-fadeIn">
             
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
-              <div>
-                <button onClick={() => setSelectedEvent(null)} className="text-slate-400 hover:text-orange-500 font-bold text-xs md:text-sm uppercase tracking-widest mb-3 flex items-center gap-1.5 transition-colors py-1">
-                  <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7"></path></svg> Kembali
+            {/* 👇 TOMBOL KEMBALI, JUDUL EVENT, DAN TOMBOL LAPOR KENDALA 👇 */}
+            <div className="flex flex-col mb-4">
+              <button onClick={() => setSelectedEvent(null)} className="text-slate-400 hover:text-orange-500 font-bold text-xs md:text-sm uppercase tracking-widest mb-3 flex items-center gap-1.5 transition-colors py-1 w-max">
+                <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7"></path></svg> Kembali
+              </button>
+              
+              {/* Flexbox justify-between untuk misahin Judul (kiri) dan Tombol (kanan) */}
+              <div className="flex flex-row items-center justify-between gap-3 w-full">
+                <h2 className="text-lg md:text-2xl font-black text-white leading-tight truncate">Tamu: <span className="text-orange-500">{selectedEvent.title}</span></h2>
+                
+                {/* Tombol Lapor Kendala di Pojok Kanan Sejajar Judul */}
+                <button 
+                  onClick={() => setIsEmergencyOpen(true)}
+                  className="flex items-center gap-1.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-widest transition-all border border-red-500/30 shrink-0"
+                >
+                  <svg className="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                  Lapor Kendala
                 </button>
-                <h2 className="text-lg md:text-2xl font-black text-white leading-tight">Tamu: <span className="text-orange-500">{selectedEvent.title}</span></h2>
+              </div>
+            </div>
+
+            {/* LIVE PROGRESS COUNTER */}
+            {!loadingAttendees && (
+              <div className="bg-slate-800/80 border border-slate-700 rounded-2xl p-4 mb-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm backdrop-blur-sm">
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                    <svg className="w-3 h-3 text-orange-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"></path></svg>
+                    Live Progress Check-In
+                  </p>
+                  <p className="text-2xl font-black text-white leading-none">
+                    {checkedInGuests} <span className="text-sm font-medium text-slate-500">/ {totalGuests} Tamu</span>
+                  </p>
+                </div>
+                <div className="w-full md:w-1/2 flex items-center gap-3">
+                  <div className="flex-1 h-3 bg-slate-900 rounded-full overflow-hidden border border-slate-700 shadow-inner">
+                    <div 
+                      className="h-full bg-gradient-to-r from-orange-600 to-orange-400 rounded-full transition-all duration-1000 ease-out" 
+                      style={{ width: `${progressPercentage}%` }}
+                    ></div>
+                  </div>
+                  <span className="text-xs font-black text-orange-500 min-w-[36px] text-right">{progressPercentage}%</span>
+                </div>
+              </div>
+            )}
+              
+            {/* TAMPILAN FILTER & SEARCH */}
+            <div className="flex flex-col lg:flex-row gap-3 w-full mt-2 lg:mt-0 mb-6">
+              <div className="relative w-full lg:flex-1">
+                <input 
+                  type="text" 
+                  placeholder="Cari nama, email, ID..." 
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1); 
+                  }}
+                  className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl pl-10 pr-4 py-3 md:py-2.5 text-[11px] md:text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all"
+                />
+                <svg className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
               </div>
               
-              {/* 👇👇 TAMPILAN FILTER & SEARCH (Sejajar di Mobile) 👇👇 */}
-              <div className="flex flex-col lg:flex-row gap-3 w-full lg:w-auto mt-2 lg:mt-0">
-                <div className="relative w-full lg:w-64">
-                  <input 
-                    type="text" 
-                    placeholder="Cari nama, email, ID..." 
-                    value={searchQuery}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value);
-                      setCurrentPage(1); 
-                    }}
-                    className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl pl-10 pr-4 py-3 md:py-2.5 text-[11px] md:text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all"
-                  />
-                  <svg className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                </div>
-                
-                <div className="flex flex-row gap-2 w-full lg:w-auto">
-                  <select
-                    value={selectedSessionFilter}
-                    onChange={(e) => {
-                      setSelectedSessionFilter(e.target.value);
-                      setCurrentPage(1); 
-                    }}
-                    className="flex-1 lg:flex-none bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-3 md:py-2.5 text-[10px] md:text-sm font-bold focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 cursor-pointer appearance-none truncate"
-                  >
-                    {uniqueSessions.map(session => (
-                      <option key={session} value={session}>{session}</option>
-                    ))}
-                  </select>
+              <div className="flex flex-row gap-2 w-full lg:w-auto">
+                <select
+                  value={selectedSessionFilter}
+                  onChange={(e) => {
+                    setSelectedSessionFilter(e.target.value);
+                    setCurrentPage(1); 
+                  }}
+                  className="flex-1 lg:flex-none bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-3 md:py-2.5 text-[10px] md:text-sm font-bold focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 cursor-pointer appearance-none truncate"
+                >
+                  {uniqueSessions.map(session => (
+                    <option key={session} value={session}>{session}</option>
+                  ))}
+                </select>
 
-                  <select
-                    value={selectedStatusFilter}
-                    onChange={(e) => {
-                      setSelectedStatusFilter(e.target.value);
-                      setCurrentPage(1); 
-                    }}
-                    className="flex-1 lg:flex-none bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-3 md:py-2.5 text-[10px] md:text-sm font-bold focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 cursor-pointer appearance-none truncate"
-                  >
-                    <option value="Semua Status">Semua Status</option>
-                    <option value="Sudah Hadir">Sudah Hadir</option>
-                    <option value="Belum Hadir">Belum Hadir</option>
-                    <option value="Absen">Tolak Hadir</option>
-                  </select>
-                </div>
+                <select
+                  value={selectedStatusFilter}
+                  onChange={(e) => {
+                    setSelectedStatusFilter(e.target.value);
+                    setCurrentPage(1); 
+                  }}
+                  className="flex-1 lg:flex-none bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-3 md:py-2.5 text-[10px] md:text-sm font-bold focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 cursor-pointer appearance-none truncate"
+                >
+                  <option value="Semua Status">Semua Status</option>
+                  <option value="Sudah Hadir">Sudah Hadir</option>
+                  <option value="Belum Hadir">Belum Hadir</option>
+                  <option value="Absen">Tolak Hadir</option>
+                </select>
               </div>
             </div>
 
@@ -354,7 +491,6 @@ export default function AgentDashboard() {
                 <div className="py-20 text-center"><p className="text-slate-400 font-bold text-xs md:text-sm">Menarik data tamu...</p></div>
               ) : (
                 <>
-                  {/* TABEL DIKEMBALIKAN UNTUK SEMUA LAYAR */}
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse min-w-[700px]">
                       <thead>

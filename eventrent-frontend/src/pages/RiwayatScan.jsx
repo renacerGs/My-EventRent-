@@ -11,18 +11,21 @@ export default function RiwayatScan() {
   const [selectedEventFilter, setSelectedEventFilter] = useState('ALL');
   const [selectedSessionFilter, setSelectedSessionFilter] = useState('ALL');
   
-  // 👇 STATE BARU: Filter Tanggal 👇
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
-    // Agen atau panitia boleh masuk
     if (!user) {
       navigate('/');
       return;
     }
     fetchHistory();
   }, [user, navigate]);
+
+  // Reset Sesi ke ALL tiap kali Event berubah
+  useEffect(() => {
+    setSelectedSessionFilter('ALL');
+  }, [selectedEventFilter]);
 
   const fetchHistory = async () => {
     try {
@@ -42,12 +45,16 @@ export default function RiwayatScan() {
     }
   };
 
+  // 1. Ambil Event yang Unik
   const uniqueEvents = [...new Set(scanHistory.map(h => h.event_title))].filter(Boolean);
-  const uniqueSessions = [...new Set(scanHistory.map(h => h.session_name))].filter(Boolean);
+  
+  // 2. Ambil Sesi yang Unik BERDASARKAN Event yang dipilih
+  const availableSessions = selectedEventFilter === 'ALL'
+    ? [...new Set(scanHistory.map(h => h.session_name))].filter(Boolean)
+    : [...new Set(scanHistory.filter(h => h.event_title === selectedEventFilter).map(h => h.session_name))].filter(Boolean);
 
-  // 👇 LOGIKA FILTER GABUNGAN (SEARCH + EVENT + SESI + TANGGAL) 👇
+  // LOGIKA FILTER GABUNGAN
   const filteredHistory = scanHistory.filter(h => {
-    // 1. Text Search
     let matchesSearch = true;
     if (searchQuery) {
       const lowerQ = searchQuery.toLowerCase();
@@ -58,22 +65,16 @@ export default function RiwayatScan() {
       );
     }
 
-    // 2. Filter Event
     let matchesEvent = selectedEventFilter === 'ALL' || h.event_title === selectedEventFilter;
-
-    // 3. Filter Sesi
     let matchesSession = selectedSessionFilter === 'ALL' || h.session_name === selectedSessionFilter;
 
-    // 4. Filter Tanggal (Range)
     let matchesDate = true;
     if (h.raw_date) {
       const logDate = new Date(h.raw_date);
-      if (startDate) {
-        matchesDate = matchesDate && logDate >= new Date(startDate);
-      }
+      if (startDate) matchesDate = matchesDate && logDate >= new Date(startDate);
       if (endDate) {
         const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999); // Mentokin ke akhir hari
+        end.setHours(23, 59, 59, 999); 
         matchesDate = matchesDate && logDate <= end;
       }
     }
@@ -106,41 +107,52 @@ export default function RiwayatScan() {
           </div>
         </div>
 
-        {/* 👇 FILTER CONTROLS RESPONSIVE 👇 */}
-        <div className="bg-slate-800/50 p-4 md:p-5 rounded-[20px] md:rounded-2xl border border-slate-700/50 mb-8 backdrop-blur-sm shadow-lg">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4 items-center">
-            
-            {/* Search */}
-            <div className="relative lg:col-span-2">
-              <input 
-                type="text" 
-                placeholder="Cari ID, Nama Tamu, atau Event..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-900/80 border border-slate-700 text-white rounded-xl pl-10 pr-4 py-3 text-xs md:text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-              />
-              <svg className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-            </div>
+        {/* 👇 FILTER CONTROLS (TATA LETAK BARU RESPONSIVE) 👇 */}
+        <div className="bg-slate-800/50 p-4 md:p-5 rounded-[20px] md:rounded-2xl border border-slate-700/50 mb-8 backdrop-blur-sm shadow-lg flex flex-col gap-3 md:gap-4">
+          
+          {/* BARIS 1: Search (Full Width) */}
+          <div className="relative w-full">
+            <input 
+              type="text" 
+              placeholder="Cari ID Tiket, Nama Tamu, atau Event..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-900/80 border border-slate-700 text-white rounded-xl pl-10 pr-4 py-3 text-xs md:text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+            />
+            <svg className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+          </div>
 
-            {/* Event Dropdown */}
+          {/* BARIS 2 & 3: Dropdowns & Tanggal */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            
+            {/* Filter Event */}
             <div className="relative">
-              <select value={selectedEventFilter} onChange={(e) => setSelectedEventFilter(e.target.value)} className="w-full appearance-none bg-slate-900/80 border border-slate-700 text-white rounded-xl pl-3 pr-8 py-3 text-xs md:text-sm focus:outline-none focus:border-blue-500 transition-all cursor-pointer">
+              <select value={selectedEventFilter} onChange={(e) => setSelectedEventFilter(e.target.value)} className="w-full appearance-none bg-slate-900/80 border border-slate-700 text-white rounded-xl pl-3 pr-8 py-3 text-[10px] md:text-sm focus:outline-none focus:border-blue-500 transition-all cursor-pointer truncate">
                 <option value="ALL">Semua Event</option>
                 {uniqueEvents.map((evt, i) => <option key={i} value={evt}>{evt}</option>)}
               </select>
               <svg className="w-3.5 h-3.5 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
             </div>
 
+            {/* Filter Session */}
+            <div className="relative">
+              <select value={selectedSessionFilter} onChange={(e) => setSelectedSessionFilter(e.target.value)} className="w-full appearance-none bg-slate-900/80 border border-slate-700 text-white rounded-xl pl-3 pr-8 py-3 text-[10px] md:text-sm focus:outline-none focus:border-blue-500 transition-all cursor-pointer truncate" disabled={availableSessions.length === 0}>
+                <option value="ALL">Semua Sesi</option>
+                {availableSessions.map((ses, i) => <option key={i} value={ses}>{ses}</option>)}
+              </select>
+              <svg className="w-3.5 h-3.5 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+            </div>
+
             {/* Tgl Mulai */}
-            <div className="relative flex items-center bg-slate-900/80 border border-slate-700 rounded-xl px-3 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mr-2">Dari:</span>
-              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-transparent text-white py-3 text-xs md:text-sm focus:outline-none appearance-none [color-scheme:dark]" />
+            <div className="relative flex flex-col justify-center bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-1.5 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
+              <span className="text-[8px] md:text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Dari Tgl:</span>
+              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full bg-transparent text-white text-[10px] md:text-xs focus:outline-none appearance-none [color-scheme:dark]" />
             </div>
 
             {/* Tgl Akhir */}
-            <div className="relative flex items-center bg-slate-900/80 border border-slate-700 rounded-xl px-3 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mr-2">Sampai:</span>
-              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-transparent text-white py-3 text-xs md:text-sm focus:outline-none appearance-none [color-scheme:dark]" />
+            <div className="relative flex flex-col justify-center bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-1.5 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
+              <span className="text-[8px] md:text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Sampai Tgl:</span>
+              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full bg-transparent text-white text-[10px] md:text-xs focus:outline-none appearance-none [color-scheme:dark]" />
             </div>
 
           </div>

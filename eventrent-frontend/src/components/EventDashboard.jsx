@@ -15,11 +15,11 @@ export default function EventDashboard() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSessionFilter, setSelectedSessionFilter] = useState('Semua Sesi'); 
-  // State Baru: Filter Status Kehadiran
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('Semua'); 
   
   const [popup, setPopup] = useState({ show: false, message: '', type: 'success' });
   const [confirmDialog, setConfirmDialog] = useState({ show: false, ticketId: null });
+  const [confirmRemoveAgent, setConfirmRemoveAgent] = useState({ show: false, agentId: null });
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10; 
@@ -132,13 +132,14 @@ export default function EventDashboard() {
     }
   };
 
-  const handleRemoveAgent = async (agentId) => {
-    if (!window.confirm('Yakin ingin memberhentikan agen ini?')) return;
+  const executeRemoveAgent = async () => {
+    const agentId = confirmRemoveAgent.agentId;
+    setConfirmRemoveAgent({ show: false, agentId: null });
     try {
       const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/agents/${agentId}?eoId=${user?.id}`, { method: 'DELETE' });
       if (res.ok) {
         toast.success('Agen berhasil diberhentikan.');
-        fetchAgents();
+        fetchAgents(); // Refresh tabel
       } else {
         toast.error('Gagal menghapus agen.');
       }
@@ -227,28 +228,24 @@ export default function EventDashboard() {
     setPopup({ show: true, message: "Link Undangan/Event berhasil disalin!", type: 'success' }); 
   };
 
-  // UPDATE LOGIKA FILTER: Saring hingga ke level detail tiket di dalam order
+  // UPDATE LOGIKA FILTER
   const filteredOrders = groupedAttendees.map(order => {
-    // 1. Filter level status kehadiran di dalam tiket
     const filteredTickets = order.tickets.filter(t => {
       if (selectedStatusFilter === 'Hadir') return t.is_scanned;
       if (selectedStatusFilter === 'Belum Hadir') return !t.is_scanned && t.is_attending !== false;
       if (selectedStatusFilter === 'Tidak Hadir') return t.is_attending === false;
-      return true; // Semua
+      return true;
     });
     return { ...order, tickets: filteredTickets };
   }).filter(order => {
-    // Buang order jika setelah difilter status, tiketnya kosong
     if (order.tickets.length === 0) return false;
 
-    // 2. Filter Search
     const matchSearch = !searchQuery || order.tickets.some(t => 
       t.attendee_name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
       order.buyer_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (t.greeting && t.greeting.toLowerCase().includes(searchQuery.toLowerCase())) 
     );
     
-    // 3. Filter Sesi
     const matchSession = selectedSessionFilter === 'Semua Sesi' || order.tickets.some(t => t.session_name === selectedSessionFilter);
 
     return matchSearch && matchSession;
@@ -311,6 +308,22 @@ export default function EventDashboard() {
             <div className="flex gap-3">
               <button onClick={() => setConfirmDialog({ show: false, ticketId: null })} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 md:py-3.5 rounded-xl md:rounded-2xl hover:bg-gray-200 transition-colors uppercase tracking-widest text-[10px] md:text-xs">Batal</button>
               <button onClick={confirmManualCheckIn} className="flex-1 bg-[#FF6B35] text-white font-bold py-3 md:py-3.5 rounded-xl md:rounded-2xl hover:bg-orange-600 transition-colors uppercase tracking-widest text-[10px] md:text-xs">Ya, Check-In</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmRemoveAgent.show && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 transition-all animate-fadeIn">
+          <div className="bg-white rounded-[24px] md:rounded-[32px] p-6 md:p-8 max-w-sm w-full shadow-2xl transform text-center">
+            <div className="w-16 h-16 md:w-20 md:h-20 mx-auto rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-4 md:mb-5">
+              <svg className="w-8 h-8 md:w-10 md:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <h3 className="text-lg md:text-xl font-black text-gray-900 mb-2">Berhentikan Agen?</h3>
+            <p className="text-xs md:text-sm font-medium text-gray-500 mb-6 md:mb-8">Yakin mau memecat agen ini dari event? Mereka akan otomatis menerima notifikasi pemberhentian.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmRemoveAgent({ show: false, agentId: null })} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 md:py-3.5 rounded-xl md:rounded-2xl hover:bg-gray-200 transition-colors uppercase tracking-widest text-[10px] md:text-xs">Batal</button>
+              <button onClick={executeRemoveAgent} className="flex-1 bg-red-500 text-white font-bold py-3 md:py-3.5 rounded-xl md:rounded-2xl hover:bg-red-600 shadow-lg shadow-red-200 transition-all active:scale-95 uppercase tracking-widest text-[10px] md:text-xs">Ya, Berhentikan</button>
             </div>
           </div>
         </div>
@@ -473,7 +486,6 @@ export default function EventDashboard() {
             <div className="px-5 py-5 md:px-8 md:py-6 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
               <h3 className="text-lg md:text-xl font-bold text-gray-900 whitespace-nowrap">{isWed ? 'Buku Tamu & RSVP' : 'Peserta Event'}</h3>
               
-              {/* DESAIN FILTER BARU (SEARCH DI ATAS, FILTER SESI & KEHADIRAN SEJAJAR DI HP) */}
               <div className="flex flex-col gap-3 w-full lg:w-auto">
                 <div className="relative w-full">
                   <input 
@@ -537,7 +549,6 @@ export default function EventDashboard() {
                           <td colSpan="6" className="px-8 py-6 border-l-4 border-[#FF6B35]">
                             <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">{isWed ? 'Detail Undangan & Ucapan Doa' : 'Daftar Tiket Individual'}</p>
                             
-                            {/* TABEL BARU UNTUK DATA PESERTA / TAMU */}
                             <div className="overflow-x-auto bg-white rounded-xl border border-gray-200 shadow-sm">
                               <table className="w-full text-left border-collapse min-w-[700px]">
                                 <thead>
@@ -623,7 +634,6 @@ export default function EventDashboard() {
                               <p className="font-black text-gray-900 text-base truncate">{t.attendee_name || `Peserta ${idx + 1}`}</p>
                               <p className={`text-[10px] text-gray-500 truncate ${isWed ? 'mb-1' : 'mb-2'}`}>{t.attendee_email || '-'}</p>
                               
-                              {/* Menampilkan Agen yang Scan di Mobile */}
                               {t.is_scanned && (
                                 <p className="text-[9px] text-gray-600 mt-1 mb-2 font-bold">Di-scan oleh: <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-800">{t.scanned_by_name || 'Agen/EO'}</span></p>
                               )}
@@ -683,7 +693,22 @@ export default function EventDashboard() {
                         <td className="px-8 py-4">
                           <div className="flex items-center gap-4"><img src={a.picture} alt={a.name} className="w-12 h-12 rounded-full border-2 border-gray-100 object-cover" /><div><p className="font-black text-gray-900 text-sm">{a.name}</p><p className="text-[10px] font-bold text-gray-400">{a.email}</p></div></div>
                         </td>
-                        <td className="px-8 py-4"><span className="bg-orange-50 text-[#FF6B35] px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-orange-100">{a.role || 'Panitia'}</span></td>
+                        <td className="px-8 py-4">
+                          <div className="flex flex-col items-start gap-1.5">
+                            <span className="bg-orange-50 text-[#FF6B35] px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-orange-100">
+                              {a.role || 'Panitia'}
+                            </span>
+                            {a.is_accepted ? (
+                              <span className="text-[9px] font-bold text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 flex items-center gap-1">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg> Aktif
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-bold text-amber-500 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 flex items-center gap-1 animate-pulse">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Menunggu Konfirmasi
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-8 py-4 text-center">
                           <div className="inline-flex items-center gap-1 bg-yellow-50 px-3 py-1.5 rounded-full text-yellow-600 font-black text-[10px] tracking-widest border border-yellow-100"><svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>{a.rating_given ? `${a.rating_given}.0` : 'N/A'}</div>
                         </td>
@@ -691,7 +716,7 @@ export default function EventDashboard() {
                           <div className="flex items-center justify-end gap-2">
                             <button onClick={() => setAgentDetailModal(a)} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors" title="Lihat CV/Profil"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg></button>
                             <button onClick={() => setAgentEditRole({ show: true, agentId: a.id, role: a.role || '', rating_given: a.rating_given || 0 })} className="p-2 bg-orange-50 text-[#FF6B35] rounded-xl hover:bg-orange-100 transition-colors" title="Kelola Agen"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
-                            <button onClick={() => handleRemoveAgent(a.id)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors" title="Berhentikan Agen"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                            <button onClick={() => setConfirmRemoveAgent({ show: true, agentId: a.id })} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors" title="Berhentikan Agen"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
                           </div>
                         </td>
                       </tr>

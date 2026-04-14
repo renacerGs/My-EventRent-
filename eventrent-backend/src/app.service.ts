@@ -756,13 +756,24 @@ export class AppService implements OnModuleInit {
 
   async removeAgent(eventId: number, eoId: number, agentId: number) {
     try {
-      const eventCheck = await this.pool.query('SELECT id FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
+      // 1. Ambil title event sekalian buat isi notif
+      const eventCheck = await this.pool.query('SELECT id, title FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
       if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
+      
+      const eventTitle = eventCheck.rows[0].title;
 
+      // 2. Hapus agen dari kepanitiaan
       const delRes = await this.pool.query('DELETE FROM event_agents WHERE event_id = $1 AND user_id = $2 RETURNING id', [eventId, agentId]);
       if (delRes.rowCount === 0) throw new BadRequestException('Agen tidak ditemukan di event ini');
 
-      return { message: 'Agen berhasil dihapus/diberhentikan' };
+      // 3. 👇 TEMBAK NOTIFIKASI KE AGEN 👇
+      await this.pool.query(
+        `INSERT INTO notifications (user_id, title, message, type, related_event_id)
+         VALUES ($1, $2, $3, 'INFO', $4)`,
+        [agentId, 'Pemberhentian Tugas 🛑', `Anda telah diberhentikan dari kepanitiaan untuk event: ${eventTitle}.`, eventId]
+      );
+
+      return { message: 'Agen berhasil diberhentikan dan notifikasi telah dikirim.' };
     } catch (err) {
       if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
       throw new InternalServerErrorException('Gagal menghapus agen');

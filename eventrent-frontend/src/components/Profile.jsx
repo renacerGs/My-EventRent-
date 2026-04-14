@@ -45,7 +45,7 @@ export default function Profile() {
         bank_account_name: user.bank_account_name || ''
       });
     }
-  }, []);
+  }, [navigate, user]);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -110,12 +110,12 @@ export default function Profile() {
         const newPicture = data.picture || imagePreview; 
         const updatedUser = { 
           ...user, 
-          name: data.name, 
-          phone: data.phone, 
+          name: data.name || name, 
+          phone: data.phone || phone, 
           picture: newPicture,
-          bank_name: data.bank_name,
-          bank_account: data.bank_account,
-          bank_account_name: data.bank_account_name
+          bank_name: data.bank_name || bankData.bank_name,
+          bank_account: data.bank_account || bankData.bank_account,
+          bank_account_name: data.bank_account_name || bankData.bank_account_name
         };
         
         try {
@@ -174,16 +174,32 @@ export default function Profile() {
   };
 
   if (!user) return null;
+  
   const isGoogleUser = !!user.googleId; 
+  // 👇 BACA ROLE UNTUK MENGUBAH TEMA 👇
+  const isAgentMode = user.role === 'agent';
 
-  const inputStyle = "w-full bg-gray-50 border border-gray-200 rounded-xl px-5 py-4 text-sm font-bold text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#FF6B35] focus:ring-1 focus:ring-[#FF6B35] transition-all";
-  const labelStyle = "block text-[10px] font-black text-gray-400 mb-2 uppercase tracking-widest ml-1";
+  // 👇 STYLING DINAMIS BERDASARKAN MODE 👇
+  const inputStyle = `w-full border rounded-xl px-5 py-4 text-sm font-bold focus:outline-none transition-all ${
+    isAgentMode 
+      ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-orange-500 focus:ring-1 focus:ring-orange-500' 
+      : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#FF6B35] focus:ring-1 focus:ring-[#FF6B35]'
+  }`;
+  
+  const labelStyle = `block text-[10px] font-black mb-2 uppercase tracking-widest ml-1 ${
+    isAgentMode ? 'text-slate-400' : 'text-gray-400'
+  }`;
 
   const currentImage = imagePreview || user.picture;
 
   return (
-    <div className="bg-[#F8F9FA] min-h-screen pt-10 pb-20 font-sans relative">
+    <div className={`min-h-screen pt-10 pb-20 font-sans relative ${isAgentMode ? 'bg-[#0f172a]' : 'bg-[#F8F9FA]'}`}>
       
+      {/* ORNAMEN BACKGROUND KHUSUS MODE AGEN */}
+      {isAgentMode && (
+        <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-orange-500/10 to-transparent pointer-events-none"></div>
+      )}
+
       <AnimatePresence>
         {popup.isOpen && (
           <div className="fixed inset-0 z-[120] flex flex-col items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
@@ -220,29 +236,29 @@ export default function Profile() {
         )}
       </AnimatePresence>
 
-      <div className="max-w-5xl mx-auto px-4 md:px-8">
+      <div className="max-w-5xl mx-auto px-4 md:px-8 relative z-10">
         
         <div className="flex items-center gap-4 mb-8">
-          <button onClick={() => navigate(-1)} className="w-12 h-12 flex items-center justify-center rounded-full bg-white border border-gray-200 text-gray-500 hover:text-[#FF6B35] hover:border-[#FF6B35] shadow-sm transition-all active:scale-95">
+          <button onClick={() => navigate(-1)} className={`w-12 h-12 flex items-center justify-center rounded-full border shadow-sm transition-all active:scale-95 ${isAgentMode ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-orange-500 hover:border-orange-500' : 'bg-white border-gray-200 text-gray-500 hover:text-[#FF6B35] hover:border-[#FF6B35]'}`}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
           </button>
-          <h1 className="text-3xl md:text-4xl font-black text-gray-900 uppercase tracking-tight m-0">My Account</h1>
+          <h1 className={`text-3xl md:text-4xl font-black uppercase tracking-tight m-0 ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>My Account</h1>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
           {/* BAGIAN KIRI: PROFIL UTAMA & BANK */}
           <div className="lg:col-span-7">
-            <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100">
-              <h2 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-wide border-b border-gray-100 pb-4">Personal & Bank Info</h2>
+            <div className={`p-8 rounded-[32px] shadow-sm border ${isAgentMode ? 'bg-slate-800/50 border-slate-700/50 backdrop-blur-sm' : 'bg-white border-gray-100'}`}>
+              <h2 className={`text-xl font-black mb-6 uppercase tracking-wide border-b pb-4 ${isAgentMode ? 'text-white border-slate-700' : 'text-gray-900 border-gray-100'}`}>Personal & Bank Info</h2>
               
               <form onSubmit={handleUpdateProfile}>
-                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8 bg-gray-50 p-6 rounded-2xl border border-gray-100">
-                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-md relative group bg-gray-200 flex-shrink-0">
+                <div className={`flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8 p-6 rounded-2xl border ${isAgentMode ? 'bg-slate-900/50 border-slate-700' : 'bg-gray-50 border-gray-100'}`}>
+                  <div className={`w-24 h-24 rounded-full overflow-hidden border-4 shadow-md relative group shrink-0 ${isAgentMode ? 'border-slate-700 bg-slate-800' : 'border-white bg-gray-200'}`}>
                      {currentImage && currentImage.length > 10 ? (
                        <img src={currentImage} alt="Profile" className="w-full h-full object-cover" />
                      ) : (
-                       <svg className="w-12 h-12 text-gray-400 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg>
+                       <svg className={`w-12 h-12 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 ${isAgentMode ? 'text-slate-500' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg>
                      )}
                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer">
                         <span className="text-white text-[10px] font-bold uppercase tracking-widest">Edit</span>
@@ -251,9 +267,9 @@ export default function Profile() {
                   </div>
                   
                   <div className="text-center sm:text-left">
-                    <h3 className="text-lg font-black text-gray-900">{user.name}</h3>
-                    <p className="text-sm font-semibold text-gray-500 mb-2">{user.email}</p>
-                    <label className="cursor-pointer inline-block bg-white text-gray-700 px-4 py-1.5 border border-gray-200 rounded-lg text-xs font-bold uppercase tracking-widest hover:bg-gray-100 transition-colors shadow-sm">
+                    <h3 className={`text-lg font-black ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>{user.name}</h3>
+                    <p className={`text-sm font-semibold mb-2 ${isAgentMode ? 'text-slate-400' : 'text-gray-500'}`}>{user.email}</p>
+                    <label className={`cursor-pointer inline-block px-4 py-1.5 border rounded-lg text-xs font-bold uppercase tracking-widest transition-colors shadow-sm ${isAgentMode ? 'bg-slate-700 text-slate-300 border-slate-600 hover:bg-slate-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'}`}>
                       Ganti Foto
                       <input type="file" className="hidden" onChange={handleImageChange} accept="image/*" />
                     </label>
@@ -266,21 +282,20 @@ export default function Profile() {
                       <label className={labelStyle}>Full Name</label>
                       <input type="text" value={name} onChange={e => setName(e.target.value)} className={inputStyle} required />
                     </div>
-                    {/* INPUT NOMOR HP */}
                     <div>
                       <label className={labelStyle}>WhatsApp / Phone</label>
-                      <input type="text" value={phone} onChange={e => setPhone(e.target.value)} className={inputStyle} placeholder="081234567890" />
+                      <input type="tel" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, ''))} className={inputStyle} placeholder="081234567890" />
                     </div>
                   </div>
                   
                   <div>
                     <label className={labelStyle}>Email Address</label>
-                    <input type="email" value={user.email} disabled className="w-full bg-gray-100 border border-gray-200 rounded-xl px-5 py-4 text-sm font-bold text-gray-400 cursor-not-allowed" />
+                    <input type="email" value={user.email} disabled className={`w-full rounded-xl px-5 py-4 text-sm font-bold cursor-not-allowed ${isAgentMode ? 'bg-slate-800 border border-slate-700 text-slate-500' : 'bg-gray-100 border border-gray-200 text-gray-400'}`} />
                     <p className="text-[10px] text-red-400 font-bold mt-2 ml-1 uppercase tracking-widest">*Email tidak dapat diubah</p>
                   </div>
 
-                  <div className="pt-4 mt-6 border-t border-gray-100">
-                    <h3 className="text-[10px] font-black mb-4 uppercase tracking-widest bg-orange-50 w-max px-3 py-1.5 rounded-lg border border-orange-100 text-[#FF6B35]">Data Rekening (Untuk Agen)</h3>
+                  <div className={`pt-4 mt-6 border-t ${isAgentMode ? 'border-slate-700' : 'border-gray-100'}`}>
+                    <h3 className={`text-[10px] font-black mb-4 uppercase tracking-widest w-max px-3 py-1.5 rounded-lg border ${isAgentMode ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-orange-50 text-[#FF6B35] border-orange-100'}`}>🏦 Data Rekening (Untuk Agen)</h3>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
@@ -296,14 +311,15 @@ export default function Profile() {
                         <input type="text" value={bankData.bank_account_name} onChange={e => setBankData({...bankData, bank_account_name: e.target.value})} className={inputStyle} placeholder="Budi Santoso" />
                       </div>
                     </div>
-                    <p className="text-[10px] text-gray-400 font-bold mt-2 ml-1">*Lengkapi data ini agar EO mudah mentransfer upah Anda.</p>
+                    <p className={`text-[10px] font-bold mt-2 ml-1 ${isAgentMode ? 'text-slate-400' : 'text-gray-400'}`}>*Lengkapi data ini agar EO mudah mentransfer upah Anda.</p>
                   </div>
 
                   <div className="pt-6">
+                    {/* 👇 FIX: Logika Shadow yang Cerdas 👇 */}
                     <button 
                       type="submit" 
                       disabled={isLoadingProfile}
-                      className="w-full sm:w-auto bg-[#FF6B35] text-white px-10 py-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl shadow-orange-100 hover:bg-[#E85526] transition-all active:scale-95 disabled:opacity-50"
+                      className={`w-full sm:w-auto bg-[#FF6B35] text-white px-10 py-4 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-[#E85526] transition-all active:scale-95 disabled:opacity-50 shadow-xl ${isAgentMode ? 'shadow-orange-500/20' : 'shadow-orange-100/50'}`}
                     >
                       {isLoadingProfile ? 'Menyimpan...' : 'Simpan Perubahan'}
                     </button>
@@ -313,18 +329,18 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* BAGIAN KANAN: SECURITY SAJA SEKARANG */}
+          {/* BAGIAN KANAN: SECURITY */}
           <div className="lg:col-span-5 flex flex-col gap-8">
-            <div className="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100">
-              <h2 className="text-xl font-black text-gray-900 mb-6 uppercase tracking-wide border-b border-gray-100 pb-4">Keamanan</h2>
+            <div className={`p-8 rounded-[32px] shadow-sm border ${isAgentMode ? 'bg-slate-800/50 border-slate-700/50 backdrop-blur-sm' : 'bg-white border-gray-100'}`}>
+              <h2 className={`text-xl font-black mb-6 uppercase tracking-wide border-b pb-4 ${isAgentMode ? 'text-white border-slate-700' : 'text-gray-900 border-gray-100'}`}>Keamanan</h2>
               
               {isGoogleUser ? (
-                <div className="text-center py-10 px-4 bg-blue-50/50 rounded-2xl border border-blue-100">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-500">
+                <div className={`text-center py-10 px-4 rounded-2xl border ${isAgentMode ? 'bg-blue-900/10 border-blue-800/50' : 'bg-blue-50/50 border-blue-100'}`}>
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${isAgentMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-500'}`}>
                     <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/></svg>
                   </div>
-                  <h3 className="text-sm text-gray-900 font-black mb-1 uppercase tracking-wide">Login via Google</h3>
-                  <p className="text-gray-500 text-[10px] font-bold leading-relaxed px-4">
+                  <h3 className={`text-sm font-black mb-1 uppercase tracking-wide ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>Login via Google</h3>
+                  <p className={`text-[10px] font-bold leading-relaxed px-4 ${isAgentMode ? 'text-slate-400' : 'text-gray-500'}`}>
                     Akun kamu terhubung secara aman dengan Google. Tidak perlu mengingat password.
                   </p>
                 </div>
@@ -343,7 +359,7 @@ export default function Profile() {
                     <input type="password" value={passData.confirmPass} onChange={e => setPassData({...passData, confirmPass: e.target.value})} className={inputStyle} placeholder="••••••••" required />
                   </div>
                   <div className="pt-2">
-                     <button type="submit" disabled={isLoadingPass} className="w-full bg-gray-900 text-white py-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl hover:bg-black transition-all active:scale-95 disabled:opacity-50">
+                     <button type="submit" disabled={isLoadingPass} className={`w-full text-white py-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 ${isAgentMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-900 hover:bg-black'}`}>
                       {isLoadingPass ? 'Memproses...' : 'Ubah Password'}
                     </button>
                   </div>
