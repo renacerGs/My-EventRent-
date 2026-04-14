@@ -12,13 +12,13 @@ export default function AgentDashboard() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [attendees, setAttendees] = useState([]);
   const [loadingAttendees, setLoadingAttendees] = useState(false);
-  
   const [searchQuery, setSearchQuery] = useState('');
-  // 👇 STATE BARU UNTUK FILTER SESI 👇
   const [selectedSessionFilter, setSelectedSessionFilter] = useState('Semua Sesi');
-  
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState('Semua Status');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  const [activeTab, setActiveTab] = useState('active');
 
   useEffect(() => {
     if (!user || user.role !== 'agent') {
@@ -47,6 +47,7 @@ export default function AgentDashboard() {
     setSelectedEvent(eventData);
     setSearchQuery('');
     setSelectedSessionFilter('Semua Sesi');
+    setSelectedStatusFilter('Semua Status');
     setCurrentPage(1);
     fetchGuestList(eventData.id);
   };
@@ -99,10 +100,8 @@ export default function AgentDashboard() {
     </div>
   );
 
-  // 👇 MENGAMBIL DAFTAR SESI YANG UNIK DARI DATA TAMU 👇
   const uniqueSessions = ['Semua Sesi', ...new Set(attendees.map(t => t.session_name))];
 
-  // 👇 LOGIKA FILTER GABUNGAN (SEARCH + FILTER SESI) 👇
   const filteredAttendees = attendees.filter(t => {
     const searchLower = searchQuery.toLowerCase();
     const matchSearch = !searchQuery || (
@@ -110,9 +109,19 @@ export default function AgentDashboard() {
       t.buyer_name?.toLowerCase().includes(searchLower) || 
       t.ticket_id?.toLowerCase().includes(searchLower)
     );
+    
     const matchSession = selectedSessionFilter === 'Semua Sesi' || t.session_name === selectedSessionFilter;
     
-    return matchSearch && matchSession;
+    let matchStatus = true;
+    if (selectedStatusFilter === 'Sudah Hadir') {
+      matchStatus = t.is_scanned === true;
+    } else if (selectedStatusFilter === 'Belum Hadir') {
+      matchStatus = t.is_scanned === false && t.is_attending !== false;
+    } else if (selectedStatusFilter === 'Absen') {
+      matchStatus = t.is_attending === false;
+    }
+    
+    return matchSearch && matchSession && matchStatus;
   });
 
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -125,103 +134,144 @@ export default function AgentDashboard() {
     ? (ratedEvents.reduce((sum, ev) => sum + ev.rating_given, 0) / ratedEvents.length).toFixed(1) 
     : 'N/A';
 
+  // 👇 LOGIKA FILTER EVENT AKTIF & HISTORY BERDASARKAN TANGGAL SEKARANG 👇
+  const now = new Date();
+  
+  const activeEvents = assignedEvents.filter(ev => {
+    const eventDate = new Date(ev.date_start);
+    eventDate.setHours(23, 59, 59, 999);
+    return eventDate >= now;
+  });
+
+  const historyEvents = assignedEvents.filter(ev => {
+    const eventDate = new Date(ev.date_start);
+    eventDate.setHours(23, 59, 59, 999); 
+    return eventDate < now;
+  });
+
+  const displayedEvents = activeTab === 'active' ? activeEvents : historyEvents;
+
   return (
     <div className="bg-[#0f172a] min-h-screen font-sans pb-20 relative">
       <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-orange-500/10 to-transparent pointer-events-none"></div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 pt-10 md:pt-16 relative z-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 pt-6 md:pt-16 relative z-10">
         
         {/* HEADER PROFIL AGEN */}
-        <div className="flex flex-col md:flex-row items-center md:items-end justify-between gap-6 mb-10 bg-slate-800/50 p-8 rounded-[32px] border border-slate-700/50 backdrop-blur-sm">
-          <div className="flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
-            <div className="w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden border-4 border-slate-700 shadow-xl">
+        <div className="flex flex-col md:flex-row items-center md:items-end justify-between gap-6 mb-8 md:mb-10 bg-slate-800/50 p-6 md:p-8 rounded-[24px] md:rounded-[32px] border border-slate-700/50 backdrop-blur-sm">
+          <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 text-center md:text-left">
+            <div className="w-16 h-16 md:w-24 md:h-24 rounded-full overflow-hidden border-4 border-slate-700 shadow-xl shrink-0">
               <img src={user?.picture} alt={user?.name} className="w-full h-full object-cover" />
             </div>
             <div>
-              <div className="flex items-center justify-center md:justify-start gap-2 mb-1">
-                <h1 className="text-2xl md:text-3xl font-black text-white">{user?.name}</h1>
-                <span className="bg-orange-500/20 text-orange-400 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-widest border border-orange-500/30">Verified Agent</span>
+              <div className="flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-2 mb-1">
+                <h1 className="text-xl md:text-3xl font-black text-white">{user?.name}</h1>
+                <span className="bg-orange-500/20 text-orange-400 px-2 py-0.5 md:px-2.5 md:py-1 rounded-md text-[9px] md:text-[10px] font-black uppercase tracking-widest border border-orange-500/30 mt-1 md:mt-0">Verified Agent</span>
               </div>
-              <p className="text-sm font-medium text-slate-400">{user?.email}</p>
+              <p className="text-xs md:text-sm font-medium text-slate-400">{user?.email}</p>
             </div>
           </div>
           
-          <div className="flex w-full md:w-auto border-t md:border-t-0 border-slate-700 pt-6 md:pt-0 justify-around md:justify-end gap-8 md:gap-10">
+          <div className="flex w-full md:w-auto border-t md:border-t-0 border-slate-700 pt-5 md:pt-0 justify-around md:justify-end gap-6 md:gap-10">
             <div className="text-center md:text-right">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Total Event</p>
-              <p className="text-3xl font-black text-white">{assignedEvents.length}</p>
+              <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Total Event</p>
+              <p className="text-2xl md:text-3xl font-black text-white">{assignedEvents.length}</p>
             </div>
             <div className="text-center md:text-right">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Avg. Rating</p>
-              <p className="text-3xl font-black text-yellow-500 flex items-center justify-center md:justify-end gap-1">
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
+              <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Avg. Rating</p>
+              <p className="text-2xl md:text-3xl font-black text-yellow-500 flex items-center justify-center md:justify-end gap-1">
+                <svg className="w-5 h-5 md:w-6 md:h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
                 {avgRating}
               </p>
             </div>
           </div>
         </div>
 
+        {/* TAMPILAN 1: DAFTAR EVENT */}
         {!selectedEvent ? (
           <>
-            <div className="flex items-center gap-3 mb-6">
-              <span className="w-2 h-8 bg-orange-500 rounded-full inline-block"></span>
-              <h2 className="text-xl md:text-2xl font-black text-white uppercase tracking-wide">Daftar Tugas Anda</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-slate-700/50 pb-4">
+              <div className="flex items-center gap-3">
+                <span className="w-2 h-6 md:h-8 bg-orange-500 rounded-full inline-block"></span>
+                <h2 className="text-lg md:text-2xl font-black text-white uppercase tracking-wide">Tugas Anda</h2>
+              </div>
+              
+              <div className="flex bg-slate-800 rounded-xl p-1 border border-slate-700 w-full sm:w-auto">
+                <button onClick={() => setActiveTab('active')} className={`flex-1 sm:flex-none px-4 py-2 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'active' ? 'bg-orange-500 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>
+                  Upcoming
+                </button>
+                <button onClick={() => setActiveTab('history')} className={`flex-1 sm:flex-none px-4 py-2 text-[10px] md:text-xs font-black uppercase tracking-widest rounded-lg transition-all ${activeTab === 'history' ? 'bg-slate-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}>
+                  History
+                </button>
+              </div>
             </div>
 
-            {assignedEvents.length > 0 ? (
-              <div className="bg-slate-800/50 rounded-[24px] md:rounded-[32px] border border-slate-700/50 overflow-hidden shadow-xl">
+            {displayedEvents.length > 0 ? (
+              <div className="bg-slate-800/50 rounded-[20px] md:rounded-[32px] border border-slate-700/50 overflow-hidden shadow-xl">
                 
+                {/* HEADER TABEL DESKTOP */}
                 <div className="hidden md:flex items-center justify-between px-8 py-4 bg-slate-900/50 border-b border-slate-700/50 text-[10px] font-black text-slate-500 uppercase tracking-widest">
                   <div className="w-[40%]">Event Details</div>
-                  <div className="w-[20%] text-center">Tugas & Rating</div>
-                  <div className="w-[15%] text-center">Status</div>
+                  <div className="w-[35%] flex justify-between">
+                    <div className="w-[57%] text-center">Tugas & Rating</div>
+                    <div className="w-[43%] text-center">Status</div>
+                  </div>
                   <div className="w-[25%] text-right">Action</div>
                 </div>
 
                 <div className="flex flex-col">
-                  {assignedEvents.map((ev, index) => (
-                    <div key={ev.id} className={`flex flex-col md:flex-row items-start md:items-center justify-between p-5 md:px-8 md:py-6 hover:bg-slate-700/30 transition-colors gap-4 md:gap-0 ${index !== assignedEvents.length - 1 ? 'border-b border-slate-700/50' : ''}`}>
+                  {displayedEvents.map((ev, index) => (
+                    <div key={ev.id} className={`flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-8 md:py-6 hover:bg-slate-700/30 transition-colors gap-3 md:gap-0 ${index !== displayedEvents.length - 1 ? 'border-b border-slate-700/50' : ''}`}>
                       
-                      <div className="flex items-center gap-4 w-full md:w-[40%]">
-                        <img src={ev.img} alt={ev.title} className="w-16 h-16 md:w-20 md:h-20 rounded-xl object-cover border border-slate-700 shrink-0" />
+                      {/* EVENT DETAIL (KIRI) */}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-[40%]">
+                        <div className="w-full sm:w-20 h-36 sm:h-20 rounded-xl overflow-hidden relative shrink-0 border border-slate-700">
+                          <img src={ev.img} alt={ev.title} className="w-full h-full object-cover" />
+                        </div>
                         <div>
-                          <h3 className="font-black text-white text-base md:text-lg line-clamp-1">{ev.title}</h3>
-                          <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                          <h3 className="font-black text-white text-lg md:text-lg line-clamp-1">{ev.title}</h3>
+                          <p className="text-[10px] md:text-xs text-slate-400 mt-1 flex items-center gap-1.5">
+                            <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                             {ev.date_start}
                           </p>
                           <p className="text-[10px] text-slate-500 font-bold mt-1 uppercase tracking-widest truncate max-w-[200px]">{ev.location}</p>
                         </div>
                       </div>
 
-                      <div className="w-full md:w-[20%] flex flex-row md:flex-col items-center justify-between md:justify-center gap-2 border-t md:border-none border-slate-700 pt-3 md:pt-0">
-                        <span className="md:hidden text-[10px] font-bold text-slate-500 uppercase">Tugas:</span>
-                        <div className="flex flex-col items-end md:items-center gap-1.5">
-                          <span className="bg-slate-900 border border-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest truncate max-w-[140px]">
+                      {/* TUGAS, RATING & STATUS (TENGAH) */}
+                      <div className="w-full md:w-[35%] flex flex-row items-center justify-start md:justify-between gap-2 border-t md:border-none border-slate-700 pt-3 md:pt-0">
+                        
+                        <div className="flex flex-row md:flex-col items-center justify-start md:justify-center gap-2 md:w-[57%]">
+                          <span className="bg-slate-900 border border-slate-700 text-slate-300 px-2.5 md:px-3 py-1 md:py-1.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest truncate max-w-[120px] md:max-w-[140px]">
                             {ev.role || 'Panitia'}
                           </span>
-                          <div className="flex items-center gap-1 text-yellow-500 text-[10px] font-black bg-yellow-500/10 px-2 py-0.5 rounded-md border border-yellow-500/20" title="Rating Anda dari EO">
+                          <span className="flex items-center gap-1 text-yellow-500 text-[9px] md:text-[10px] font-black bg-yellow-500/10 px-2 py-1 md:py-0.5 rounded-md border border-yellow-500/20" title="Rating Anda dari EO">
                             ★ {ev.rating_given ? `${ev.rating_given}.0` : 'N/A'}
-                          </div>
+                          </span>
                         </div>
+
+                        <div className="flex items-center justify-start md:justify-center md:w-[43%]">
+                          {activeTab === 'active' ? (
+                            <span className="bg-emerald-500/10 text-emerald-400 px-2.5 md:px-3 py-1 rounded-lg md:rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">Active</span>
+                          ) : (
+                            <span className="bg-slate-700 text-slate-400 px-2.5 md:px-3 py-1 rounded-lg md:rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest border border-slate-600">Ended</span>
+                          )}
+                        </div>
+
                       </div>
 
-                      <div className="w-full md:w-[15%] flex justify-between md:justify-center items-center border-t md:border-none border-slate-700 pt-3 md:pt-0">
-                        <span className="md:hidden text-[10px] font-bold text-slate-500 uppercase">Status:</span>
-                        <span className="bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-500/20">
-                          Active
-                        </span>
-                      </div>
-
-                      <div className="w-full md:w-[25%] flex items-center justify-end gap-2 mt-2 md:mt-0">
-                        <button onClick={() => handleOpenGuestList(ev)} className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 transition-colors text-[10px] font-black uppercase tracking-widest border border-slate-600" title="Daftar Tamu">
+                      {/* ACTIONS (KANAN) */}
+                      <div className="w-full md:w-[25%] flex flex-row items-center justify-end gap-2 mt-3 md:mt-0">
+                        <button onClick={() => handleOpenGuestList(ev)} className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 bg-slate-700 text-white rounded-xl hover:bg-slate-600 transition-colors text-[10px] font-black uppercase tracking-widest border border-slate-600">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-                          <span className="md:hidden">Tamu</span>
+                          <span className="md:hidden lg:inline">Tamu</span>
                         </button>
-                        <button onClick={() => navigate(`/scanner/${ev.id}`)} className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-4 py-2.5 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors text-[10px] font-black uppercase tracking-widest shadow-lg shadow-orange-500/20" title="Buka Scanner">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
-                          <span className="md:hidden">Scan</span>
-                        </button>
+                        {activeTab === 'active' && (
+                          <button onClick={() => navigate(`/scanner/${ev.id}`)} className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors text-[10px] font-black uppercase tracking-widest shadow-lg shadow-orange-500/20">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+                            <span className="md:hidden lg:inline">Scan</span>
+                          </button>
+                        )}
                       </div>
 
                     </div>
@@ -229,63 +279,82 @@ export default function AgentDashboard() {
                 </div>
               </div>
             ) : (
-              <div className="bg-slate-800/50 rounded-[32px] p-12 text-center border border-slate-700/50 flex flex-col items-center justify-center min-h-[300px]">
-                <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-6 shadow-inner">
-                  <svg className="w-10 h-10 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+              <div className="bg-slate-800/50 rounded-[24px] md:rounded-[32px] p-8 md:p-12 text-center border border-slate-700/50 flex flex-col items-center justify-center min-h-[250px] md:min-h-[300px]">
+                <div className="w-16 h-16 md:w-20 md:h-20 bg-slate-800 rounded-full flex items-center justify-center mb-4 md:mb-6 shadow-inner">
+                  <svg className="w-8 h-8 md:w-10 md:h-10 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
                 </div>
-                <h3 className="text-xl font-black text-white mb-2">Tugas Kosong</h3>
-                <p className="text-slate-400 text-sm font-medium max-w-md mx-auto leading-relaxed">
-                  Santai dulu bro! Belum ada Event Organizer yang menugaskan lo buat jadi panitia/agen di acaranya.
+                <h3 className="text-lg md:text-xl font-black text-white mb-2">Tugas Kosong</h3>
+                <p className="text-slate-400 text-xs md:text-sm font-medium max-w-sm mx-auto leading-relaxed">
+                  {activeTab === 'active' ? 'Belum ada Event Organizer yang menugaskan lo buat jadi panitia/agen di acaranya.' : 'Belum ada riwayat event yang selesai lo kerjain.'}
                 </p>
               </div>
             )}
           </>
         ) : (
+          /* TAMPILAN 2: DAFTAR TAMU SPESIFIK EVENT */
           <div className="animate-fadeIn">
+            
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
               <div>
-                <button onClick={() => setSelectedEvent(null)} className="text-slate-400 hover:text-orange-500 font-bold text-[10px] uppercase tracking-widest mb-2 flex items-center gap-1 transition-colors">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7"></path></svg> Kembali
+                <button onClick={() => setSelectedEvent(null)} className="text-slate-400 hover:text-orange-500 font-bold text-xs md:text-sm uppercase tracking-widest mb-3 flex items-center gap-1.5 transition-colors py-1">
+                  <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M15 19l-7-7 7-7"></path></svg> Kembali
                 </button>
-                <h2 className="text-xl md:text-2xl font-black text-white leading-tight">Daftar Tamu: <span className="text-orange-500">{selectedEvent.title}</span></h2>
+                <h2 className="text-lg md:text-2xl font-black text-white leading-tight">Tamu: <span className="text-orange-500">{selectedEvent.title}</span></h2>
               </div>
               
-              {/* 👇👇 DROPDOWN FILTER & SEARCH BAR 👇👇 */}
-              <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-                <select
-                  value={selectedSessionFilter}
-                  onChange={(e) => {
-                    setSelectedSessionFilter(e.target.value);
-                    setCurrentPage(1); // Reset halaman ke 1 pas filter diganti
-                  }}
-                  className="bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 text-sm font-bold focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 cursor-pointer appearance-none"
-                >
-                  {uniqueSessions.map(session => (
-                    <option key={session} value={session}>{session}</option>
-                  ))}
-                </select>
-
-                <div className="relative w-full sm:w-64">
+              {/* 👇👇 TAMPILAN FILTER & SEARCH (Sejajar di Mobile) 👇👇 */}
+              <div className="flex flex-col lg:flex-row gap-3 w-full lg:w-auto mt-2 lg:mt-0">
+                <div className="relative w-full lg:w-64">
                   <input 
                     type="text" 
                     placeholder="Cari nama, email, ID..." 
                     value={searchQuery}
                     onChange={(e) => {
                       setSearchQuery(e.target.value);
-                      setCurrentPage(1); // Reset halaman ke 1 pas ngetik search
+                      setCurrentPage(1); 
                     }}
-                    className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all"
+                    className="w-full bg-slate-800 border border-slate-700 text-white rounded-xl pl-10 pr-4 py-3 md:py-2.5 text-[11px] md:text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-all"
                   />
                   <svg className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+                
+                <div className="flex flex-row gap-2 w-full lg:w-auto">
+                  <select
+                    value={selectedSessionFilter}
+                    onChange={(e) => {
+                      setSelectedSessionFilter(e.target.value);
+                      setCurrentPage(1); 
+                    }}
+                    className="flex-1 lg:flex-none bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-3 md:py-2.5 text-[10px] md:text-sm font-bold focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 cursor-pointer appearance-none truncate"
+                  >
+                    {uniqueSessions.map(session => (
+                      <option key={session} value={session}>{session}</option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={selectedStatusFilter}
+                    onChange={(e) => {
+                      setSelectedStatusFilter(e.target.value);
+                      setCurrentPage(1); 
+                    }}
+                    className="flex-1 lg:flex-none bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-3 md:py-2.5 text-[10px] md:text-sm font-bold focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 cursor-pointer appearance-none truncate"
+                  >
+                    <option value="Semua Status">Semua Status</option>
+                    <option value="Sudah Hadir">Sudah Hadir</option>
+                    <option value="Belum Hadir">Belum Hadir</option>
+                    <option value="Absen">Tolak Hadir</option>
+                  </select>
                 </div>
               </div>
             </div>
 
-            <div className="bg-slate-800 rounded-[24px] border border-slate-700 overflow-hidden shadow-xl">
+            <div className="bg-slate-800/50 md:bg-slate-800 rounded-[20px] md:rounded-[24px] border border-transparent md:border-slate-700 overflow-hidden md:shadow-xl">
               {loadingAttendees ? (
-                <div className="py-20 text-center"><p className="text-slate-400 font-bold text-sm">Menarik data tamu...</p></div>
+                <div className="py-20 text-center"><p className="text-slate-400 font-bold text-xs md:text-sm">Menarik data tamu...</p></div>
               ) : (
                 <>
+                  {/* TABEL DIKEMBALIKAN UNTUK SEMUA LAYAR */}
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse min-w-[700px]">
                       <thead>
@@ -319,8 +388,8 @@ export default function AgentDashboard() {
                                 )}
                               </td>
                               <td className="px-6 py-4 text-right">
-                                {!t.is_scanned && t.is_attending !== false ? (
-                                  <button onClick={() => handleManualCheckIn(t.ticket_id, selectedEvent.id)} className="bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-orange-500/30">
+                                {!t.is_scanned && t.is_attending !== false && activeTab === 'active' ? (
+                                  <button onClick={() => handleManualCheckIn(t.ticket_id, selectedEvent.id)} className="bg-orange-500/10 text-orange-500 hover:bg-orange-500 hover:text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-orange-500/30 whitespace-nowrap">
                                     Check-In
                                   </button>
                                 ) : (
@@ -331,7 +400,7 @@ export default function AgentDashboard() {
                           ))
                         ) : (
                           <tr>
-                            <td colSpan="5" className="px-6 py-12 text-center text-slate-500 font-bold text-sm">Tidak ada data tamu yang cocok dengan filter.</td>
+                            <td colSpan="5" className="px-6 py-12 text-center text-slate-500 font-bold text-sm">Tidak ada data tamu yang cocok.</td>
                           </tr>
                         )}
                       </tbody>
@@ -339,13 +408,13 @@ export default function AgentDashboard() {
                   </div>
 
                   {totalPages > 1 && (
-                    <div className="px-6 py-4 border-t border-slate-700 bg-slate-900/30 flex items-center justify-between">
+                    <div className="px-6 py-4 border-t border-slate-700 bg-transparent md:bg-slate-900/30 flex items-center justify-between">
                       <span className="text-[10px] font-bold text-slate-500">
                         Hal <span className="text-white">{currentPage}</span> dari <span className="text-white">{totalPages}</span>
                       </span>
                       <div className="flex gap-2">
-                        <button onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1} className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-50 transition-colors">Prev</button>
-                        <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages} className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-50 transition-colors">Next</button>
+                        <button onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1} className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 disabled:opacity-50 transition-colors">Prev</button>
+                        <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages} className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 disabled:opacity-50 transition-colors">Next</button>
                       </div>
                     </div>
                   )}

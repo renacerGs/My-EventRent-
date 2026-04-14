@@ -592,6 +592,7 @@ export class AppService implements OnModuleInit {
     }
   }
 
+  // 👇 UDAH DI-UPDATE: TAMBAHAN LEFT JOIN users scanner 👇
   async getEventAttendees(eventId: number, userId: number) {
     try {
       // 1. Cek apakah dia Pemilik Event (EO)
@@ -616,10 +617,12 @@ export class AppService implements OnModuleInit {
         SELECT t.ticket_code as ticket_id, t.purchase_date, t.price,
                t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned, t.pax, t.greeting, t.is_attending,
                u.name as buyer_name, COALESCE(u.email, t.guest_email) as buyer_email, u.picture as buyer_pic,
-               s.name as session_name
+               s.name as session_name,
+               scanner.name as scanned_by_name
         FROM tickets t
         LEFT JOIN users u ON t.user_id = u.id
         JOIN event_sessions s ON t.session_id = s.id
+        LEFT JOIN users scanner ON t.scanned_by = scanner.id 
         WHERE t.event_id = $1
         ORDER BY t.purchase_date DESC
       `;
@@ -631,6 +634,7 @@ export class AppService implements OnModuleInit {
     }
   }
 
+  // 👇 UDAH DI-UPDATE: NYIMPEN userId (AGEN) KE KOLOM scanned_by 👇
   async scanTicket(ticketCode: string, eventId: number, userId: number) {
     try {
       // 1. Cek apakah dia Pemilik Event (EO)
@@ -674,7 +678,12 @@ export class AppService implements OnModuleInit {
         return { valid: false, message: `TIKET SUDAH DIGUNAKAN pada ${scanWaktu}!`, data: ticket };
       }
 
-      await this.pool.query('UPDATE tickets SET is_scanned = TRUE, scanned_at = NOW() WHERE ticket_code = $1', [ticketCode]);
+      // TAMBAHAN: Update kolom scanned_by dengan userId yang ngescan
+      await this.pool.query(
+        'UPDATE tickets SET is_scanned = TRUE, scanned_at = NOW(), scanned_by = $2 WHERE ticket_code = $1', 
+        [ticketCode, userId]
+      );
+      
       return { valid: true, message: 'SCAN SUKSES! Tiket Valid.', data: ticket };
     } catch (err) {
       if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
@@ -768,7 +777,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 👇 FIX RATING TAMPIL DI FRONTEND 👇
   async getAssignedEvents(agentId: number) {
     try {
       const query = `
