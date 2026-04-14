@@ -211,19 +211,27 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                           <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                           DAFTAR TUGAS
                         </button>
+                        
+                        {/* 👇 UBAH TEKS JADI PROFIL & REKENING 👇 */}
                         <button onClick={() => { navigate('/profile'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-blue-500 rounded-xl transition-all group">
                           <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
-                          DATA REKENING GAJI
+                          PROFIL & REKENING
+                        </button>
+
+                        {/* 👇 MENU TAMBAHAN BARU: RIWAYAT SCAN 👇 */}
+                        <button onClick={() => { navigate('/agent/history'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-blue-500 rounded-xl transition-all group">
+                          <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                          RIWAYAT SCAN
                         </button>
                       </>
                     )}
 
                     <div className="h-px bg-gray-100 my-1 mx-2"></div>
                     
-                    {/* 👇 TOMBOL AJAIB SWITCH ROLE 👇 */}
+                    {/* 👇 UBAH TEKS JADI MODE PEMBELI 👇 */}
                     <button onClick={toggleRole} className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 text-gray-900 rounded-xl hover:bg-gray-100 transition-all group">
                       <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 group-hover:text-gray-900 transition-colors">
-                        {isAgentMode ? 'Balik ke Pembeli' : 'Mode Agen'}
+                        {isAgentMode ? 'Mode Pembeli' : 'Mode Agen'}
                       </span>
                       <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
                     </button>

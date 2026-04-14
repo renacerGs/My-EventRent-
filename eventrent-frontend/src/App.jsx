@@ -18,8 +18,9 @@ import Checkout from "./pages/Checkout";
 import Scanner from './pages/Scanner';
 import TrackTicket from './pages/TrackTicket'; 
 
-// 👇 FIX: PASTIKAN FILE INI ADA DI DALAM FOLDER src/components/ 👇
+// 👇 ROUTE KHUSUS AGEN 👇
 import AgentDashboard from './components/AgentDashboard'; 
+import RiwayatScan from './pages/RiwayatScan'; // 👈 IMPORT HALAMAN RIWAYAT SCAN YANG BARU
 
 // --- ROUTE KHUSUS PEMBUATAN EVENT ---
 import ChooseEventType from "./components/ChooseEventType"; 
@@ -136,6 +137,7 @@ export default function App() {
           
           {/* 👇 ROUTE BARU KHUSUS PORTAL AGEN 👇 */}
           <Route path="/agent" element={<ProtectedRoute><AgentDashboard /></ProtectedRoute>} />
+          <Route path="/agent/history" element={<ProtectedRoute><RiwayatScan /></ProtectedRoute>} /> {/* 👈 ROUTE RIWAYAT SCAN */}
           
           {/* --- MANAJEMEN EVENT & DASHBOARD --- */}
           <Route path="/manage" element={<ProtectedRoute><ManageEvent /></ProtectedRoute>} />
