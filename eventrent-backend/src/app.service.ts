@@ -18,6 +18,10 @@ export class AppService implements OnModuleInit {
       ssl: {
         rejectUnauthorized: false,
       },
+      // 👇 TAMBAHAN FIX ERROR MaxClientsInSessionMode 👇
+      max: 5, // Batasin maksimal 5 koneksi bersamaan
+      idleTimeoutMillis: 30000, // Tutup koneksi otomatis kalau nganggur 30 detik
+      connectionTimeoutMillis: 5000, // Maksimal nunggu koneksi 5 detik
     });
 
     this.transporter = nodemailer.createTransport({
@@ -592,7 +596,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 👇 UDAH DI-UPDATE: TAMBAHAN LEFT JOIN users scanner 👇
   async getEventAttendees(eventId: number, userId: number) {
     try {
       // 1. Cek apakah dia Pemilik Event (EO)
@@ -637,7 +640,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 👇 UDAH DI-UPDATE: NYIMPEN userId (AGEN) KE KOLOM scanned_by 👇
   async scanTicket(ticketCode: string, eventId: number, userId: number) {
     try {
       // 1. Cek apakah dia Pemilik Event (EO)
@@ -681,7 +683,6 @@ export class AppService implements OnModuleInit {
         return { valid: false, message: `TIKET SUDAH DIGUNAKAN pada ${scanWaktu}!`, data: ticket };
       }
 
-      // TAMBAHAN: Update kolom scanned_by dengan userId yang ngescan
       await this.pool.query(
         'UPDATE tickets SET is_scanned = TRUE, scanned_at = NOW(), scanned_by = $2 WHERE ticket_code = $1', 
         [ticketCode, userId]
@@ -698,7 +699,6 @@ export class AppService implements OnModuleInit {
 
   async addAgent(eventId: number, eoId: number, agentEmail: string, role: string = 'Agen') {
     try {
-      // PERBAIKAN: Ambil title event sekalian buat isi notif
       const eventCheck = await this.pool.query('SELECT id, title FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
       if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
 
@@ -711,13 +711,11 @@ export class AppService implements OnModuleInit {
       const checkAgent = await this.pool.query('SELECT id FROM event_agents WHERE event_id = $1 AND user_id = $2', [eventId, agentId]);
       if (checkAgent.rows.length > 0) throw new BadRequestException('Agen ini sudah terdaftar di event ini!');
 
-      // PERBAIKAN: is_accepted di-set FALSE by default
       const insertRes = await this.pool.query(
         'INSERT INTO event_agents (event_id, user_id, role, is_accepted) VALUES ($1, $2, $3, FALSE) RETURNING *',
         [eventId, agentId, role]
       );
       
-      // TAMBAHAN: Kirim Notifikasi ke Agen
       const eventTitle = eventCheck.rows[0].title;
       await this.pool.query(
         `INSERT INTO notifications (user_id, title, message, type, related_event_id)
@@ -739,7 +737,7 @@ export class AppService implements OnModuleInit {
       if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
 
       const query = `
-        SELECT ea.user_id as id, ea.role, ea.rating_given, ea.created_at, ea.is_accepted, -- 👈 TAMBAHIN ea.is_accepted
+        SELECT ea.user_id as id, ea.role, ea.rating_given, ea.created_at, ea.is_accepted, 
                u.name, u.email, u.picture, u.bank_name, u.bank_account, u.bank_account_name, u.phone
         FROM event_agents ea
         JOIN users u ON ea.user_id = u.id
@@ -756,17 +754,14 @@ export class AppService implements OnModuleInit {
 
   async removeAgent(eventId: number, eoId: number, agentId: number) {
     try {
-      // 1. Ambil title event sekalian buat isi notif
       const eventCheck = await this.pool.query('SELECT id, title FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
       if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
       
       const eventTitle = eventCheck.rows[0].title;
 
-      // 2. Hapus agen dari kepanitiaan
       const delRes = await this.pool.query('DELETE FROM event_agents WHERE event_id = $1 AND user_id = $2 RETURNING id', [eventId, agentId]);
       if (delRes.rowCount === 0) throw new BadRequestException('Agen tidak ditemukan di event ini');
 
-      // 3. 👇 TEMBAK NOTIFIKASI KE AGEN 👇
       await this.pool.query(
         `INSERT INTO notifications (user_id, title, message, type, related_event_id)
          VALUES ($1, $2, $3, 'INFO', $4)`,
@@ -809,7 +804,7 @@ export class AppService implements OnModuleInit {
         FROM event_agents ea
         JOIN events e ON ea.event_id = e.id
         JOIN users u ON e.created_by = u.id
-        WHERE ea.user_id = $1 AND ea.is_accepted = TRUE -- 
+        WHERE ea.user_id = $1 AND ea.is_accepted = TRUE 
         ORDER BY e.event_start ASC
       `;
       const { rows } = await this.pool.query(query, [agentId]);
@@ -1044,13 +1039,11 @@ export class AppService implements OnModuleInit {
 
   async respondAgentInvitation(notifId: number, userId: number, action: 'accept' | 'reject') {
     try {
-      // 1. Cek notifikasi dan ambil Event ID
       const notifRes = await this.pool.query('SELECT related_event_id FROM notifications WHERE id = $1 AND user_id = $2', [notifId, userId]);
       if (notifRes.rows.length === 0) throw new BadRequestException('Notifikasi tidak valid');
       
       const eventId = notifRes.rows[0].related_event_id;
 
-      // 2. 👇 TAMBAHAN: Ambil data EO (created_by), Judul Event, dan Nama Agen buat isi Notif
       const eventInfo = await this.pool.query('SELECT created_by, title FROM events WHERE id = $1', [eventId]);
       const eoId = eventInfo.rows[0].created_by;
       const eventTitle = eventInfo.rows[0].title;
@@ -1058,11 +1051,9 @@ export class AppService implements OnModuleInit {
       const agentInfo = await this.pool.query('SELECT name FROM users WHERE id = $1', [userId]);
       const agentName = agentInfo.rows[0].name;
 
-      // 3. Eksekusi Accept / Reject & Tembak Notif ke EO
       if (action === 'accept') {
         await this.pool.query('UPDATE event_agents SET is_accepted = TRUE WHERE event_id = $1 AND user_id = $2', [eventId, userId]);
         
-        // Kirim Notif ke EO (Diterima)
         await this.pool.query(
           `INSERT INTO notifications (user_id, title, message, type, related_event_id)
            VALUES ($1, $2, $3, 'INFO', $4)`,
@@ -1071,7 +1062,6 @@ export class AppService implements OnModuleInit {
       } else {
         await this.pool.query('DELETE FROM event_agents WHERE event_id = $1 AND user_id = $2', [eventId, userId]);
 
-        // Kirim Notif ke EO (Ditolak)
         await this.pool.query(
           `INSERT INTO notifications (user_id, title, message, type, related_event_id)
            VALUES ($1, $2, $3, 'INFO', $4)`,
@@ -1079,7 +1069,6 @@ export class AppService implements OnModuleInit {
         );
       }
 
-      // 4. Tandai notif si agen udah dibaca dan ubah tipe biar tombol pop-upnya hilang
       await this.pool.query('UPDATE notifications SET is_read = TRUE, type = $1 WHERE id = $2', [action === 'accept' ? 'INVITATION_ACCEPTED' : 'INVITATION_REJECTED', notifId]);
 
       return { message: action === 'accept' ? 'Undangan berhasil diterima! Selamat bertugas.' : 'Undangan berhasil ditolak.' };
@@ -1097,13 +1086,11 @@ export class AppService implements OnModuleInit {
   // --- EVENT REPORTS SYSTEM ---
   async createEventReport(eventId: number, agentId: number, message: string) {
     try {
-      // 1. Simpan ke tabel event_reports
       await this.pool.query(
         'INSERT INTO event_reports (event_id, agent_id, message) VALUES ($1, $2, $3)',
         [eventId, agentId, message]
       );
 
-      // 2. Ambil info event dan agen buat notif ke EO
       const eventRes = await this.pool.query('SELECT created_by, title FROM events WHERE id = $1', [eventId]);
       const eoId = eventRes.rows[0].created_by;
       const eventTitle = eventRes.rows[0].title;
@@ -1111,7 +1098,6 @@ export class AppService implements OnModuleInit {
       const agentRes = await this.pool.query('SELECT name FROM users WHERE id = $1', [agentId]);
       const agentName = agentRes.rows[0]?.name || 'Agen';
 
-      // 3. Tembak Notifikasi "Peringatan" ke EO
       await this.pool.query(
         `INSERT INTO notifications (user_id, title, message, type, related_event_id)
          VALUES ($1, $2, $3, 'REPORT_ISSUE', $4)`,
@@ -1126,7 +1112,6 @@ export class AppService implements OnModuleInit {
 
   async getEventReports(eventId: number, eoId: number) {
     try {
-      // Pastikan yang akses beneran EO-nya
       const check = await this.pool.query('SELECT id FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
       if (check.rows.length === 0) throw new UnauthorizedException('Akses ditolak');
 
@@ -1146,7 +1131,6 @@ export class AppService implements OnModuleInit {
 
   async resolveEventReport(reportId: number, eoId: number) {
     try {
-      // Pastikan laporan ini milik event yang dibuat oleh EO tersebut
       const check = await this.pool.query(`
         SELECT r.id FROM event_reports r
         JOIN events e ON r.event_id = e.id
