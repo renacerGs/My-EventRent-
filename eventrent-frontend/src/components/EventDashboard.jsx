@@ -30,6 +30,9 @@ export default function EventDashboard() {
   const [agentDetailModal, setAgentDetailModal] = useState(null); 
   const [agentEditRole, setAgentEditRole] = useState({ show: false, agentId: null, role: '', rating_given: 0 });
 
+  // 👇 STATE BARU BUAT LAPORAN KENDALA 👇
+  const [reports, setReports] = useState([]);
+
   const fetchData = async (isBackground = false) => {
     try {
       if (isBackground) setIsRefreshing(true);
@@ -97,10 +100,40 @@ export default function EventDashboard() {
     }
   };
 
+  // 👇 FUNGSI BARU NARIK DATA LAPORAN KENDALA 👇
+  const fetchReports = async () => {
+    try {
+      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/reports?eoId=${user?.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setReports(data);
+      }
+    } catch (err) {
+      console.error("Gagal menarik data laporan", err);
+    }
+  };
+
+  // 👇 FUNGSI BARU RESOLVE LAPORAN 👇
+  const handleResolveReport = async (reportId) => {
+    try {
+      const toastId = toast.loading("Memproses...");
+      const res = await fetch(`https://my-event-rent.vercel.app/api/reports/${reportId}/resolve?eoId=${user?.id}`, { method: 'PATCH' });
+      if (res.ok) {
+        toast.success("Kendala berhasil ditandai selesai!", { id: toastId });
+        fetchReports(); // Refresh data laporan
+      } else {
+        toast.error("Gagal menandai selesai", { id: toastId });
+      }
+    } catch (err) {
+      toast.error("Gagal memproses jaringan.", { id: toastId });
+    }
+  };
+
   useEffect(() => {
     if (!user?.id) { navigate('/'); return; }
     fetchData();
     fetchAgents(); 
+    fetchReports(); // Panggil fetchReports di sini
     const intervalId = setInterval(() => { fetchData(true); }, 60000);
     return () => clearInterval(intervalId); 
   }, [id, user?.id, navigate]); 
@@ -479,6 +512,13 @@ export default function EventDashboard() {
           <button onClick={() => setActiveTab('agents')} className={`px-6 py-3.5 font-black text-xs md:text-sm uppercase tracking-widest border-b-2 transition-colors whitespace-nowrap ${activeTab === 'agents' ? 'border-[#FF6B35] text-[#FF6B35]' : 'border-transparent text-gray-400 hover:text-gray-700'}`}>
             👥 Tim Agen & Panitia
           </button>
+          {/* 👇 TAB BARU BUAT LAPORAN 👇 */}
+          <button onClick={() => setActiveTab('reports')} className={`px-6 py-3.5 font-black text-xs md:text-sm uppercase tracking-widest border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${activeTab === 'reports' ? 'border-red-500 text-red-500' : 'border-transparent text-gray-400 hover:text-gray-700'}`}>
+            ⚠️ Laporan Kendala
+            {reports.filter(r => r.status === 'PENDING').length > 0 && (
+              <span className="bg-red-500 text-white px-2 py-0.5 rounded-full text-[9px]">{reports.filter(r => r.status === 'PENDING').length}</span>
+            )}
+          </button>
         </div>
 
         {activeTab === 'attendees' && (
@@ -729,6 +769,53 @@ export default function EventDashboard() {
             </div>
           </div>
         )}
+
+        {/* 👇 ISI TAB LAPORAN KENDALA 👇 */}
+        {activeTab === 'reports' && (
+          <div className="bg-white rounded-[24px] md:rounded-[32px] shadow-sm border border-gray-200 overflow-hidden mb-10 animate-fadeIn">
+            <div className="px-5 py-6 md:px-8 md:py-8 border-b border-gray-100">
+              <h3 className="text-xl font-black text-gray-900">Kendala Lapangan</h3>
+              <p className="text-xs font-bold text-gray-500">Laporan langsung dari agen saat event berlangsung.</p>
+            </div>
+            
+            <div className="p-5 md:p-8">
+              {reports.length > 0 ? (
+                <div className="grid gap-4">
+                  {reports.map(r => (
+                    <div key={r.id} className={`p-5 rounded-2xl border ${r.status === 'PENDING' ? 'bg-red-50/30 border-red-100' : 'bg-gray-50 border-gray-100'} flex flex-col md:flex-row gap-4 items-start md:items-center justify-between`}>
+                      <div className="flex items-start gap-4">
+                        <img src={r.agent_pic || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} alt="Agent" className="w-10 h-10 rounded-full border border-gray-200 object-cover shrink-0" />
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-bold text-sm text-gray-900">{r.agent_name}</h4>
+                            {r.status === 'PENDING' ? (
+                              <span className="bg-red-100 text-red-600 text-[9px] px-2 py-0.5 rounded font-black tracking-widest uppercase">Perlu Tindakan</span>
+                            ) : (
+                              <span className="bg-green-100 text-green-600 text-[9px] px-2 py-0.5 rounded font-black tracking-widest uppercase">Terselesaikan</span>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-700 leading-relaxed font-medium">"{r.message}"</p>
+                          <p className="text-[10px] text-gray-400 font-bold mt-2 uppercase tracking-widest">{new Date(r.created_at).toLocaleString('id-ID')}</p>
+                        </div>
+                      </div>
+                      
+                      {r.status === 'PENDING' && (
+                        <button onClick={() => handleResolveReport(r.id)} className="w-full md:w-auto px-5 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors shadow-sm active:scale-95 shrink-0">
+                          Tandai Selesai
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-10">
+                  <p className="text-gray-400 font-bold text-sm">Aman bro! Belum ada laporan kendala dari agen.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );

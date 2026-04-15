@@ -17,6 +17,7 @@ import EventDashboard from "./components/EventDashboard";
 import Checkout from "./pages/Checkout"; 
 import Scanner from './pages/Scanner';
 import TrackTicket from './pages/TrackTicket'; 
+import Notifications from './pages/Notifications';
 
 // 👇 ROUTE KHUSUS AGEN 👇
 import AgentDashboard from './components/AgentDashboard'; 
@@ -123,6 +124,7 @@ export default function App() {
           <Route path="/event/:id" element={<EventDetail events={events} />} />
           <Route path="/checkout/:id" element={<Checkout />} />
           <Route path="/cek-tiket" element={<TrackTicket />} />
+          <Route path="/notifications" element={<Notifications />} />
           
           {/* --- HALAMAN UNDANGAN KHUSUS --- */}
           <Route path="/invitation/:id" element={<WeddingInvitation />} />

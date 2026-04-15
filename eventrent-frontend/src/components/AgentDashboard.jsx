@@ -108,19 +108,18 @@ export default function AgentDashboard() {
 
     try {
       setIsSendingEmergency(true);
-      // Nembak API Laporan Darurat
-      const res = await fetch('https://my-event-rent.vercel.app/api/reports/emergency', {
+      // Nembak API Laporan Darurat ke TABEL BARU
+      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${selectedEvent.id}/reports`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agentId: user.id,
-          eventId: selectedEvent ? selectedEvent.id : null,
           message: emergencyMessage
         })
       });
 
       if (res.ok) {
-        toast.success('Laporan berhasil terkirim ke panitia pusat!');
+        toast.success('Laporan berhasil masuk ke sistem EO!');
         setIsEmergencyOpen(false);
         setEmergencyMessage('');
       } else {

@@ -210,7 +210,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
 
           {user ? (
             <>
-              {/* 👇 TOMBOL LIKES (KEMBALI HADIR, HIDE DI AGEN) 👇 */}
+              {/* 👇 TOMBOL LIKES 👇 */}
               {!isAgentMode && (
                 <Link to="/likes" className="flex items-center justify-center w-9 h-9 md:w-[42px] md:h-[42px] border border-gray-100 text-gray-400 bg-white rounded-full hover:bg-orange-50 hover:text-[#FF6B35] hover:border-orange-100 transition shadow-sm shrink-0">
                    <svg className="w-5 h-5 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
@@ -229,11 +229,15 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                 </button>
 
                 {/* Dropdown Notifikasi */}
-                <div className={`absolute right-0 top-full mt-3 w-[280px] md:w-[350px] bg-white rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 transform origin-top-right transition-all duration-300 z-[60] overflow-hidden ${showNotifDropdown ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
-                  <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <div className={`absolute right-0 top-full mt-3 w-[280px] md:w-[350px] bg-white rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 transform origin-top-right transition-all duration-300 z-[60] flex flex-col overflow-hidden ${showNotifDropdown ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
+                  
+                  {/* Header Notif */}
+                  <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
                     <h3 className="font-black text-gray-900 text-xs uppercase tracking-widest">Notifikasi</h3>
                     {unreadCount > 0 && <span className="bg-[#FF6B35] text-white px-2 py-0.5 rounded-md text-[9px] font-bold">{unreadCount} Baru</span>}
                   </div>
+                  
+                  {/* Container List Notifikasi (Scrollable) */}
                   <div className="max-h-[300px] overflow-y-auto">
                     {notifications.length > 0 ? (
                       notifications.map(notif => (
@@ -254,6 +258,20 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                       <div className="p-6 text-center text-gray-400 text-xs font-bold">Belum ada notifikasi bro.</div>
                     )}
                   </div>
+                  
+                  {/* 👇 FOOTER TOMBOL LIHAT SEMUA (Fix: Pake shrink-0 biar nempel di bawah) 👇 */}
+                  <div className="border-t border-gray-100 bg-gray-50/50 p-2 shrink-0">
+                    <button 
+                      onClick={() => { 
+                        setShowNotifDropdown(false);
+                        navigate('/notifications'); // Pastikan ini sama persis dengan di App.jsx lu
+                      }} 
+                      className="block w-full text-center py-2.5 text-[10px] md:text-xs font-black text-[#FF6B35] hover:text-orange-600 uppercase tracking-widest transition-colors rounded-xl hover:bg-orange-50"
+                    >
+                      Lihat Semua Notifikasi
+                    </button>
+                  </div>
+
                 </div>
               </div>
 
