@@ -1093,4 +1093,72 @@ export class AppService implements OnModuleInit {
     await this.pool.query('UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2', [notifId, userId]);
     return { success: true };
   }
+
+  // --- EVENT REPORTS SYSTEM ---
+  async createEventReport(eventId: number, agentId: number, message: string) {
+    try {
+      // 1. Simpan ke tabel event_reports
+      await this.pool.query(
+        'INSERT INTO event_reports (event_id, agent_id, message) VALUES ($1, $2, $3)',
+        [eventId, agentId, message]
+      );
+
+      // 2. Ambil info event dan agen buat notif ke EO
+      const eventRes = await this.pool.query('SELECT created_by, title FROM events WHERE id = $1', [eventId]);
+      const eoId = eventRes.rows[0].created_by;
+      const eventTitle = eventRes.rows[0].title;
+
+      const agentRes = await this.pool.query('SELECT name FROM users WHERE id = $1', [agentId]);
+      const agentName = agentRes.rows[0]?.name || 'Agen';
+
+      // 3. Tembak Notifikasi "Peringatan" ke EO
+      await this.pool.query(
+        `INSERT INTO notifications (user_id, title, message, type, related_event_id)
+         VALUES ($1, $2, $3, 'REPORT_ISSUE', $4)`,
+        [eoId, `⚠️ Ada Kendala di: ${eventTitle}`, `Agen ${agentName} melaporkan masalah. Segera cek Dashboard Event!`, eventId]
+      );
+
+      return { success: true, message: 'Laporan berhasil dikirim' };
+    } catch (err) {
+      throw new InternalServerErrorException('Gagal mengirim laporan');
+    }
+  }
+
+  async getEventReports(eventId: number, eoId: number) {
+    try {
+      // Pastikan yang akses beneran EO-nya
+      const check = await this.pool.query('SELECT id FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
+      if (check.rows.length === 0) throw new UnauthorizedException('Akses ditolak');
+
+      const query = `
+        SELECT r.id, r.message, r.status, r.created_at, u.name as agent_name, u.picture as agent_pic
+        FROM event_reports r
+        JOIN users u ON r.agent_id = u.id
+        WHERE r.event_id = $1
+        ORDER BY r.created_at DESC
+      `;
+      const { rows } = await this.pool.query(query, [eventId]);
+      return rows;
+    } catch (err) {
+      throw new InternalServerErrorException('Gagal mengambil laporan');
+    }
+  }
+
+  async resolveEventReport(reportId: number, eoId: number) {
+    try {
+      // Pastikan laporan ini milik event yang dibuat oleh EO tersebut
+      const check = await this.pool.query(`
+        SELECT r.id FROM event_reports r
+        JOIN events e ON r.event_id = e.id
+        WHERE r.id = $1 AND e.created_by = $2
+      `, [reportId, eoId]);
+      
+      if (check.rows.length === 0) throw new UnauthorizedException('Akses ditolak');
+
+      await this.pool.query("UPDATE event_reports SET status = 'RESOLVED' WHERE id = $1", [reportId]);
+      return { success: true, message: 'Laporan ditandai selesai' };
+    } catch (err) {
+      throw new InternalServerErrorException('Gagal menyelesaikan laporan');
+    }
+  }
 }

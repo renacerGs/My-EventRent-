@@ -278,4 +278,23 @@ export class AppController {
   async markNotifRead(@Param('id') notifId: number, @Query('userId') userId: number) {
     return await this.appService.markNotificationRead(notifId, userId);
   }
+
+  // --- REPORTS / KENDALA LAPANGAN ---
+  @ApiTags('Reports')
+  @Post('events/:id/reports')
+  async createReport(@Param('id') eventId: number, @Body() body: { agentId: number, message: string }) {
+    return await this.appService.createEventReport(eventId, body.agentId, body.message);
+  }
+
+  @ApiTags('Reports')
+  @Get('events/:id/reports')
+  async getReports(@Param('id') eventId: number, @Query('eoId') eoId: number) {
+    return await this.appService.getEventReports(eventId, eoId);
+  }
+
+  @ApiTags('Reports')
+  @Patch('reports/:id/resolve')
+  async resolveReport(@Param('id') reportId: number, @Query('eoId') eoId: number) {
+    return await this.appService.resolveEventReport(reportId, eoId);
+  }
 }
