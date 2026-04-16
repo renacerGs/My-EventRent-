@@ -259,12 +259,12 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                     )}
                   </div>
                   
-                  {/* 👇 FOOTER TOMBOL LIHAT SEMUA (Fix: Pake shrink-0 biar nempel di bawah) 👇 */}
+                  {/* FOOTER TOMBOL LIHAT SEMUA */}
                   <div className="border-t border-gray-100 bg-gray-50/50 p-2 shrink-0">
                     <button 
                       onClick={() => { 
                         setShowNotifDropdown(false);
-                        navigate('/notifications'); // Pastikan ini sama persis dengan di App.jsx lu
+                        navigate('/notifications'); 
                       }} 
                       className="block w-full text-center py-2.5 text-[10px] md:text-xs font-black text-[#FF6B35] hover:text-orange-600 uppercase tracking-widest transition-colors rounded-xl hover:bg-orange-50"
                     >
@@ -290,12 +290,20 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                 <div className={`absolute right-0 top-full mt-3 w-[220px] md:w-[260px] bg-white rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 transform origin-top-right transition-all duration-300 z-[60] overflow-hidden ${isDropdownOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                   <div className="p-2 flex flex-col gap-1">
                     
+                    {/* MENU BERBEDA TERGANTUNG ROLE */}
                     {!isAgentMode ? (
                       <>
                         <button onClick={() => { navigate('/'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35] rounded-xl transition-all group">
                           <svg className="w-4 h-4 text-gray-400 group-hover:text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
                           HOME
                         </button>
+                        
+                        {/* 👇 MENU CARI JOB (FREELANCE) 👇 */}
+                        <button onClick={() => { navigate('/jobs'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-orange-50 hover:text-[#FF6B35] rounded-xl transition-all group">
+                          <svg className="w-4 h-4 text-gray-400 group-hover:text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                          CARI JOB (FREELANCE)
+                        </button>
+
                         <button onClick={() => { navigate('/profile'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35] rounded-xl transition-all group">
                           <svg className="w-4 h-4 text-gray-400 group-hover:text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                           MY PROFILE
@@ -315,10 +323,12 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                           <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                           DAFTAR TUGAS
                         </button>
+                        
                         <button onClick={() => { navigate('/profile'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-blue-500 rounded-xl transition-all group">
                           <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
                           PROFIL & REKENING
                         </button>
+
                         <button onClick={() => { navigate('/agent/history'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-blue-500 rounded-xl transition-all group">
                           <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                           RIWAYAT SCAN
@@ -354,6 +364,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
         </div>
       </nav>
 
+      {/* POP-UP CONFIRMATION LOGOUT */}
       {showLogoutModal && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-[24px] p-6 sm:p-8 max-w-sm w-full shadow-2xl text-center transform transition-all animate-in zoom-in-95 duration-200">

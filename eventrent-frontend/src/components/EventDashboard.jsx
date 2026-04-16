@@ -30,8 +30,13 @@ export default function EventDashboard() {
   const [agentDetailModal, setAgentDetailModal] = useState(null); 
   const [agentEditRole, setAgentEditRole] = useState({ show: false, agentId: null, role: '', rating_given: 0 });
 
-  // 👇 STATE BARU BUAT LAPORAN KENDALA 👇
   const [reports, setReports] = useState([]);
+
+  // STATE RECRUITMENT
+  const [jobs, setJobs] = useState([]);
+  const [applicants, setApplicants] = useState([]);
+  const [newJob, setNewJob] = useState({ role: '', quota: '', fee: '', description: '' });
+  const [isCreatingJob, setIsCreatingJob] = useState(false);
 
   const fetchData = async (isBackground = false) => {
     try {
@@ -100,7 +105,6 @@ export default function EventDashboard() {
     }
   };
 
-  // 👇 FUNGSI BARU NARIK DATA LAPORAN KENDALA 👇
   const fetchReports = async () => {
     try {
       const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/reports?eoId=${user?.id}`);
@@ -113,14 +117,25 @@ export default function EventDashboard() {
     }
   };
 
-  // 👇 FUNGSI BARU RESOLVE LAPORAN 👇
-  const handleResolveReport = async (reportId) => {
+  const fetchRecruitmentData = async () => {
     try {
-      const toastId = toast.loading("Memproses...");
+      const resJobs = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/jobs?eoId=${user?.id}`);
+      if (resJobs.ok) setJobs(await resJobs.json());
+
+      const resApps = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/applicants?eoId=${user?.id}`);
+      if (resApps.ok) setApplicants(await resApps.json());
+    } catch (err) {
+      console.error("Gagal narik data recruitment", err);
+    }
+  };
+
+  const handleResolveReport = async (reportId) => {
+    const toastId = toast.loading("Memproses...");
+    try {
       const res = await fetch(`https://my-event-rent.vercel.app/api/reports/${reportId}/resolve?eoId=${user?.id}`, { method: 'PATCH' });
       if (res.ok) {
         toast.success("Kendala berhasil ditandai selesai!", { id: toastId });
-        fetchReports(); // Refresh data laporan
+        fetchReports();
       } else {
         toast.error("Gagal menandai selesai", { id: toastId });
       }
@@ -129,16 +144,74 @@ export default function EventDashboard() {
     }
   };
 
+  const handleCreateJob = async (e) => {
+    e.preventDefault();
+    setIsCreatingJob(true);
+    const toastId = toast.loading('Membuka lowongan...');
+    
+    try {
+      const res = await fetch('https://my-event-rent.vercel.app/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: id,
+          eoId: user?.id,
+          role: newJob.role,
+          quota: parseInt(newJob.quota),
+          fee: parseInt(newJob.fee),
+          description: newJob.description
+        })
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        toast.success('Lowongan berhasil dibuka!', { id: toastId });
+        setNewJob({ role: '', quota: '', fee: '', description: '' });
+        fetchRecruitmentData(); 
+      } else {
+        toast.error(data.message || 'Gagal membuka lowongan.', { id: toastId });
+      }
+    } catch (err) {
+      toast.error('Terjadi kesalahan jaringan atau API belum siap.', { id: toastId });
+    } finally {
+      setIsCreatingJob(false);
+    }
+  };
+
+  const handleRespondApplicant = async (appId, action) => {
+    if (!window.confirm(`Yakin mau ${action === 'ACCEPTED' ? 'Menerima' : 'Menolak'} pelamar ini?`)) return;
+    
+    const toastId = toast.loading('Memproses lamaran...');
+    try {
+      const res = await fetch('https://my-event-rent.vercel.app/api/jobs/respond', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ applicationId: appId, action: action, eoId: user?.id })
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success(action === 'ACCEPTED' ? 'Pelamar diterima & otomatis jadi Agen!' : 'Pelamar ditolak.', { id: toastId });
+        fetchRecruitmentData(); 
+        if (action === 'ACCEPTED') fetchAgents(); 
+      } else {
+        toast.error(data.message || 'Gagal memproses lamaran.', { id: toastId });
+      }
+    } catch (err) {
+      toast.error('Terjadi kesalahan jaringan.', { id: toastId });
+    }
+  };
+
   useEffect(() => {
     if (!user?.id) { navigate('/'); return; }
     fetchData();
     fetchAgents(); 
-    fetchReports(); // Panggil fetchReports di sini
+    fetchReports(); 
+    fetchRecruitmentData(); 
     const intervalId = setInterval(() => { fetchData(true); }, 60000);
     return () => clearInterval(intervalId); 
   }, [id, user?.id, navigate]); 
 
-  // Reset pagination tiap kali search/filter berubah
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, selectedSessionFilter, selectedStatusFilter]); 
@@ -172,7 +245,7 @@ export default function EventDashboard() {
       const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/agents/${agentId}?eoId=${user?.id}`, { method: 'DELETE' });
       if (res.ok) {
         toast.success('Agen berhasil diberhentikan.');
-        fetchAgents(); // Refresh tabel
+        fetchAgents(); 
       } else {
         toast.error('Gagal menghapus agen.');
       }
@@ -261,7 +334,6 @@ export default function EventDashboard() {
     setPopup({ show: true, message: "Link Undangan/Event berhasil disalin!", type: 'success' }); 
   };
 
-  // UPDATE LOGIKA FILTER
   const filteredOrders = groupedAttendees.map(order => {
     const filteredTickets = order.tickets.filter(t => {
       if (selectedStatusFilter === 'Hadir') return t.is_scanned;
@@ -309,6 +381,10 @@ export default function EventDashboard() {
     }); 
   });
 
+  // 👇 PERHITUNGAN BADGE MENU 👇
+  const pendingApplicantsCount = applicants.filter(a => a.status === 'PENDING').length;
+  const pendingReportsCount = reports.filter(r => r.status === 'PENDING').length;
+
   return (
     <div className="bg-[#F8F9FA] min-h-screen font-sans pb-20 pt-4 md:pt-8 text-left relative">
       
@@ -349,8 +425,8 @@ export default function EventDashboard() {
       {confirmRemoveAgent.show && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 transition-all animate-fadeIn">
           <div className="bg-white rounded-[24px] md:rounded-[32px] p-6 md:p-8 max-w-sm w-full shadow-2xl transform text-center">
-            <div className="w-16 h-16 md:w-20 md:h-20 mx-auto rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-4 md:mb-5">
-              <svg className="w-8 h-8 md:w-10 md:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            <div className="w-16 h-16 md:w-20 md:h-20 mx-auto rounded-full bg-red-50 text-red-50 flex items-center justify-center mb-4 md:mb-5">
+              <svg className="w-8 h-8 md:w-10 md:h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
             </div>
             <h3 className="text-lg md:text-xl font-black text-gray-900 mb-2">Berhentikan Agen?</h3>
             <p className="text-xs md:text-sm font-medium text-gray-500 mb-6 md:mb-8">Yakin mau memecat agen ini dari event? Mereka akan otomatis menerima notifikasi pemberhentian.</p>
@@ -505,22 +581,52 @@ export default function EventDashboard() {
           </div>
         </div>
 
-        <div className="flex border-b border-gray-200 mb-6 px-2 overflow-x-auto hide-scrollbar">
-          <button onClick={() => setActiveTab('attendees')} className={`px-6 py-3.5 font-black text-xs md:text-sm uppercase tracking-widest border-b-2 transition-colors whitespace-nowrap ${activeTab === 'attendees' ? 'border-[#FF6B35] text-[#FF6B35]' : 'border-transparent text-gray-400 hover:text-gray-700'}`}>
-            🎟️ Data {isWed ? 'Tamu RSVP' : 'Peserta'}
+        {/* 👇 MENU TAB YANG UDAH DI-REDESIGN BIAR CAKEP 👇 */}
+        <div className="bg-white p-2 rounded-2xl md:rounded-full shadow-sm border border-gray-100 mb-8 overflow-x-auto hide-scrollbar flex items-center gap-2 relative z-10 w-full sm:w-max">
+          <button 
+            onClick={() => setActiveTab('attendees')} 
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl md:rounded-full font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-all duration-300 ${activeTab === 'attendees' ? 'bg-[#FF6B35] text-white shadow-md shadow-orange-200 scale-100' : 'text-gray-500 hover:bg-gray-50 scale-95'}`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>
+            Data {isWed ? 'Tamu' : 'Peserta'}
           </button>
-          <button onClick={() => setActiveTab('agents')} className={`px-6 py-3.5 font-black text-xs md:text-sm uppercase tracking-widest border-b-2 transition-colors whitespace-nowrap ${activeTab === 'agents' ? 'border-[#FF6B35] text-[#FF6B35]' : 'border-transparent text-gray-400 hover:text-gray-700'}`}>
-            👥 Tim Agen & Panitia
+
+          <button 
+            onClick={() => setActiveTab('agents')} 
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl md:rounded-full font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-all duration-300 ${activeTab === 'agents' ? 'bg-purple-600 text-white shadow-md shadow-purple-200 scale-100' : 'text-gray-500 hover:bg-gray-50 scale-95'}`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+            Tim Agen
           </button>
-          {/* 👇 TAB BARU BUAT LAPORAN 👇 */}
-          <button onClick={() => setActiveTab('reports')} className={`px-6 py-3.5 font-black text-xs md:text-sm uppercase tracking-widest border-b-2 transition-colors whitespace-nowrap flex items-center gap-2 ${activeTab === 'reports' ? 'border-red-500 text-red-500' : 'border-transparent text-gray-400 hover:text-gray-700'}`}>
-            ⚠️ Laporan Kendala
-            {reports.filter(r => r.status === 'PENDING').length > 0 && (
-              <span className="bg-red-500 text-white px-2 py-0.5 rounded-full text-[9px]">{reports.filter(r => r.status === 'PENDING').length}</span>
+
+          <button 
+            onClick={() => setActiveTab('recruitment')} 
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl md:rounded-full font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-all duration-300 relative ${activeTab === 'recruitment' ? 'bg-blue-600 text-white shadow-md shadow-blue-200 scale-100' : 'text-gray-500 hover:bg-gray-50 scale-95'}`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            Recruitment
+            {pendingApplicantsCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-[9px] shadow-sm animate-bounce">
+                {pendingApplicantsCount}
+              </span>
+            )}
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('reports')} 
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl md:rounded-full font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-all duration-300 relative ${activeTab === 'reports' ? 'bg-rose-500 text-white shadow-md shadow-rose-200 scale-100' : 'text-gray-500 hover:bg-gray-50 scale-95'}`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            Kendala
+            {pendingReportsCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-[9px] shadow-sm animate-pulse border-2 border-white">
+                {pendingReportsCount}
+              </span>
             )}
           </button>
         </div>
 
+        {/* TAB 1: DATA PESERTA */}
         {activeTab === 'attendees' && (
           <div className="bg-white rounded-[24px] md:rounded-[32px] shadow-sm border border-gray-200 overflow-hidden mb-10 animate-fadeIn">
             <div className="px-5 py-5 md:px-8 md:py-6 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
@@ -705,17 +811,18 @@ export default function EventDashboard() {
           </div>
         )}
 
+        {/* TAB 2: TIM AGEN */}
         {activeTab === 'agents' && (
           <div className="bg-white rounded-[24px] md:rounded-[32px] shadow-sm border border-gray-200 overflow-hidden mb-10 animate-fadeIn">
             <div className="px-5 py-6 md:px-8 md:py-8 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
-              <h3 className="text-xl md:text-2xl font-black text-gray-900 mb-2">Rekrut Agen Baru</h3>
-              <p className="text-xs md:text-sm font-bold text-gray-500 mb-6">Masukkan email agen untuk memberikan akses Scanner ke event ini. Pastikan mereka sudah terdaftar di EventRent.</p>
+              <h3 className="text-xl md:text-2xl font-black text-gray-900 mb-2">Rekrut Agen Manual</h3>
+              <p className="text-xs md:text-sm font-bold text-gray-500 mb-6">Masukkan email agen secara manual. Atau buka lowongan di tab Recruitment.</p>
               <form onSubmit={handleAddAgent} className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"></path></svg></div>
-                  <input value={agentEmailInput} onChange={e => setAgentEmailInput(e.target.value)} type="email" placeholder="Misal: budi@gmail.com" required className="w-full pl-11 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl md:rounded-2xl text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/20 focus:border-[#FF6B35] transition-all shadow-sm" />
+                  <input value={agentEmailInput} onChange={e => setAgentEmailInput(e.target.value)} type="email" placeholder="Misal: budi@gmail.com" required className="w-full pl-11 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl md:rounded-2xl text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all shadow-sm" />
                 </div>
-                <button type="submit" className="bg-[#FF6B35] text-white px-8 py-3.5 rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest hover:bg-orange-600 transition-colors shadow-lg shadow-orange-200 flex items-center justify-center gap-2 whitespace-nowrap">
+                <button type="submit" className="bg-purple-600 text-white px-8 py-3.5 rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest hover:bg-purple-700 transition-colors shadow-lg shadow-purple-200 flex items-center justify-center gap-2 whitespace-nowrap">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg> Tambah Agen
                 </button>
               </form>
@@ -735,7 +842,7 @@ export default function EventDashboard() {
                         </td>
                         <td className="px-8 py-4">
                           <div className="flex flex-col items-start gap-1.5">
-                            <span className="bg-orange-50 text-[#FF6B35] px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-orange-100">
+                            <span className="bg-purple-50 text-purple-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-purple-100">
                               {a.role || 'Panitia'}
                             </span>
                             {a.is_accepted ? (
@@ -755,7 +862,7 @@ export default function EventDashboard() {
                         <td className="px-8 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
                             <button onClick={() => setAgentDetailModal(a)} className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors" title="Lihat CV/Profil"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg></button>
-                            <button onClick={() => setAgentEditRole({ show: true, agentId: a.id, role: a.role || '', rating_given: a.rating_given || 0 })} className="p-2 bg-orange-50 text-[#FF6B35] rounded-xl hover:bg-orange-100 transition-colors" title="Kelola Agen"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
+                            <button onClick={() => setAgentEditRole({ show: true, agentId: a.id, role: a.role || '', rating_given: a.rating_given || 0 })} className="p-2 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-100 transition-colors" title="Kelola Agen"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></button>
                             <button onClick={() => setConfirmRemoveAgent({ show: true, agentId: a.id })} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors" title="Berhentikan Agen"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
                           </div>
                         </td>
@@ -770,7 +877,109 @@ export default function EventDashboard() {
           </div>
         )}
 
-        {/* 👇 ISI TAB LAPORAN KENDALA 👇 */}
+        {/* 👇 ISI TAB RECRUITMENT BARU 👇 */}
+        {activeTab === 'recruitment' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10 animate-fadeIn">
+            
+            {/* BAGIAN KIRI: BIKIN LOWONGAN */}
+            <div className="lg:col-span-1 bg-white rounded-[24px] shadow-sm border border-gray-200 p-6 md:p-8 h-max">
+              <h3 className="text-lg font-black text-gray-900 mb-1">Buka Lowongan Baru</h3>
+              <p className="text-xs font-bold text-gray-500 mb-6">Cari panitia / agen tambahan buat event lo.</p>
+              
+              <form onSubmit={handleCreateJob} className="space-y-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Tugas / Posisi</label>
+                  <input type="text" value={newJob.role} onChange={e => setNewJob({...newJob, role: e.target.value})} placeholder="Misal: Penjaga Pintu A" required className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Kuota Orang</label>
+                    <input type="number" min="1" value={newJob.quota} onChange={e => setNewJob({...newJob, quota: e.target.value})} placeholder="Misal: 5" required className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Fee / Gaji (Rp)</label>
+                    <input type="number" min="0" value={newJob.fee} onChange={e => setNewJob({...newJob, fee: e.target.value})} placeholder="Misal: 150000" required className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Deskripsi / Syarat</label>
+                  <textarea value={newJob.description} onChange={e => setNewJob({...newJob, description: e.target.value})} placeholder="Tulis syarat, jam kerja, atau dresscode..." required className="w-full h-24 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none transition-all"></textarea>
+                </div>
+                <button type="submit" disabled={isCreatingJob} className="w-full bg-blue-600 text-white font-black py-3.5 rounded-xl hover:bg-blue-700 transition-colors uppercase tracking-widest text-[10px] md:text-xs shadow-lg shadow-blue-200 mt-2">
+                  {isCreatingJob ? 'Memproses...' : 'Posting Lowongan'}
+                </button>
+              </form>
+            </div>
+
+            {/* BAGIAN KANAN: DAFTAR PELAMAR & LOWONGAN AKTIF */}
+            <div className="lg:col-span-2 space-y-6">
+              
+              {/* DAFTAR PELAMAR MASUK */}
+              <div className="bg-white rounded-[24px] shadow-sm border border-gray-200 overflow-hidden">
+                <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                  <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Inbox Pelamar</h3>
+                  <span className="bg-blue-100 text-blue-600 px-2.5 py-1 rounded-md text-[10px] font-black">{applicants.filter(a => a.status === 'PENDING').length} Menunggu</span>
+                </div>
+                <div className="p-0">
+                  {applicants.length > 0 ? (
+                    <div className="divide-y divide-gray-100">
+                      {applicants.map(app => (
+                        <div key={app.id} className="p-5 hover:bg-gray-50 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <img src={app.user_pic || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} alt="" className="w-10 h-10 rounded-full border border-gray-200" />
+                            <div>
+                              <p className="font-bold text-sm text-gray-900">{app.user_name}</p>
+                              <p className="text-[10px] text-gray-500">Apply untuk: <span className="font-bold text-blue-600">{app.role_applied}</span></p>
+                            </div>
+                          </div>
+                          
+                          {app.status === 'PENDING' ? (
+                            <div className="flex gap-2 w-full md:w-auto">
+                              <button onClick={() => handleRespondApplicant(app.id, 'REJECTED')} className="flex-1 md:flex-none px-4 py-2 border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors">Tolak</button>
+                              <button onClick={() => handleRespondApplicant(app.id, 'ACCEPTED')} className="flex-1 md:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors shadow-sm">Terima</button>
+                            </div>
+                          ) : (
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg ${app.status === 'ACCEPTED' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-gray-100 text-gray-500'}`}>
+                              {app.status === 'ACCEPTED' ? 'Diterima' : 'Ditolak'}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 text-gray-400 text-xs font-bold">Belum ada user yang ngelamar.</div>
+                  )}
+                </div>
+              </div>
+
+              {/* DAFTAR LOWONGAN YANG LAGI DIBUKA */}
+              <div className="bg-white rounded-[24px] shadow-sm border border-gray-200 overflow-hidden">
+                <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/50">
+                  <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Lowongan Aktif</h3>
+                </div>
+                <div className="p-5">
+                  {jobs.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {jobs.map(job => (
+                        <div key={job.id} className="border border-gray-100 rounded-xl p-4 shadow-sm relative">
+                          <span className={`absolute top-3 right-3 w-2 h-2 rounded-full ${job.is_active ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
+                          <h4 className="font-black text-gray-900 text-sm mb-1 pr-4">{job.role}</h4>
+                          <p className="text-[10px] text-gray-500 font-bold mb-3">Rp {new Intl.NumberFormat('id-ID').format(job.fee)} • Kuota: {job.quota} org</p>
+                          <p className="text-xs text-gray-600 line-clamp-2">{job.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-400 text-xs font-bold">Lo belum buka lowongan apapun.</div>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: LAPORAN KENDALA */}
         {activeTab === 'reports' && (
           <div className="bg-white rounded-[24px] md:rounded-[32px] shadow-sm border border-gray-200 overflow-hidden mb-10 animate-fadeIn">
             <div className="px-5 py-6 md:px-8 md:py-8 border-b border-gray-100">
@@ -782,14 +991,14 @@ export default function EventDashboard() {
               {reports.length > 0 ? (
                 <div className="grid gap-4">
                   {reports.map(r => (
-                    <div key={r.id} className={`p-5 rounded-2xl border ${r.status === 'PENDING' ? 'bg-red-50/30 border-red-100' : 'bg-gray-50 border-gray-100'} flex flex-col md:flex-row gap-4 items-start md:items-center justify-between`}>
+                    <div key={r.id} className={`p-5 rounded-2xl border ${r.status === 'PENDING' ? 'bg-rose-50/30 border-rose-100' : 'bg-gray-50 border-gray-100'} flex flex-col md:flex-row gap-4 items-start md:items-center justify-between`}>
                       <div className="flex items-start gap-4">
                         <img src={r.agent_pic || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} alt="Agent" className="w-10 h-10 rounded-full border border-gray-200 object-cover shrink-0" />
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <h4 className="font-bold text-sm text-gray-900">{r.agent_name}</h4>
                             {r.status === 'PENDING' ? (
-                              <span className="bg-red-100 text-red-600 text-[9px] px-2 py-0.5 rounded font-black tracking-widest uppercase">Perlu Tindakan</span>
+                              <span className="bg-rose-100 text-rose-600 text-[9px] px-2 py-0.5 rounded font-black tracking-widest uppercase">Perlu Tindakan</span>
                             ) : (
                               <span className="bg-green-100 text-green-600 text-[9px] px-2 py-0.5 rounded font-black tracking-widest uppercase">Terselesaikan</span>
                             )}
@@ -809,6 +1018,9 @@ export default function EventDashboard() {
                 </div>
               ) : (
                 <div className="text-center py-10">
+                  <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
+                    <svg className="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  </div>
                   <p className="text-gray-400 font-bold text-sm">Aman bro! Belum ada laporan kendala dari agen.</p>
                 </div>
               )}

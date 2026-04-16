@@ -19,9 +19,12 @@ import Scanner from './pages/Scanner';
 import TrackTicket from './pages/TrackTicket'; 
 import Notifications from './pages/Notifications';
 
-// 👇 ROUTE KHUSUS AGEN 👇
+// 👇 IMPORT HALAMAN JOB BOARD BARU 👇
+import JobBoard from './pages/JobBoard';
+
+// --- ROUTE KHUSUS AGEN 👇
 import AgentDashboard from './components/AgentDashboard'; 
-import RiwayatScan from './pages/RiwayatScan'; // 👈 IMPORT HALAMAN RIWAYAT SCAN YANG BARU
+import RiwayatScan from './pages/RiwayatScan'; 
 
 // --- ROUTE KHUSUS PEMBUATAN EVENT ---
 import ChooseEventType from "./components/ChooseEventType"; 
@@ -137,9 +140,12 @@ export default function App() {
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/my-tickets" element={<ProtectedRoute><MyTickets /></ProtectedRoute>} />
           
-          {/* 👇 ROUTE BARU KHUSUS PORTAL AGEN 👇 */}
+          {/* 👇 ROUTE JOB BOARD (CARI KERJA) 👇 */}
+          <Route path="/jobs" element={<ProtectedRoute><JobBoard /></ProtectedRoute>} />
+          
+          {/* --- ROUTE KHUSUS PORTAL AGEN --- */}
           <Route path="/agent" element={<ProtectedRoute><AgentDashboard /></ProtectedRoute>} />
-          <Route path="/agent/history" element={<ProtectedRoute><RiwayatScan /></ProtectedRoute>} /> {/* 👈 ROUTE RIWAYAT SCAN */}
+          <Route path="/agent/history" element={<ProtectedRoute><RiwayatScan /></ProtectedRoute>} /> 
           
           {/* --- MANAJEMEN EVENT & DASHBOARD --- */}
           <Route path="/manage" element={<ProtectedRoute><ManageEvent /></ProtectedRoute>} />
@@ -174,10 +180,9 @@ export default function App() {
           }
           setIsLoginOpen(false); 
           
-          // 👇 LOGIKA REDIRECT BERDASARKAN ROLE 👇
           if (userData.role === 'agent') {
             toast.success(`Berhasil masuk portal agen, ${userData.name}!`);
-            navigate('/agent'); // Langsung lempar ke markas agen
+            navigate('/agent'); 
           } else {
             toast.success('Login berhasil! Welcome back bro.'); 
           }
