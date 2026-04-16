@@ -1363,4 +1363,30 @@ export class AppService implements OnModuleInit {
       throw new InternalServerErrorException('Gagal memproses pembayaran agen');
     }
   }
+
+  // ==========================================
+  // FITUR PENDING: HAPUS LOWONGAN (JOB POSTING)
+  // ==========================================
+
+  async deleteJobPosting(jobId: number, eoId: number) {
+    try {
+      // 1. Cek dulu apakah lowongan ini emang punya EO yang request
+      const checkQuery = 'SELECT id FROM job_postings WHERE id = $1 AND eo_id = $2';
+      const checkRes = await this.pool.query(checkQuery, [jobId, eoId]);
+
+      if (checkRes.rows.length === 0) {
+        throw new UnauthorizedException('Lowongan tidak ditemukan atau lo bukan pemiliknya bro.');
+      }
+
+      // 2. Eksekusi Hapus (Ingat: Foreign Key di job_applications harus ON DELETE CASCADE biar lamarannya ikut kehapus)
+      const deleteQuery = 'DELETE FROM job_postings WHERE id = $1 AND eo_id = $2 RETURNING id';
+      await this.pool.query(deleteQuery, [jobId, eoId]);
+
+      return { success: true, message: 'Lowongan berhasil dibatalkan/dihapus!' };
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
+      console.error('Error deleteJobPosting:', err);
+      throw new InternalServerErrorException('Gagal menghapus lowongan kerja.');
+    }
+  }
 }

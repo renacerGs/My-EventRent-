@@ -298,7 +298,7 @@ export class AppController {
   }
 
   // ==========================================
-  // 👇 API BARU: RECRUITMENT (JOB BOARD) 👇
+  // 👇 API RECRUITMENT (JOB BOARD) 👇
   // ==========================================
 
   @ApiTags('Recruitment')
@@ -367,8 +367,20 @@ export class AppController {
     }
   }
 
+  // 👇 FITUR BARU: Hapus Lowongan 👇
+  @ApiTags('Recruitment')
+  @ApiOperation({ summary: 'EO Menghapus atau Membatalkan Lowongan' })
+  @Delete('jobs/:id')
+  async deleteJob(@Param('id') jobId: string, @Query('eoId') eoId: string) {
+    try {
+      return await this.appService.deleteJobPosting(Number(jobId), Number(eoId));
+    } catch (error: any) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
   // ==========================================
-  // 👇 API BARU: PAYOUT / PENGGAJIAN AGEN 👇
+  // 👇 API PAYOUT / PENGGAJIAN AGEN 👇
   // ==========================================
 
   @ApiTags('Payout')
