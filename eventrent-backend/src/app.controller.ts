@@ -307,7 +307,7 @@ export class AppController {
   async createJob(@Body() body: any) {
     try {
       return await this.appService.createJobPosting(body);
-    } catch (error: any) { // FIX: tambahin ': any' di sini
+    } catch (error: any) { 
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
@@ -318,7 +318,7 @@ export class AppController {
   async getAllJobs() {
     try {
       return await this.appService.getAllActiveJobs();
-    } catch (error: any) { // FIX: tambahin ': any' di sini
+    } catch (error: any) { 
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
@@ -329,7 +329,7 @@ export class AppController {
   async getEventJobs(@Param('id') eventId: string, @Query('eoId') eoId: string) {
     try {
       return await this.appService.getJobsByEvent(Number(eventId), Number(eoId));
-    } catch (error: any) { // FIX: tambahin ': any' di sini
+    } catch (error: any) { 
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
@@ -340,7 +340,7 @@ export class AppController {
   async applyJob(@Body() body: any) {
     try {
       return await this.appService.applyForJob(body.jobId, body.userId);
-    } catch (error: any) { // FIX: tambahin ': any' di sini
+    } catch (error: any) { 
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
@@ -351,7 +351,7 @@ export class AppController {
   async getEventApplicants(@Param('id') eventId: string, @Query('eoId') eoId: string) {
     try {
       return await this.appService.getApplicantsByEvent(Number(eventId), Number(eoId));
-    } catch (error: any) { // FIX: tambahin ': any' di sini
+    } catch (error: any) { 
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }
@@ -362,7 +362,36 @@ export class AppController {
   async respondApplicant(@Body() body: any) {
     try {
       return await this.appService.respondToApplicant(body.applicationId, body.action, body.eoId);
-    } catch (error: any) { // FIX: tambahin ': any' di sini
+    } catch (error: any) { 
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  // ==========================================
+  // 👇 API BARU: PAYOUT / PENGGAJIAN AGEN 👇
+  // ==========================================
+
+  @ApiTags('Payout')
+  @ApiOperation({ summary: 'Daftar Gaji Agen di Event' })
+  @Get('events/:id/payouts')
+  async getPayouts(@Param('id') eventId: string, @Query('eoId') eoId: string) {
+    try {
+      return await this.appService.getEventPayouts(Number(eventId), Number(eoId));
+    } catch (error: any) {
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @ApiTags('Payout')
+  @ApiOperation({ summary: 'Tandai Gaji Agen Lunas' })
+  @Post('events/:id/payouts/pay')
+  async markPaid(
+    @Param('id') eventId: string,
+    @Body() body: { agentId: number, eoId: number, amount: number }
+  ) {
+    try {
+      return await this.appService.markAgentPaid(Number(eventId), body.agentId, body.eoId, body.amount);
+    } catch (error: any) {
       throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
     }
   }

@@ -1300,4 +1300,67 @@ export class AppService implements OnModuleInit {
       client.release();
     }
   }
+
+  // ==========================================
+  // FITUR PENGGAJIAN AGEN (PAYOUT)
+  // ==========================================
+
+  async getEventPayouts(eventId: number, eoId: number) {
+    try {
+      const check = await this.pool.query('SELECT id FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
+      if (check.rows.length === 0) throw new UnauthorizedException('Akses ditolak. Lu bukan EO event ini.');
+
+      const query = `
+        SELECT 
+          ea.user_id as agent_id, 
+          ea.role, 
+          u.name as agent_name, 
+          u.picture as agent_pic, 
+          u.bank_name, 
+          u.bank_account, 
+          u.bank_account_name,
+          COALESCE(p.amount, 0) as amount_paid,
+          COALESCE(p.status, 'PENDING') as status,
+          p.paid_at
+        FROM event_agents ea
+        JOIN users u ON ea.user_id = u.id
+        LEFT JOIN agent_payouts p ON p.event_id = ea.event_id AND p.agent_id = ea.user_id
+        WHERE ea.event_id = $1 AND ea.is_accepted = TRUE
+      `;
+      const { rows } = await this.pool.query(query, [eventId]);
+      return rows;
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
+      throw new InternalServerErrorException('Gagal mengambil data penggajian');
+    }
+  }
+
+  async markAgentPaid(eventId: number, agentId: number, eoId: number, amount: number) {
+    try {
+      const check = await this.pool.query('SELECT id, title FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
+      if (check.rows.length === 0) throw new UnauthorizedException('Akses ditolak.');
+
+      const eventTitle = check.rows[0].title;
+
+      const query = `
+        INSERT INTO agent_payouts (event_id, agent_id, amount, status, paid_at)
+        VALUES ($1, $2, $3, 'PAID', NOW())
+        ON CONFLICT (event_id, agent_id) 
+        DO UPDATE SET status = 'PAID', amount = EXCLUDED.amount, paid_at = NOW()
+        RETURNING *;
+      `;
+      const res = await this.pool.query(query, [eventId, agentId, amount]);
+
+      await this.pool.query(
+        `INSERT INTO notifications (user_id, title, message, type, related_event_id)
+         VALUES ($1, $2, $3, 'PAYOUT_SUCCESS', $4)`,
+        [agentId, 'Gajian Cair! 💸', `EO telah mentransfer fee kamu sebesar Rp ${amount.toLocaleString('id-ID')} untuk event ${eventTitle}. Cek rekening kamu ya!`, eventId]
+      );
+
+      return { message: 'Berhasil ditandai lunas!', data: res.rows[0] };
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
+      throw new InternalServerErrorException('Gagal memproses pembayaran agen');
+    }
+  }
 }
