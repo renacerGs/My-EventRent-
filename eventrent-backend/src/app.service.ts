@@ -18,10 +18,9 @@ export class AppService implements OnModuleInit {
       ssl: {
         rejectUnauthorized: false,
       },
-      // 👇 TAMBAHAN FIX ERROR MaxClientsInSessionMode 👇
-      max: 5, // Batasin maksimal 5 koneksi bersamaan
-      idleTimeoutMillis: 30000, // Tutup koneksi otomatis kalau nganggur 30 detik
-      connectionTimeoutMillis: 5000, // Maksimal nunggu koneksi 5 detik
+      max: 5, 
+      idleTimeoutMillis: 30000, 
+      connectionTimeoutMillis: 5000, 
     });
 
     this.transporter = nodemailer.createTransport({
@@ -1143,6 +1142,162 @@ export class AppService implements OnModuleInit {
       return { success: true, message: 'Laporan ditandai selesai' };
     } catch (err) {
       throw new InternalServerErrorException('Gagal menyelesaikan laporan');
+    }
+  }
+
+  // ==========================================
+  // FITUR RECRUITMENT (JOB BOARD) - FIX UNTUK POSTGRES
+  // ==========================================
+
+  // 1. EO Bikin Lowongan
+  async createJobPosting(data: any) {
+    try {
+      const query = `
+        INSERT INTO job_postings (event_id, eo_id, role, quota, fee, description, is_active)
+        VALUES ($1, $2, $3, $4, $5, $6, TRUE)
+        RETURNING *
+      `;
+      const values = [data.eventId, data.eoId, data.role, data.quota, data.fee, data.description];
+      const res = await this.pool.query(query, values);
+      return res.rows[0];
+    } catch (err) {
+      throw new InternalServerErrorException('Gagal membuat lowongan kerja');
+    }
+  }
+
+  // 2. User Lihat Semua Lowongan (Halaman Cari Job)
+  async getAllActiveJobs() {
+    try {
+      const query = `
+        SELECT j.*, e.title as event_title, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date
+        FROM job_postings j
+        JOIN events e ON j.event_id = e.id
+        WHERE j.is_active = TRUE
+        ORDER BY j.created_at DESC
+      `;
+      const { rows } = await this.pool.query(query);
+      return rows;
+    } catch (err) {
+      throw new InternalServerErrorException('Gagal mengambil daftar lowongan');
+    }
+  }
+
+  // 3. EO Lihat Lowongannya Sendiri di Dashboard
+  async getJobsByEvent(eventId: number, eoId: number) {
+    try {
+      const query = `
+        SELECT * FROM job_postings 
+        WHERE event_id = $1 AND eo_id = $2
+        ORDER BY created_at DESC
+      `;
+      const { rows } = await this.pool.query(query, [eventId, eoId]);
+      return rows;
+    } catch (err) {
+      throw new InternalServerErrorException('Gagal mengambil lowongan EO');
+    }
+  }
+
+  // 4. User Ngirim Lamaran
+  async applyForJob(jobId: number, userId: number) {
+    try {
+      const query = `
+        INSERT INTO job_applications (job_id, user_id, status)
+        VALUES ($1, $2, 'PENDING')
+        RETURNING *
+      `;
+      const { rows } = await this.pool.query(query, [jobId, userId]);
+      return rows[0];
+    } catch (err: any) {
+      if (err.code === '23505') { 
+        throw new BadRequestException('Lu udah pernah ngelamar di posisi ini bro!');
+      }
+      throw new InternalServerErrorException('Gagal mengirim lamaran');
+    }
+  }
+
+  // 5. EO Lihat Daftar Pelamar
+  async getApplicantsByEvent(eventId: number, eoId: number) {
+    try {
+      const query = `
+        SELECT a.id, a.status, a.user_id, 
+               u.name as user_name, u.picture as user_pic,
+               j.role as role_applied
+        FROM job_applications a
+        JOIN users u ON a.user_id = u.id
+        JOIN job_postings j ON a.job_id = j.id
+        WHERE j.event_id = $1 AND j.eo_id = $2
+        ORDER BY a.created_at DESC
+      `;
+      const { rows } = await this.pool.query(query, [eventId, eoId]);
+      return rows;
+    } catch (err) {
+      throw new InternalServerErrorException('Gagal mengambil daftar pelamar');
+    }
+  }
+
+  // 6. EO Terima/Tolak Pelamar
+  async respondToApplicant(applicationId: number, action: string, eoId: number) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const updateQuery = `
+        UPDATE job_applications 
+        SET status = $1 
+        WHERE id = $2 
+        RETURNING user_id, job_id
+      `;
+      const appRes = await client.query(updateQuery, [action, applicationId]);
+      
+      if (appRes.rows.length === 0) throw new BadRequestException('Lamaran tidak ditemukan');
+      
+      const applicantId = appRes.rows[0].user_id;
+      const jobId = appRes.rows[0].job_id;
+
+      const jobRes = await client.query(`
+        SELECT j.role, j.event_id, e.title as event_name 
+        FROM job_postings j
+        JOIN events e ON j.event_id = e.id
+        WHERE j.id = $1 AND j.eo_id = $2
+      `, [jobId, eoId]);
+
+      if (jobRes.rows.length === 0) throw new UnauthorizedException('Bukan lowongan milik lu bro');
+      
+      const jobInfo = jobRes.rows[0];
+
+      if (action === 'ACCEPTED') {
+        const checkAgent = await client.query('SELECT id FROM event_agents WHERE event_id = $1 AND user_id = $2', [jobInfo.event_id, applicantId]);
+        
+        if (checkAgent.rows.length === 0) {
+          await client.query(
+            `INSERT INTO event_agents (event_id, user_id, role, is_accepted) VALUES ($1, $2, $3, TRUE)`,
+            [jobInfo.event_id, applicantId, jobInfo.role]
+          );
+        }
+
+        await client.query(
+          `INSERT INTO notifications (user_id, title, message, type, related_event_id)
+           VALUES ($1, $2, $3, 'JOB_ACCEPTED', $4)`,
+          [applicantId, 'Lamaran Diterima! 🎉', `Selamat! Lo diterima sebagai ${jobInfo.role} di event ${jobInfo.event_name}. Cek Daftar Tugas lu sekarang!`, jobInfo.event_id]
+        );
+      } 
+      else if (action === 'REJECTED') {
+        await client.query(
+          `INSERT INTO notifications (user_id, title, message, type, related_event_id)
+           VALUES ($1, $2, $3, 'JOB_REJECTED', $4)`,
+          [applicantId, 'Lamaran Ditolak 😔', `Maaf bro, lamaran lu untuk posisi ${jobInfo.role} di event ${jobInfo.event_name} belum bisa diterima. Tetap semangat!`, jobInfo.event_id]
+        );
+      }
+
+      await client.query('COMMIT');
+      return { message: `Pelamar berhasil ${action}` };
+
+    } catch (err) {
+      await client.query('ROLLBACK');
+      if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
+      throw new InternalServerErrorException('Gagal memproses lamaran');
+    } finally {
+      client.release();
     }
   }
 }

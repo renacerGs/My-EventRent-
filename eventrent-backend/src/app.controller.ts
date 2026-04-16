@@ -1,5 +1,5 @@
 // src/app.controller.ts
-import { Controller, Get, Post, Body, Query, Delete, Param, Put, Patch } from '@nestjs/common'; 
+import { Controller, Get, Post, Body, Query, Delete, Param, Put, Patch, HttpException, HttpStatus } from '@nestjs/common'; 
 import { AppService } from './app.service';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { BuyTicketDto } from './dto/buy-ticket.dto';
@@ -149,7 +149,7 @@ export class AppController {
     return this.appService.scanTicket(body.ticketId, body.eventId, body.userId);
   }
 
-  // 👇👇👇 API BARU UNTUK AGENTS (KEPANITIAAN) 👇👇👇
+  // 👇👇👇 API AGENTS (KEPANITIAAN) 👇👇👇
   @ApiTags('Agents (Kepanitiaan)')
   @ApiOperation({ summary: 'Menambahkan agen baru ke dalam event' })
   @Post('events/:id/agents')
@@ -197,7 +197,6 @@ export class AppController {
   async getAssignedEvents(@Param('id') agentId: number) {
     return await this.appService.getAssignedEvents(agentId);
   }
-  // 👆👆👆 BATAS API AGENTS 👆👆👆
   
   // --- AUTH & USERS ---
   @ApiTags('Authentication & Users')
@@ -296,5 +295,75 @@ export class AppController {
   @Patch('reports/:id/resolve')
   async resolveReport(@Param('id') reportId: number, @Query('eoId') eoId: number) {
     return await this.appService.resolveEventReport(reportId, eoId);
+  }
+
+  // ==========================================
+  // 👇 API BARU: RECRUITMENT (JOB BOARD) 👇
+  // ==========================================
+
+  @ApiTags('Recruitment')
+  @ApiOperation({ summary: 'EO Bikin Lowongan Baru' })
+  @Post('jobs')
+  async createJob(@Body() body: any) {
+    try {
+      return await this.appService.createJobPosting(body);
+    } catch (error: any) { // FIX: tambahin ': any' di sini
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @ApiTags('Recruitment')
+  @ApiOperation({ summary: 'User Lihat Semua Lowongan (Halaman Cari Job)' })
+  @Get('jobs')
+  async getAllJobs() {
+    try {
+      return await this.appService.getAllActiveJobs();
+    } catch (error: any) { // FIX: tambahin ': any' di sini
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @ApiTags('Recruitment')
+  @ApiOperation({ summary: 'EO Lihat Lowongannya Sendiri di Dashboard' })
+  @Get('events/:id/jobs')
+  async getEventJobs(@Param('id') eventId: string, @Query('eoId') eoId: string) {
+    try {
+      return await this.appService.getJobsByEvent(Number(eventId), Number(eoId));
+    } catch (error: any) { // FIX: tambahin ': any' di sini
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @ApiTags('Recruitment')
+  @ApiOperation({ summary: 'User Ngirim Lamaran' })
+  @Post('jobs/apply')
+  async applyJob(@Body() body: any) {
+    try {
+      return await this.appService.applyForJob(body.jobId, body.userId);
+    } catch (error: any) { // FIX: tambahin ': any' di sini
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @ApiTags('Recruitment')
+  @ApiOperation({ summary: 'EO Lihat Daftar Pelamar' })
+  @Get('events/:id/applicants')
+  async getEventApplicants(@Param('id') eventId: string, @Query('eoId') eoId: string) {
+    try {
+      return await this.appService.getApplicantsByEvent(Number(eventId), Number(eoId));
+    } catch (error: any) { // FIX: tambahin ': any' di sini
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @ApiTags('Recruitment')
+  @ApiOperation({ summary: 'EO Terima/Tolak Pelamar' })
+  @Post('jobs/respond')
+  async respondApplicant(@Body() body: any) {
+    try {
+      return await this.appService.respondToApplicant(body.applicationId, body.action, body.eoId);
+    } catch (error: any) { // FIX: tambahin ': any' di sini
+      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
+    }
   }
 }
