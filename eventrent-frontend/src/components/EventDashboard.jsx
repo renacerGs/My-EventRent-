@@ -254,7 +254,7 @@ export default function EventDashboard() {
     }
   };
 
-  // 👇 FUNGSI MARK PAID YANG UDAH DI UPDATE PAKE ANIMASI ALA CHECKOUT 👇
+  // 👇 FUNGSI MARK PAID YANG UDAH DI UPDATE PAKE ANIMASI & POP-UP ERROR CUSTOM 👇
   const executeMarkPaid = async () => {
     const amount = payoutAmountInput || 0;
     if (amount <= 0) {
@@ -279,8 +279,7 @@ export default function EventDashboard() {
       if (res.ok) {
         setPayoutProcessStatus('success'); // Munculin centang hijau
         fetchPayouts(); 
-        
-        // Auto close pop-up setelah animasi jalan 2 detik
+
         setTimeout(() => {
           setShowPayoutModal(false);
           setSelectedAgentPayout(null);
@@ -288,8 +287,16 @@ export default function EventDashboard() {
           setPayoutProcessStatus('idle'); // Reset kembali normal
         }, 2000);
       } else {
-        toast.error(data.message || 'Gagal memproses pembayaran.');
         setPayoutProcessStatus('idle');
+        setShowPayoutModal(false); 
+        
+        setTimeout(() => {
+          setPopup({ 
+            show: true, 
+            message: data.message || 'Gagal memproses pembayaran.', 
+            type: 'error' 
+          });
+        }, 300); // Kasih delay 300ms biar transisi tutup-buka modalnya smooth
       }
     } catch (err) {
       toast.error('Terjadi kesalahan jaringan.');
