@@ -17,11 +17,12 @@ export default function EventDashboard() {
   const [selectedSessionFilter, setSelectedSessionFilter] = useState('Semua Sesi'); 
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('Semua'); 
   
+  // STATE MODALS
   const [popup, setPopup] = useState({ show: false, message: '', type: 'success' });
   const [confirmDialog, setConfirmDialog] = useState({ show: false, ticketId: null });
   const [confirmRemoveAgent, setConfirmRemoveAgent] = useState({ show: false, agentId: null });
-  // 👇 STATE BARU UNTUK POP-UP HAPUS LOWONGAN
   const [confirmDeleteJob, setConfirmDeleteJob] = useState({ show: false, jobId: null });
+  const [confirmRespondApp, setConfirmRespondApp] = useState({ show: false, appId: null, action: null });
 
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10; 
@@ -46,6 +47,8 @@ export default function EventDashboard() {
   const [showPayoutModal, setShowPayoutModal] = useState(false); 
   const [selectedAgentPayout, setSelectedAgentPayout] = useState(null);
   const [payoutAmountInput, setPayoutAmountInput] = useState('');
+  // 👇 STATE BARU UNTUK ANIMASI CHECKOUT PAYOUT
+  const [payoutProcessStatus, setPayoutProcessStatus] = useState('idle'); 
 
   const fetchData = async (isBackground = false) => {
     try {
@@ -197,7 +200,6 @@ export default function EventDashboard() {
     }
   };
 
-  // 👇 FITUR HAPUS LOWONGAN (DIBAGI JADI 2 FUNGSI BIAR BISA PAKE POP-UP)
   const initiateDeleteJob = (jobId) => {
     setConfirmDeleteJob({ show: true, jobId: jobId });
   };
@@ -224,8 +226,9 @@ export default function EventDashboard() {
     }
   };
 
-  const handleRespondApplicant = async (appId, action) => {
-    if (!window.confirm(`Yakin mau ${action === 'ACCEPTED' ? 'Menerima' : 'Menolak'} pelamar ini?`)) return;
+  const executeRespondApplicant = async () => {
+    const { appId, action } = confirmRespondApp;
+    setConfirmRespondApp({ show: false, appId: null, action: null });
     
     const toastId = toast.loading('Memproses lamaran...');
     try {
@@ -251,6 +254,7 @@ export default function EventDashboard() {
     }
   };
 
+  // 👇 FUNGSI MARK PAID YANG UDAH DI UPDATE PAKE ANIMASI ALA CHECKOUT 👇
   const executeMarkPaid = async () => {
     const amount = payoutAmountInput || 0;
     if (amount <= 0) {
@@ -261,9 +265,9 @@ export default function EventDashboard() {
     if (!selectedAgentPayout) return;
     const agentId = selectedAgentPayout.agent_id;
 
-    if (!window.confirm(`Yakin mau tandai lunas sebesar Rp ${Number(amount).toLocaleString('id-ID')} buat agen ini? Notif bakal dikirim ke agen.`)) return;
+    // Ganti ke animasi loading
+    setPayoutProcessStatus('processing');
 
-    const toastId = toast.loading('Memproses pembayaran...');
     try {
       const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/payouts/pay`, {
         method: 'POST',
@@ -273,16 +277,23 @@ export default function EventDashboard() {
       const data = await res.json();
 
       if (res.ok) {
-        toast.success('Agen berhasil dibayar!', { id: toastId });
+        setPayoutProcessStatus('success'); // Munculin centang hijau
         fetchPayouts(); 
-        setShowPayoutModal(false);
-        setSelectedAgentPayout(null);
-        setPayoutAmountInput('');
+        
+        // Auto close pop-up setelah animasi jalan 2 detik
+        setTimeout(() => {
+          setShowPayoutModal(false);
+          setSelectedAgentPayout(null);
+          setPayoutAmountInput('');
+          setPayoutProcessStatus('idle'); // Reset kembali normal
+        }, 2000);
       } else {
-        toast.error(data.message || 'Gagal memproses pembayaran.', { id: toastId });
+        toast.error(data.message || 'Gagal memproses pembayaran.');
+        setPayoutProcessStatus('idle');
       }
     } catch (err) {
-      toast.error('Terjadi kesalahan jaringan.', { id: toastId });
+      toast.error('Terjadi kesalahan jaringan.');
+      setPayoutProcessStatus('idle');
     }
   };
 
@@ -513,50 +524,85 @@ export default function EventDashboard() {
         </div>
       )}
 
-      {/* ======================= MODAL PENGGAJIAN ======================= */}
+      {/* ======================= MODAL PENGGAJIAN (UPDATE GAYA CHECKOUT) ======================= */}
       {showPayoutModal && selectedAgentPayout && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 animate-fadeIn">
-          <div className="bg-white rounded-[24px] md:rounded-[32px] p-6 md:p-8 max-w-sm w-full shadow-2xl relative">
-            <button onClick={() => { setShowPayoutModal(false); setSelectedAgentPayout(null); setPayoutAmountInput(''); }} className="absolute top-6 right-6 text-gray-400 hover:text-gray-900 transition-colors">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-            </button>
-
-            <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            </div>
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div className="rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl relative bg-white">
             
-            <h3 className="text-xl font-black text-gray-900 mb-1 text-center">Tandai Lunas</h3>
-            <p className="text-xs font-bold text-gray-500 mb-6 text-center">Input nominal transfer untuk agen <span className="text-gray-900">{selectedAgentPayout.agent_name}</span></p>
-
-            <div className="mb-6">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Nominal Ditransfer (Rp)</label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400">Rp</span>
-                <input 
-                  type="number" 
-                  min="0"
-                  placeholder="150000"
-                  value={payoutAmountInput}
-                  onChange={(e) => setPayoutAmountInput(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-12 pr-4 py-3 text-lg font-black text-gray-900 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button onClick={() => { setShowPayoutModal(false); setSelectedAgentPayout(null); setPayoutAmountInput(''); }} className="flex-1 py-3.5 bg-gray-100 text-gray-700 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-gray-200 transition-colors">Batal</button>
-              <button 
-                onClick={executeMarkPaid} 
-                className="flex-1 py-3.5 bg-emerald-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 shadow-lg shadow-emerald-200 transition-all active:scale-95"
-              >
-                Lunas
+            {/* Tampil Pas Mode Input (Idle) */}
+            {payoutProcessStatus === 'idle' && (
+              <button onClick={() => { setShowPayoutModal(false); setSelectedAgentPayout(null); setPayoutAmountInput(''); }} className="absolute top-5 right-5 rounded-full w-8 h-8 flex items-center justify-center transition-colors text-gray-400 bg-gray-100 hover:text-gray-900 z-10">
+                ✕
               </button>
-            </div>
+            )}
+
+            {payoutProcessStatus === 'idle' && (
+              <div className="p-8 pt-10">
+                <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                
+                <h3 className="text-xl font-black text-gray-900 mb-1 text-center">Transfer Gaji Agen</h3>
+                <p className="text-xs font-bold text-gray-500 mb-6 text-center">Tandai lunas untuk agen <span className="text-gray-900">{selectedAgentPayout.agent_name}</span></p>
+
+                {/* Info Bank Agen biar EO gampang transfer */}
+                <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-6 text-center relative overflow-hidden">
+                   <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
+                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tujuan Transfer ({selectedAgentPayout.bank_name || 'Bank Belum Diisi'})</p>
+                   <p className="text-2xl font-black text-gray-900 tracking-widest select-all">{selectedAgentPayout.bank_account || '-'}</p>
+                   <p className="text-[10px] text-gray-500 font-bold uppercase mt-1">A.N {selectedAgentPayout.bank_account_name || '-'}</p>
+                </div>
+
+                <div className="mb-8">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block text-center">Nominal Ditransfer (Rp)</label>
+                  <div className="relative">
+                    <span className="absolute left-5 top-1/2 -translate-y-1/2 font-black text-gray-400">Rp</span>
+                    <input 
+                      type="number" 
+                      min="0"
+                      placeholder="150000"
+                      value={payoutAmountInput}
+                      onChange={(e) => setPayoutAmountInput(e.target.value)}
+                      className="w-full bg-white border border-gray-300 rounded-2xl pl-14 pr-4 py-4 text-xl font-black text-gray-900 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all text-center"
+                    />
+                  </div>
+                </div>
+
+                <button 
+                  onClick={executeMarkPaid} 
+                  className="w-full py-4 bg-emerald-500 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 shadow-xl shadow-emerald-200 transition-all active:scale-95"
+                >
+                  Konfirmasi Lunas
+                </button>
+              </div>
+            )}
+
+            {/* Tampil Pas Mode Processing / Success */}
+            {payoutProcessStatus !== 'idle' && (
+              <div className="p-12 text-center flex flex-col items-center justify-center min-h-[350px]">
+                {payoutProcessStatus === 'processing' ? (
+                  <>
+                    <div className="w-16 h-16 border-4 rounded-full animate-spin mb-6 border-gray-100 border-t-emerald-500"></div>
+                    <h3 className="text-lg font-black uppercase tracking-wide text-gray-900">Memverifikasi...</h3>
+                    <p className="text-xs mt-2 font-medium text-gray-500">Menyimpan data pembayaran</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 border-[6px] animate-bounce bg-emerald-50 text-emerald-500 border-emerald-100">
+                      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                    </div>
+                    <h3 className="text-2xl font-black uppercase tracking-tight text-gray-900">Pembayaran Sukses!</h3>
+                    <p className="text-sm mt-2 font-medium text-gray-500">Notifikasi gaji cair telah dikirim ke agen.</p>
+                  </>
+                )}
+              </div>
+            )}
+
           </div>
         </div>
       )}
 
-      {/* ======================= MODAL HAPUS LOWONGAN (BARU) ======================= */}
+      {/* ======================= MODAL HAPUS LOWONGAN ======================= */}
       {confirmDeleteJob.show && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 transition-all animate-fadeIn">
           <div className="bg-white rounded-[24px] md:rounded-[32px] p-6 md:p-8 max-w-sm w-full shadow-2xl transform text-center">
@@ -568,6 +614,35 @@ export default function EventDashboard() {
             <div className="flex gap-3">
               <button onClick={() => setConfirmDeleteJob({ show: false, jobId: null })} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 md:py-3.5 rounded-xl md:rounded-2xl hover:bg-gray-200 transition-colors uppercase tracking-widest text-[10px] md:text-xs">Batal</button>
               <button onClick={executeDeleteJob} className="flex-1 bg-red-500 text-white font-bold py-3 md:py-3.5 rounded-xl md:rounded-2xl hover:bg-red-600 shadow-lg shadow-red-200 transition-all active:scale-95 uppercase tracking-widest text-[10px] md:text-xs">Ya, Hapus</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================= MODAL TERIMA/TOLAK PELAMAR ======================= */}
+      {confirmRespondApp.show && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 transition-all animate-fadeIn">
+          <div className="bg-white rounded-[24px] md:rounded-[32px] p-6 md:p-8 max-w-sm w-full shadow-2xl transform text-center">
+            <div className={`w-16 h-16 md:w-20 md:h-20 mx-auto rounded-full flex items-center justify-center mb-4 md:mb-5 ${confirmRespondApp.action === 'ACCEPTED' ? 'bg-blue-50 text-blue-500' : 'bg-red-50 text-red-500'}`}>
+              {confirmRespondApp.action === 'ACCEPTED' ? (
+                <svg className="w-8 h-8 md:w-10 md:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"></path></svg>
+              ) : (
+                <svg className="w-8 h-8 md:w-10 md:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+              )}
+            </div>
+            <h3 className="text-lg md:text-xl font-black text-gray-900 mb-2">
+              {confirmRespondApp.action === 'ACCEPTED' ? 'Terima Pelamar?' : 'Tolak Pelamar?'}
+            </h3>
+            <p className="text-xs md:text-sm font-medium text-gray-500 mb-6 md:mb-8">
+              {confirmRespondApp.action === 'ACCEPTED' 
+                ? 'Yakin mau terima agen ini? Mereka akan otomatis masuk ke tim panitia event lo.' 
+                : 'Yakin mau tolak lamaran ini? Notifikasi penolakan akan otomatis dikirim.'}
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmRespondApp({ show: false, appId: null, action: null })} className="flex-1 bg-gray-100 text-gray-700 font-bold py-3 md:py-3.5 rounded-xl md:rounded-2xl hover:bg-gray-200 transition-colors uppercase tracking-widest text-[10px] md:text-xs">Batal</button>
+              <button onClick={executeRespondApplicant} className={`flex-1 text-white font-bold py-3 md:py-3.5 rounded-xl md:rounded-2xl shadow-lg transition-all active:scale-95 uppercase tracking-widest text-[10px] md:text-xs ${confirmRespondApp.action === 'ACCEPTED' ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-200' : 'bg-red-500 hover:bg-red-600 shadow-red-200'}`}>
+                {confirmRespondApp.action === 'ACCEPTED' ? 'Ya, Terima' : 'Ya, Tolak'}
+              </button>
             </div>
           </div>
         </div>
@@ -609,7 +684,6 @@ export default function EventDashboard() {
 
       {confirmRemoveAgent.show && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 transition-all animate-fadeIn">
-          {/* 👇 Typo-nya ada di baris ini bro, max-sm gue ganti jadi max-w-sm 👇 */}
           <div className="bg-white rounded-[24px] md:rounded-[32px] p-6 md:p-8 max-w-sm w-full shadow-2xl transform text-center">
             <div className="w-16 h-16 md:w-20 md:h-20 mx-auto rounded-full bg-red-50 text-red-50 flex items-center justify-center mb-4 md:mb-5">
               <svg className="w-8 h-8 md:w-10 md:h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
@@ -969,8 +1043,6 @@ export default function EventDashboard() {
                             <p className="text-[10px] text-gray-500 font-bold mb-3">Rp {new Intl.NumberFormat('id-ID').format(job.fee)} • Kuota: {job.quota} org</p>
                             <p className="text-xs text-gray-600 line-clamp-2">{job.description}</p>
                           </div>
-                          
-                          {/* 👇 TOMBOL PEMICU MODAL HAPUS LOWONGAN 👇 */}
                           <button 
                             onClick={() => initiateDeleteJob(job.id)}
                             className="p-2 text-red-500 bg-red-50 hover:bg-red-600 hover:text-white rounded-lg transition-all"
@@ -1006,8 +1078,8 @@ export default function EventDashboard() {
                           </div>
                           {app.status === 'PENDING' ? (
                             <div className="flex gap-2 w-full md:w-auto">
-                              <button onClick={() => handleRespondApplicant(app.id, 'REJECTED')} className="flex-1 md:flex-none px-4 py-2 border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors">Tolak</button>
-                              <button onClick={() => handleRespondApplicant(app.id, 'ACCEPTED')} className="flex-1 md:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors shadow-sm">Terima</button>
+                              <button onClick={() => setConfirmRespondApp({ show: true, appId: app.id, action: 'REJECTED' })} className="flex-1 md:flex-none px-4 py-2 border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors">Tolak</button>
+                              <button onClick={() => setConfirmRespondApp({ show: true, appId: app.id, action: 'ACCEPTED' })} className="flex-1 md:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors shadow-sm">Terima</button>
                             </div>
                           ) : (
                             <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg ${app.status === 'ACCEPTED' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-gray-100 text-gray-500'}`}>
@@ -1085,7 +1157,6 @@ export default function EventDashboard() {
                             <span className="text-[9px] text-gray-400 font-bold uppercase mt-1">{new Date(agent.paid_at).toLocaleString('id-ID', {day: 'numeric', month:'short', hour:'2-digit', minute:'2-digit'})}</span>
                           </div>
                         ) : (
-                          // 👇 TOMBOL PEMICU MODAL PENGGAJIAN 👇
                           <button 
                             onClick={() => {
                               setSelectedAgentPayout(agent);
