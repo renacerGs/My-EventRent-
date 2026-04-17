@@ -305,78 +305,55 @@ export class AppController {
   @ApiOperation({ summary: 'EO Bikin Lowongan Baru' })
   @Post('jobs')
   async createJob(@Body() body: any) {
-    try {
-      return await this.appService.createJobPosting(body);
-    } catch (error: any) { 
-      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
-    }
+    return await this.appService.createJobPosting(body);
   }
 
   @ApiTags('Recruitment')
-  @ApiOperation({ summary: 'User Lihat Semua Lowongan (Halaman Cari Job)' })
+  @ApiOperation({ summary: 'User Lihat Semua Lowongan (Mendukung Pagination)' })
   @Get('jobs')
-  async getAllJobs() {
-    try {
-      return await this.appService.getAllActiveJobs();
-    } catch (error: any) { 
-      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
-    }
+  async getAllJobs(
+    @Query('page') page?: string, 
+    @Query('limit') limit?: string
+  ) {
+    // Tangkap query params, ubah ke number. Default: page 1, limit 10
+    const pageNum = page ? Number(page) : 1;
+    const limitNum = limit ? Number(limit) : 10;
+    return await this.appService.getAllActiveJobs(pageNum, limitNum);
   }
 
   @ApiTags('Recruitment')
   @ApiOperation({ summary: 'EO Lihat Lowongannya Sendiri di Dashboard' })
   @Get('events/:id/jobs')
   async getEventJobs(@Param('id') eventId: string, @Query('eoId') eoId: string) {
-    try {
-      return await this.appService.getJobsByEvent(Number(eventId), Number(eoId));
-    } catch (error: any) { 
-      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
-    }
+    return await this.appService.getJobsByEvent(Number(eventId), Number(eoId));
   }
 
   @ApiTags('Recruitment')
   @ApiOperation({ summary: 'User Ngirim Lamaran' })
   @Post('jobs/apply')
   async applyJob(@Body() body: any) {
-    try {
-      return await this.appService.applyForJob(body.jobId, body.userId);
-    } catch (error: any) { 
-      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
-    }
+    return await this.appService.applyForJob(body.jobId, body.userId);
   }
 
   @ApiTags('Recruitment')
   @ApiOperation({ summary: 'EO Lihat Daftar Pelamar' })
   @Get('events/:id/applicants')
   async getEventApplicants(@Param('id') eventId: string, @Query('eoId') eoId: string) {
-    try {
-      return await this.appService.getApplicantsByEvent(Number(eventId), Number(eoId));
-    } catch (error: any) { 
-      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
-    }
+    return await this.appService.getApplicantsByEvent(Number(eventId), Number(eoId));
   }
 
   @ApiTags('Recruitment')
   @ApiOperation({ summary: 'EO Terima/Tolak Pelamar' })
   @Post('jobs/respond')
   async respondApplicant(@Body() body: any) {
-    try {
-      return await this.appService.respondToApplicant(body.applicationId, body.action, body.eoId);
-    } catch (error: any) { 
-      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
-    }
+    return await this.appService.respondToApplicant(body.applicationId, body.action, body.eoId);
   }
 
-  // 👇 FITUR BARU: Hapus Lowongan 👇
   @ApiTags('Recruitment')
   @ApiOperation({ summary: 'EO Menghapus atau Membatalkan Lowongan' })
   @Delete('jobs/:id')
   async deleteJob(@Param('id') jobId: string, @Query('eoId') eoId: string) {
-    try {
-      return await this.appService.deleteJobPosting(Number(jobId), Number(eoId));
-    } catch (error: any) {
-      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
-    }
+    return await this.appService.deleteJobPosting(Number(jobId), Number(eoId));
   }
 
   // ==========================================
@@ -387,11 +364,7 @@ export class AppController {
   @ApiOperation({ summary: 'Daftar Gaji Agen di Event' })
   @Get('events/:id/payouts')
   async getPayouts(@Param('id') eventId: string, @Query('eoId') eoId: string) {
-    try {
-      return await this.appService.getEventPayouts(Number(eventId), Number(eoId));
-    } catch (error: any) {
-      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
-    }
+    return await this.appService.getEventPayouts(Number(eventId), Number(eoId));
   }
 
   @ApiTags('Payout')
@@ -401,10 +374,7 @@ export class AppController {
     @Param('id') eventId: string,
     @Body() body: { agentId: number, eoId: number, amount: number }
   ) {
-    try {
-      return await this.appService.markAgentPaid(Number(eventId), body.agentId, body.eoId, body.amount);
-    } catch (error: any) {
-      throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
-    }
+    // Logic pencegahan Double-Payout di service akan otomatis menolak request jika sudah lunas
+    return await this.appService.markAgentPaid(Number(eventId), body.agentId, body.eoId, body.amount);
   }
 }

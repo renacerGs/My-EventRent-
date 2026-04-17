@@ -1165,17 +1165,21 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 2. User Lihat Semua Lowongan (Halaman Cari Job)
-  async getAllActiveJobs() {
+  // Tambahkan parameter default page dan limit
+  async getAllActiveJobs(page: number = 1, limit: number = 10) {
     try {
+      // Hitung Offset
+      const offset = (page - 1) * limit; 
+      
       const query = `
         SELECT j.*, e.title as event_title, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date
         FROM job_postings j
         JOIN events e ON j.event_id = e.id
         WHERE j.is_active = TRUE
         ORDER BY j.created_at DESC
+        LIMIT $1 OFFSET $2 -- 👇 PENTING UNTUK PAGINATION 👇
       `;
-      const { rows } = await this.pool.query(query);
+      const { rows } = await this.pool.query(query, [limit, offset]);
       return rows;
     } catch (err) {
       throw new InternalServerErrorException('Gagal mengambil daftar lowongan');
@@ -1339,14 +1343,21 @@ export class AppService implements OnModuleInit {
     try {
       const check = await this.pool.query('SELECT id, title FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
       if (check.rows.length === 0) throw new UnauthorizedException('Akses ditolak.');
-
       const eventTitle = check.rows[0].title;
+
+      // 👇 TAMBAHAN: Validasi Anti Double-Payout 👇
+      const checkPaid = await this.pool.query(
+        `SELECT id FROM agent_payouts WHERE event_id = $1 AND agent_id = $2 AND status = 'PAID'`,
+        [eventId, agentId]
+      );
+      if (checkPaid.rows.length > 0) {
+        throw new BadRequestException('Bro, agen ini sudah lu bayar lunas sebelumnya!');
+      }
+      // 👆 ===================================== 👆
 
       const query = `
         INSERT INTO agent_payouts (event_id, agent_id, amount, status, paid_at)
         VALUES ($1, $2, $3, 'PAID', NOW())
-        ON CONFLICT (event_id, agent_id) 
-        DO UPDATE SET status = 'PAID', amount = EXCLUDED.amount, paid_at = NOW()
         RETURNING *;
       `;
       const res = await this.pool.query(query, [eventId, agentId, amount]);
@@ -1359,14 +1370,10 @@ export class AppService implements OnModuleInit {
 
       return { message: 'Berhasil ditandai lunas!', data: res.rows[0] };
     } catch (err) {
-      if (err instanceof UnauthorizedException) throw err;
+      if (err instanceof UnauthorizedException || err instanceof BadRequestException) throw err;
       throw new InternalServerErrorException('Gagal memproses pembayaran agen');
     }
   }
-
-  // ==========================================
-  // FITUR PENDING: HAPUS LOWONGAN (JOB POSTING)
-  // ==========================================
 
   async deleteJobPosting(jobId: number, eoId: number) {
     try {
