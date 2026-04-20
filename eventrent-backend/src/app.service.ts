@@ -84,7 +84,8 @@ export class AppService implements OnModuleInit {
         SELECT e.id, e.title, e.description, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start, 
                TO_CHAR(e.event_end, 'Dy, DD Mon YYYY') as date_end, e.place, e.name_place, e.city, e.province, e.map_url,
                e.image_url as img, c.name as category, e.phone as contact, u.name as organizer_name,
-               e.is_private, e.event_details
+               e.is_private, e.event_details,
+               e.payment_methods as "paymentMethods"
         FROM events e
         JOIN categories c ON e.category_id = c.id
         LEFT JOIN users u ON e.created_by = u.id
@@ -183,11 +184,12 @@ export class AppService implements OnModuleInit {
       const eventQuery = `
         INSERT INTO events (
           title, description, event_start, event_end, category_id, 
-          created_by, phone, place, name_place, city, province, map_url, image_url, is_private, event_details
+          created_by, phone, place, name_place, city, province, map_url, image_url, is_private, event_details,
+          payment_methods
         )
         VALUES (
           $1, $2, $3, $4, (SELECT id FROM categories WHERE name = $5 LIMIT 1), 
-          $6, $7, $8, $9, $10, $11, $12, $13, $14, $15
+          $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
         )
         RETURNING id
       `;
@@ -198,7 +200,8 @@ export class AppService implements OnModuleInit {
         data.location?.mapUrl || null, 
         data.img || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=1000&q=80',
         data.isPrivate ? true : false,
-        data.eventDetails ? JSON.stringify(data.eventDetails) : '{}' 
+        data.eventDetails ? JSON.stringify(data.eventDetails) : '{}',
+        data.paymentMethods ? JSON.stringify(data.paymentMethods) : '{"qris":true,"va":true,"transferBank":false}'
       ];
       
       const eventRes = await client.query(eventQuery, eventValues);
@@ -256,7 +259,8 @@ export class AppService implements OnModuleInit {
             image_url = COALESCE($10, image_url), 
             category_id = (SELECT id FROM categories WHERE name = $11 LIMIT 1),
             is_private = $14,
-            event_details = COALESCE($15, event_details)
+            event_details = COALESCE($15, event_details),
+            payment_methods = COALESCE($16, payment_methods)
         WHERE id = $12 AND created_by = $13
         RETURNING *
       `;
@@ -264,7 +268,8 @@ export class AppService implements OnModuleInit {
         data.title, data.description, data.eventStart, data.eventEnd,
         data.organizer, data.location?.place, data.location?.namePlace, data.location?.city, data.location?.province,
         data.img, data.category, eventId, userId, data.isPrivate ? true : false,
-        data.eventDetails ? JSON.stringify(data.eventDetails) : null
+        data.eventDetails ? JSON.stringify(data.eventDetails) : null,
+        data.paymentMethods ? JSON.stringify(data.paymentMethods) : null
       ];
       const res = await this.pool.query(query, values);
       if (res.rowCount === 0) throw new InternalServerErrorException('Event not found or unauthorized');
@@ -1002,27 +1007,22 @@ export class AppService implements OnModuleInit {
   // --- FORGOT PASSWORD SYSTEM ---
 
   async sendForgotPasswordOTP(email: string) {
-    // Cari user berdasarkan email
     const res = await this.pool.query('SELECT id, name FROM users WHERE email = $1', [email]);
     
-    // ANTI-ENUMERATION: Kalau email gak ada, pura-pura sukses aja biar hacker gak tau
     if (res.rows.length === 0) {
       return { success: true, message: 'Jika email terdaftar, kode OTP telah dikirim.' };
     }
 
     const user = res.rows[0];
 
-    // Bikin OTP Baru (6 Digit) & Expired (15 menit)
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpiresAt = new Date(Date.now() + 15 * 60000);
 
-    // Simpan OTP ke database
     await this.pool.query(
       `UPDATE users SET otp_code = $1, otp_expires_at = $2 WHERE id = $3`,
       [otpCode, otpExpiresAt, user.id]
     );
 
-    // Kirim Email via Nodemailer
     const mailOptions = {
       from: '"EventRent Security" <noreply@eventrent.com>',
       to: email,
@@ -1052,14 +1052,11 @@ export class AppService implements OnModuleInit {
     
     const user = res.rows[0];
 
-    // Validasi OTP
     if (user.otp_code !== otpCode) throw new BadRequestException('Kode OTP salah!');
     if (new Date() > new Date(user.otp_expires_at)) throw new BadRequestException('Kode OTP sudah kedaluwarsa. Silakan minta ulang.');
 
-    // Hash Password Baru
     const hashedNewPassword = await bcrypt.hash(newPassword, 10);
 
-    // Update Password & Bersihkan OTP
     await this.pool.query(
       `UPDATE users SET password = $1, otp_code = NULL, otp_expires_at = NULL WHERE id = $2`,
       [hashedNewPassword, user.id]
