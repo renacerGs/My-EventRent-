@@ -92,7 +92,7 @@ export default function Profile() {
     e.preventDefault();
     setIsLoadingProfile(true);
     try {
-      const res = await fetch(`https://my-event-rent.vercel.app/api/users/${user.id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${user.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -153,7 +153,7 @@ export default function Profile() {
 
     setIsLoadingPass(true);
     try {
-      const res = await fetch(`https://my-event-rent.vercel.app/api/users/${user.id}/password`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${user.id}/password`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ oldPass: passData.oldPass, newPass: passData.newPass })

@@ -18,6 +18,7 @@ import Checkout from "./pages/Checkout";
 import Scanner from './pages/Scanner';
 import TrackTicket from './pages/TrackTicket'; 
 import Notifications from './pages/Notifications';
+import AgentWallet from './components/AgentWallet';
 
 // 👇 IMPORT HALAMAN JOB BOARD BARU 👇
 import JobBoard from './pages/JobBoard';
@@ -63,7 +64,7 @@ export default function App() {
     location.pathname.startsWith('/party-rsvp');
 
   useEffect(() => {
-    fetch('https://my-event-rent.vercel.app/api/events')
+    fetch(`${import.meta.env.VITE_API_URL}/api/events`)
       .then(res => res.json())
       .then(data => {
         setEvents(Array.isArray(data) ? data : []);
@@ -146,6 +147,7 @@ export default function App() {
           {/* --- ROUTE KHUSUS PORTAL AGEN --- */}
           <Route path="/agent" element={<ProtectedRoute><AgentDashboard /></ProtectedRoute>} />
           <Route path="/agent/history" element={<ProtectedRoute><RiwayatScan /></ProtectedRoute>} /> 
+          <Route path="/agent/wallet" element={<ProtectedRoute><AgentWallet /></ProtectedRoute>} />
           
           {/* --- MANAJEMEN EVENT & DASHBOARD --- */}
           <Route path="/manage" element={<ProtectedRoute><ManageEvent /></ProtectedRoute>} />

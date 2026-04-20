@@ -24,7 +24,7 @@ export default function TrackTicket() {
     setTicketData([]);
 
     try {
-      const res = await fetch('https://my-event-rent.vercel.app/api/tickets/track', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tickets/track`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, CheckCircle2, RefreshCw, ArrowLeft, UserCircle2, Briefcase } from 'lucide-react'; 
+import { Mail, CheckCircle2, RefreshCw, ArrowLeft, UserCircle2, Briefcase, KeyRound } from 'lucide-react'; 
 
-// 👇 KOMPONEN MATA
 const AnimatedEyeToggle = ({ isVisible }) => {
   const strokeColor = "#9ca3af"; 
   const activeColor = "#FF6B35"; 
@@ -17,7 +16,6 @@ const AnimatedEyeToggle = ({ isVisible }) => {
   );
 };
 
-// 👇 KOMPONEN OTP
 const OtpVerification = ({ email, onVerified, onCancel, isAgentMode }) => {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
@@ -31,7 +29,7 @@ const OtpVerification = ({ email, onVerified, onCancel, isAgentMode }) => {
     setError('');
 
     try {
-      const response = await fetch('https://my-event-rent.vercel.app/api/auth/verify-otp', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otpCode: codeToVerify }),
@@ -40,7 +38,6 @@ const OtpVerification = ({ email, onVerified, onCancel, isAgentMode }) => {
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Verifikasi gagal');
       
-      // ✅ Tambahin info role ke data user yang sukses OTP
       const finalUser = { ...data.user, role: isAgentMode ? 'agent' : 'user' };
       onVerified(finalUser); 
     } catch (err) {
@@ -86,7 +83,7 @@ const OtpVerification = ({ email, onVerified, onCancel, isAgentMode }) => {
     setIsLoading(true);
     setError('');
     try {
-      const response = await fetch('https://my-event-rent.vercel.app/api/auth/resend-otp', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/resend-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
@@ -135,6 +132,141 @@ const OtpVerification = ({ email, onVerified, onCancel, isAgentMode }) => {
   );
 };
 
+// 👇 KOMPONEN BARU: LUPA PASSWORD 👇
+const ForgotPasswordScreen = ({ onCancel, onPasswordResetSuccess }) => {
+  const [step, setStep] = useState(1); // 1 = Input Email, 2 = Input OTP & Password Baru
+  const [email, setEmail] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const inputRefs = useRef([]);
+
+  const handleSendOtp = async (e) => {
+    e.preventDefault();
+    if (!email) return;
+    setIsLoading(true);
+    setErrorMsg('');
+    try {
+      // Panggil endpoint forgot-password (Nanti kita bikin di backend)
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      
+      // Mengikuti saran anti-enumeration: Selalu lanjut ke tahap OTP walaupun gagal
+      if (res.ok) {
+        setStep(2);
+        setSuccessMsg(data.message);
+      } else {
+        // Tetap lanjut, tapi aslinya gagal di server (biar hacker bingung)
+        setStep(2);
+      }
+    } catch (err) {
+      setErrorMsg("Koneksi gagal bro, cek internet lu.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    const otpCode = otp.join('');
+    if (otpCode.length < 6 || !newPassword) return;
+    setIsLoading(true);
+    setErrorMsg('');
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otpCode, newPassword }),
+      });
+      const data = await res.json();
+      
+      if (!res.ok) throw new Error(data.message || 'Gagal reset password');
+      
+      setSuccessMsg('Password berhasil direset! Silakan login.');
+      setTimeout(() => {
+        onPasswordResetSuccess(); // Balik ke halaman login
+      }, 2000);
+    } catch (err) {
+      setErrorMsg(err.message);
+      setIsLoading(false);
+    }
+  };
+
+  const handleOtpChange = (index, value) => {
+    if (isNaN(value)) return;
+    const newOtp = [...otp];
+    newOtp[index] = value;
+    setOtp(newOtp);
+    if (value !== '' && index < 5) inputRefs.current[index + 1].focus();
+  };
+
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) inputRefs.current[index - 1].focus();
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full h-full flex flex-col justify-center items-center bg-white p-6 sm:p-8">
+      
+      <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-6">
+        <KeyRound className="w-8 h-8" />
+      </div>
+      
+      <h2 className="text-2xl font-black text-center text-gray-900 mb-2 italic uppercase">
+        {step === 1 ? 'Lupa Password?' : 'Bikin Password Baru'}
+      </h2>
+      <p className="text-center text-gray-500 mb-8 text-xs font-medium px-4">
+        {step === 1 
+          ? "Kalem bro, masukin email lu ntar kita kirimin kode OTP buat reset." 
+          : <span>Masukin kode OTP yang udah dikirim ke <span className="font-bold text-blue-500">{email}</span> dan password baru lu.</span>
+        }
+      </p>
+
+      {errorMsg && <p className="w-full max-w-sm text-red-500 text-[10px] text-center font-bold bg-red-50 py-2.5 rounded-xl italic mb-4">{errorMsg}</p>}
+      {successMsg && <p className="w-full max-w-sm text-emerald-600 text-[10px] text-center font-bold bg-emerald-50 py-2.5 rounded-xl italic mb-4">{successMsg}</p>}
+
+      {step === 1 ? (
+        <form onSubmit={handleSendOtp} className="w-full max-w-sm">
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email terdaftar" className="w-full px-5 py-3.5 mb-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/30 focus:bg-white border border-transparent focus:border-blue-100 transition-all text-sm" required />
+          <button type="submit" disabled={isLoading || !email} className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-black transition-all active:scale-95 disabled:opacity-50">
+            {isLoading ? 'Mencari...' : 'Kirim Kode OTP'}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={handleResetPassword} className="w-full max-w-sm">
+          <div className="flex justify-center gap-2 mb-6">
+            {otp.map((digit, index) => (
+              <input key={index} ref={(el) => (inputRefs.current[index] = el)} type="text" maxLength="1" value={digit} onChange={(e) => handleOtpChange(index, e.target.value)} onKeyDown={(e) => handleOtpKeyDown(index, e)} disabled={isLoading} className="w-11 h-14 text-center text-xl font-black text-gray-800 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none transition-all" />
+            ))}
+          </div>
+
+          <div className="relative w-full group mb-6">
+            <input type={showPassword ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Password Baru" className="w-full pl-5 pr-12 py-3.5 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/30 focus:bg-white border border-transparent focus:border-blue-100 transition-all text-sm" required minLength="6" />
+            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 focus:outline-none flex items-center justify-center p-1.5 z-10">
+              <AnimatedEyeToggle isVisible={showPassword} />
+            </button>
+          </div>
+
+          <button type="submit" disabled={isLoading || otp.join('').length < 6 || !newPassword} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50">
+            {isLoading ? 'Menyimpan...' : 'Simpan Password'}
+          </button>
+        </form>
+      )}
+
+      <button onClick={onCancel} disabled={isLoading} className="text-gray-400 hover:text-gray-800 font-bold inline-flex items-center gap-1 uppercase tracking-widest mt-6 transition-colors disabled:opacity-50 text-[10px]">
+        <ArrowLeft className="w-3 h-3" /> Kembali ke Login
+      </button>
+    </motion.div>
+  );
+};
+
 
 // ════════ MAIN COMPONENT LOGIN MODAL ════════
 export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
@@ -146,22 +278,22 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
   const [showPassword, setShowPassword] = useState(false);
   
   const [showOtpScreen, setShowOtpScreen] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false); // 👈 STATE LUPA PASSWORD
   const [registeredEmail, setRegisteredEmail] = useState('');
-
-  // 👇 STATE BARU UNTUK TOGGLE MODE LOGIN 👇
   const [isAgentMode, setIsAgentMode] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
       setTimeout(() => {
         setShowOtpScreen(false);
+        setShowForgotPassword(false);
         setIsSignUp(false);
         setFormData({ name: '', email: '', password: '' });
         setErrorMsg('');
         setSuccessMsg('');
         setShowPassword(false);
         setRegisteredEmail('');
-        setIsAgentMode(false); // Reset mode ke reguler saat modal ditutup
+        setIsAgentMode(false); 
       }, 300);
     }
   }, [isOpen]);
@@ -180,7 +312,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
         });
         const googleUser = await res.json();
         
-        const backendRes = await fetch('https://my-event-rent.vercel.app/api/auth/google', {
+        const backendRes = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/google`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: googleUser.email, name: googleUser.name, picture: googleUser.picture, googleId: googleUser.sub }),
@@ -189,7 +321,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
         if (!backendRes.ok) throw new Error("Gagal login dengan Google dari Server");
         
         let loggedInUser = await backendRes.json();
-        // ✅ Tambahin info role ke data user
         loggedInUser = { ...loggedInUser, role: isAgentMode ? 'agent' : 'user' };
         
         onLoginSuccess(loggedInUser); 
@@ -209,7 +340,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
     const payload = isSignUp ? { name: formData.name, email: formData.email, password: formData.password } : { email: formData.email, password: formData.password };
 
     try {
-      const res = await fetch(`https://my-event-rent.vercel.app/api/auth/${endpoint}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -222,7 +353,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
         setRegisteredEmail(formData.email);
         setShowOtpScreen(true);
       } else {
-        // ✅ Tambahin info role ke data user yang sukses login
         data = { ...data, role: isAgentMode ? 'agent' : 'user' };
         onLoginSuccess(data);
         onClose(); 
@@ -245,11 +375,15 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         className="bg-white w-full max-w-[800px] h-auto md:h-[600px] min-h-[500px] rounded-[24px] md:rounded-[40px] shadow-2xl relative overflow-hidden flex flex-col md:flex-row"
       >
-        <button onClick={onClose} className={`absolute top-4 right-5 md:top-6 md:right-8 text-3xl md:text-2xl font-black transition-all z-[110] leading-none ${showOtpScreen ? 'text-gray-400 hover:text-gray-900' : 'text-white md:text-gray-400 hover:text-white/80 md:hover:text-gray-900'}`}>&times;</button>
+        <button onClick={onClose} className={`absolute top-4 right-5 md:top-6 md:right-8 text-3xl md:text-2xl font-black transition-all z-[110] leading-none ${(showOtpScreen || showForgotPassword) ? 'text-gray-400 hover:text-gray-900' : 'text-white md:text-gray-400 hover:text-white/80 md:hover:text-gray-900'}`}>&times;</button>
 
         {showOtpScreen ? (
           <div className="w-full h-full relative z-[105] bg-white">
             <OtpVerification email={registeredEmail} onVerified={handleOtpSuccess} onCancel={() => setShowOtpScreen(false)} isAgentMode={isAgentMode} />
+          </div>
+        ) : showForgotPassword ? (
+          <div className="w-full h-full relative z-[105] bg-white">
+            <ForgotPasswordScreen onCancel={() => setShowForgotPassword(false)} onPasswordResetSuccess={() => { setShowForgotPassword(false); setIsSignUp(false); }} />
           </div>
         ) : (
           <>
@@ -279,26 +413,15 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                 </h2>
               </div>
 
-              {/* 👇👇 SAKELAR (TOGGLE) MODE LOGIN 👇👇 */}
               <div className="w-full bg-gray-100 p-1 rounded-xl flex items-center justify-between mb-6 shadow-inner relative">
-                {/* Background Slider */}
                 <div 
                   className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-lg shadow-sm transition-all duration-300 ease-out z-0`}
                   style={{ left: isAgentMode ? 'calc(50% + 2px)' : '4px' }}
                 />
-                
-                <button 
-                  type="button" 
-                  onClick={() => setIsAgentMode(false)}
-                  className={`flex-1 py-2 text-[10px] sm:text-xs font-black uppercase tracking-widest z-10 transition-colors flex items-center justify-center gap-1.5 ${!isAgentMode ? 'text-[#FF6B35]' : 'text-gray-400 hover:text-gray-600'}`}
-                >
+                <button type="button" onClick={() => setIsAgentMode(false)} className={`flex-1 py-2 text-[10px] sm:text-xs font-black uppercase tracking-widest z-10 transition-colors flex items-center justify-center gap-1.5 ${!isAgentMode ? 'text-[#FF6B35]' : 'text-gray-400 hover:text-gray-600'}`}>
                   <UserCircle2 className="w-3.5 h-3.5" /> Reguler
                 </button>
-                <button 
-                  type="button" 
-                  onClick={() => setIsAgentMode(true)}
-                  className={`flex-1 py-2 text-[10px] sm:text-xs font-black uppercase tracking-widest z-10 transition-colors flex items-center justify-center gap-1.5 ${isAgentMode ? 'text-[#FF6B35]' : 'text-gray-400 hover:text-gray-600'}`}
-                >
+                <button type="button" onClick={() => setIsAgentMode(true)} className={`flex-1 py-2 text-[10px] sm:text-xs font-black uppercase tracking-widest z-10 transition-colors flex items-center justify-center gap-1.5 ${isAgentMode ? 'text-[#FF6B35]' : 'text-gray-400 hover:text-gray-600'}`}>
                   <Briefcase className="w-3.5 h-3.5" /> Agen
                 </button>
               </div>
@@ -326,6 +449,15 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                         <AnimatedEyeToggle isVisible={showPassword} />
                       </button>
                     </div>
+
+                    {/* 👇 TOMBOL LUPA PASSWORD 👇 */}
+                    {!isSignUp && (
+                      <div className="flex justify-end w-full">
+                        <button type="button" onClick={() => setShowForgotPassword(true)} className="text-[10px] font-bold text-gray-500 hover:text-blue-500 transition-colors uppercase tracking-widest cursor-pointer">
+                          Lupa Password?
+                        </button>
+                      </div>
+                    )}
                     
                     {errorMsg && <p className="text-red-500 text-[10px] text-center font-bold bg-red-50 py-2.5 rounded-xl italic">{errorMsg}</p>}
                     {successMsg && <p className="text-green-600 text-[10px] text-center font-bold bg-green-50 py-2.5 rounded-xl italic">{successMsg}</p>}

@@ -26,7 +26,7 @@ export default function WeddingRSVP() {
   useEffect(() => {
     const fetchEvent = async () => {
       try {
-        const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`);
         if (!res.ok) throw new Error("Event tidak ditemukan");
         const data = await res.json();
         setEvent(data);
@@ -125,7 +125,7 @@ export default function WeddingRSVP() {
       const token = localStorage.getItem("token");
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
-      const response = await fetch('https://my-event-rent.vercel.app/api/tickets/buy', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/tickets/buy`, {
         method: 'POST',
         headers: headers,
         body: JSON.stringify(payload)

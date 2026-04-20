@@ -47,13 +47,13 @@ export default function EventDetail() {
     const fetchEventDetail = async () => {
       try {
         // ✅ URL VERCEL
-        const response = await fetch(`https://my-event-rent.vercel.app/api/events/${id}`);
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`);
         if (!response.ok) throw new Error('Gagal mengambil data event');
         const data = await response.json();
         setEvent(data);
         
         // ✅ URL VERCEL
-        fetch(`https://my-event-rent.vercel.app/api/events/${id}/view`, { method: 'POST' }).catch(() => {});
+        fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/view`, { method: 'POST' }).catch(() => {});
         
         // 👇👇 FIX LIKES (SABUK PENGAMAN KETAT) 👇👇
         const parsedLikes = JSON.parse(localStorage.getItem('likedEvents'));
@@ -76,7 +76,7 @@ export default function EventDetail() {
     if (!user) return showPopup("Login dulu bro buat nyimpen ke Wishlist!", "error");
     try {
       // ✅ URL VERCEL
-      const res = await fetch('https://my-event-rent.vercel.app/api/likes/toggle', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/likes/toggle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id, eventId: event.id })

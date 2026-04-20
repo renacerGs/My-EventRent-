@@ -20,7 +20,7 @@ export default function PersonalInvitation() {
   const guestName = searchParams.get("to") || "Bapak/Ibu/Saudara/i";
 
   useEffect(() => {
-    fetch(`https://my-event-rent.vercel.app/api/events/${id}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`)
       .then(res => res.json())
       .then(data => {
         setEventData(data);

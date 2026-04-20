@@ -48,7 +48,7 @@ export default function ManageEvent() {
   }, []);
 
   const fetchEvents = () => {
-    fetch(`https://my-event-rent.vercel.app/api/events/my?userId=${user.id}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/events/my?userId=${user.id}`)
       .then(res => res.json())
       .then(data => { 
         setMyEvents(Array.isArray(data) ? data : []); 
@@ -135,7 +135,7 @@ export default function ManageEvent() {
   const confirmDelete = async () => {
     if (!eventToDelete) return;
     try {
-      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${eventToDelete}?userId=${user.id}`, { method: 'DELETE' });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${eventToDelete}?userId=${user.id}`, { method: 'DELETE' });
       if (res.ok) {
         setMyEvents(prev => prev.filter(event => event.id !== eventToDelete));
         setEventToDelete(null); 
@@ -156,7 +156,7 @@ export default function ManageEvent() {
     ));
 
     try {
-      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${eventId}/visibility?userId=${user.id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${eventId}/visibility?userId=${user.id}`, {
         method: 'PATCH',
       });
       if (!res.ok) throw new Error("Gagal update di server");

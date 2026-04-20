@@ -1,16 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../supabase';
 import toast from 'react-hot-toast';
 
 // 🔥 IMPORT KOMPONEN DARI FOLDER SHARED
 import CustomDatePicker from './shared/CustomDatePicker';
 import CustomTimePicker from './shared/CustomTimePicker';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 const getCroppedImg = (imageSrc, pixelCrop) => {
   return new Promise((resolve, reject) => {
@@ -197,7 +193,7 @@ export default function CreatePublicEvent() {
           img: publicUrlData.publicUrl 
       };
 
-      const response = await fetch('https://my-event-rent.vercel.app/api/events', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)

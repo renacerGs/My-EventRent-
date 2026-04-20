@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast'; 
+// 👇 IMPORT SUPABASE 👇
+import { supabase } from '../supabase';
 
 const AnimatedSearchNavbar = ({ events, searchQuery, onSearchSelect }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -94,7 +96,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   
-  // 👇 STATE NOTIFIKASI 👇
+  // STATE NOTIFIKASI
   const [notifications, setNotifications] = useState([]);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   const notifRef = useRef(null);
@@ -113,14 +115,48 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Fetch Notifikasi
+  // Fetch Notifikasi Awal & Pasang Listener Realtime
   useEffect(() => {
-    if (user) fetchNotifications();
+    if (!user?.id) return;
+
+    fetchNotifications();
+
+    // 🔥 LISTENER REALTIME SUPABASE 🔥
+    const notifChannel = supabase
+      .channel('navbar-notification-channel')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT', 
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}` // Hemat egress bro!
+        },
+        (payload) => {
+          const newNotif = payload.new;
+          
+          toast.success(
+            <div>
+              <p className="font-bold text-sm mb-1">{newNotif.title}</p>
+              <p className="text-xs text-gray-200 line-clamp-2">{newNotif.message}</p>
+            </div>, 
+            { duration: 5000 }
+          );
+
+          // Taruh notif baru di paling atas dropdown
+          setNotifications(prevNotifs => [newNotif, ...prevNotifs]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(notifChannel);
+    };
   }, [user]);
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch(`https://my-event-rent.vercel.app/api/users/${user.id}/notifications`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${user.id}/notifications`);
       if (res.ok) {
         const data = await res.json();
         setNotifications(data);
@@ -132,7 +168,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
 
   const handleRespondNotif = async (notifId, action) => {
     try {
-      const res = await fetch(`https://my-event-rent.vercel.app/api/notifications/${notifId}/respond?userId=${user.id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications/${notifId}/respond?userId=${user.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action })
@@ -140,7 +176,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
       const data = await res.json();
       if (res.ok) {
         toast.success(data.message);
-        fetchNotifications(); // Reload data
+        fetchNotifications(); 
       } else {
         toast.error(data.message);
       }
@@ -151,10 +187,31 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
 
   const markAsRead = async (notifId) => {
     try {
-      await fetch(`https://my-event-rent.vercel.app/api/notifications/${notifId}/read?userId=${user.id}`, { method: 'PATCH' });
-      fetchNotifications();
+      await fetch(`${import.meta.env.VITE_API_URL}/api/notifications/${notifId}/read?userId=${user.id}`, { method: 'PATCH' });
+      setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, is_read: true } : n));
+      return true;
     } catch (err) {
       console.error(err);
+      return false;
+    }
+  };
+
+  // 👇 FUNGSI NAVIGASI OTOMATIS SAAT NOTIF DI KLIK 👇
+  const handleNotifClick = async (notif) => {
+    setShowNotifDropdown(false); // Tutup dropdown loncengnya
+
+    if (!notif.is_read && notif.type !== 'INVITATION_AGENT') {
+      await markAsRead(notif.id);
+    }
+
+    if (notif.type === 'REPORT_ISSUE' && notif.related_event_id) {
+      navigate(`/manage/event/${notif.related_event_id}?tab=reports`);
+    } 
+    else if (notif.type === 'NEW_APPLICANT' && notif.related_event_id) {
+      navigate(`/manage/event/${notif.related_event_id}?tab=recruitment`);
+    }
+    else if (notif.type === 'PAYOUT_SUCCESS') {
+      navigate(`/agent/wallet`);
     }
   };
 
@@ -231,25 +288,26 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                 {/* Dropdown Notifikasi */}
                 <div className={`absolute right-0 top-full mt-3 w-[280px] md:w-[350px] bg-white rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 transform origin-top-right transition-all duration-300 z-[60] flex flex-col overflow-hidden ${showNotifDropdown ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                   
-                  {/* Header Notif */}
                   <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
                     <h3 className="font-black text-gray-900 text-xs uppercase tracking-widest">Notifikasi</h3>
                     {unreadCount > 0 && <span className="bg-[#FF6B35] text-white px-2 py-0.5 rounded-md text-[9px] font-bold">{unreadCount} Baru</span>}
                   </div>
                   
-                  {/* Container List Notifikasi (Scrollable) */}
                   <div className="max-h-[300px] overflow-y-auto">
                     {notifications.length > 0 ? (
                       notifications.map(notif => (
-                        <div key={notif.id} className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!notif.is_read ? 'bg-orange-50/30' : ''}`} onClick={() => !notif.is_read && notif.type !== 'INVITATION_AGENT' && markAsRead(notif.id)}>
+                        <div 
+                          key={notif.id} 
+                          className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer ${!notif.is_read ? 'bg-orange-50/30' : ''}`} 
+                          onClick={() => handleNotifClick(notif)} // 👇 FUNGSI KLIK DIPASANG DI SINI 👇
+                        >
                           <p className="font-bold text-gray-900 text-sm mb-1">{notif.title}</p>
                           <p className="text-xs text-gray-500 mb-2 leading-relaxed">{notif.message}</p>
                           
-                          {/* Tombol Terima/Tolak Khusus Undangan Agen */}
                           {notif.type === 'INVITATION_AGENT' && !notif.is_read && (
                             <div className="flex gap-2 mt-3">
-                              <button onClick={() => handleRespondNotif(notif.id, 'reject')} className="flex-1 bg-red-50 text-red-500 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-colors">Tolak</button>
-                              <button onClick={() => handleRespondNotif(notif.id, 'accept')} className="flex-1 bg-[#FF6B35] text-white py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-colors shadow-md">Terima</button>
+                              <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'reject'); }} className="flex-1 bg-red-50 text-red-500 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-colors">Tolak</button>
+                              <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'accept'); }} className="flex-1 bg-[#FF6B35] text-white py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-colors shadow-md">Terima</button>
                             </div>
                           )}
                         </div>
@@ -259,7 +317,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                     )}
                   </div>
                   
-                  {/* FOOTER TOMBOL LIHAT SEMUA */}
                   <div className="border-t border-gray-100 bg-gray-50/50 p-2 shrink-0">
                     <button 
                       onClick={() => { 
@@ -320,6 +377,11 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                         <button onClick={() => { navigate('/profile'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-blue-500 rounded-xl transition-all group">
                           <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
                           PROFIL & REKENING
+                        </button>
+
+                        <button onClick={() => { navigate('/agent/wallet'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-emerald-500 rounded-xl transition-all group">
+                          <svg className="w-4 h-4 text-gray-400 group-hover:text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                          DOMPET PENDAPATAN
                         </button>
 
                         <button onClick={() => { navigate('/agent/history'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-blue-500 rounded-xl transition-all group">

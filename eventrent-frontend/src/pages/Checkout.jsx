@@ -87,7 +87,7 @@ export default function Checkout() {
   useEffect(() => {
     const fetchEvent = async () => {
       try {
-        const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`);
         if (!res.ok) throw new Error("Gagal load");
         const data = await res.json();
         setEvent(data);
@@ -201,7 +201,7 @@ export default function Checkout() {
         formAnswers: formAnswers 
       };
       
-      const res = await fetch('https://my-event-rent.vercel.app/api/tickets/buy', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tickets/buy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

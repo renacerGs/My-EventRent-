@@ -1,16 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../supabase';
 import toast from 'react-hot-toast';
 
 // 🔥 IMPORT KOMPONEN DARI FOLDER SHARED
 import CustomDatePicker from './shared/CustomDatePicker';
 import CustomTimePicker from './shared/CustomTimePicker';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 const SectionAccordion = ({ title, isOpen, onToggle, children }) => (
   <div className="bg-slate-900 border border-slate-800 rounded-[24px] shadow-sm overflow-hidden mb-6 transition-all duration-300 hover:border-slate-700">
@@ -89,7 +85,7 @@ export default function EditWeddingEvent() {
   useEffect(() => {
     if (!userId) { navigate('/'); return; }
 
-    fetch(`https://my-event-rent.vercel.app/api/events/${id}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`)
       .then(res => {
         if (!res.ok) throw new Error("Gagal load event");
         return res.json();
@@ -329,7 +325,7 @@ export default function EditWeddingEvent() {
         isPrivate: true      
       };
 
-      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}?userId=${userId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}?userId=${userId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 
       if (res.ok) { 
         setShowSuccessModal(true);

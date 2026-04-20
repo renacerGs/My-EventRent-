@@ -250,6 +250,20 @@ export class AppController {
     return await this.appService.changePassword(id, data);
   }
 
+  @ApiTags('Authentication & Users')
+  @ApiOperation({ summary: 'Minta OTP untuk Lupa Password' })
+  @Post('auth/forgot-password')
+  async forgotPassword(@Body() body: { email: string }) {
+    return await this.appService.sendForgotPasswordOTP(body.email);
+  }
+
+  @ApiTags('Authentication & Users')
+  @ApiOperation({ summary: 'Reset Password dengan OTP' })
+  @Post('auth/reset-password')
+  async resetPassword(@Body() body: { email: string; otpCode: string; newPassword: string }) {
+    return await this.appService.resetPasswordWithOTP(body.email, body.otpCode, body.newPassword);
+  }
+
   @Get('users/:id/scan-history')
   async getScanHistory(@Param('id') id: string) {
     return this.appService.getAgentScanHistory(Number(id));
@@ -315,7 +329,6 @@ export class AppController {
     @Query('page') page?: string, 
     @Query('limit') limit?: string
   ) {
-    // Tangkap query params, ubah ke number. Default: page 1, limit 10
     const pageNum = page ? Number(page) : 1;
     const limitNum = limit ? Number(limit) : 10;
     return await this.appService.getAllActiveJobs(pageNum, limitNum);
@@ -375,5 +388,11 @@ export class AppController {
     @Body() body: { agentId: number, eoId: number, amount: number, proofUrl: string } 
   ) {
     return await this.appService.markAgentPaid(Number(eventId), body.agentId, body.eoId, body.amount, body.proofUrl);
+  }
+
+  // 👇 ENDPOINT BARU UNTUK HALAMAN DOMPET AGEN 👇
+  @Get('users/:id/payouts')
+  async getAgentWalletPayouts(@Param('id') userId: string) {
+    return await this.appService.getAgentPayouts(Number(userId));
   }
 }

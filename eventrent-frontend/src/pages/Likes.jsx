@@ -52,7 +52,7 @@ export default function Likes() {
       try {
         setLoading(true);
         // ✅ URL VERCEL UDAH DISESUAIKAN DI SINI
-        const response = await axios.get(`https://my-event-rent.vercel.app/api/likes/my?userId=${user.id}`);
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/likes/my?userId=${user.id}`);
         
         if (response.data) {
           // ✅ SABUK PENGAMAN BIAR GAK ERROR .map is not a function
@@ -86,7 +86,7 @@ export default function Likes() {
     
     try {
       // ✅ URL VERCEL (Ini udah bener dari lu sebelumnya)
-      await axios.post('https://my-event-rent.vercel.app/api/likes/toggle', {
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/likes/toggle`, {
         userId: user.id,
         eventId: eventToUnlike
       });

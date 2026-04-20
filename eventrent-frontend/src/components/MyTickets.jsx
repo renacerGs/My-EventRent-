@@ -71,7 +71,7 @@ export default function MyTickets() {
       }
       try {
         // ✅ URL VERCEL
-        const response = await axios.get(`https://my-event-rent.vercel.app/api/tickets/my?userId=${user.id}`);
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/tickets/my?userId=${user.id}`);
         
         // ✅ SABUK PENGAMAN (Cek apakah response beneran Array)
         const rawTickets = Array.isArray(response.data) ? response.data : [];

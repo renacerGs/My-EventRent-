@@ -33,7 +33,7 @@ export default function JobBoard() {
   const fetchJobs = async () => {
     try {
       setLoading(true);
-      const res = await fetch('https://my-event-rent.vercel.app/api/jobs');
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs`);
       
       if (res.ok) {
         const data = await res.json();
@@ -67,7 +67,7 @@ export default function JobBoard() {
       setApplyingId(jobId);
       const toastId = toast.loading('Mengirim lamaran...');
 
-      const res = await fetch('https://my-event-rent.vercel.app/api/jobs/apply', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs/apply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jobId: jobId, userId: user.id })

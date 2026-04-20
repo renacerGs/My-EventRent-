@@ -1,16 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../supabase';
 import toast from 'react-hot-toast';
 
 // 🔥 IMPORT KOMPONEN DARI FOLDER SHARED
 import CustomDatePicker from './shared/CustomDatePicker';
 import CustomTimePicker from './shared/CustomTimePicker';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 // --- HELPER COMPONENT: ACCORDION SECTION (Clean White) ---
 const SectionAccordion = ({ title, isOpen, onToggle, children }) => (
@@ -113,7 +109,7 @@ export default function EditPersonalEvent() {
 
     const fetchEventData = async () => {
       try {
-        const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`);
         const data = await res.json();
 
         const formattedSessions = (data.sessions || []).map(s => ({
@@ -377,7 +373,7 @@ export default function EditPersonalEvent() {
         isPrivate: true       // 👈 WAJIB ADA
       };
 
-      const response = await fetch(`https://my-event-rent.vercel.app/api/events/${id}?userId=${userId}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}?userId=${userId}`, {
           method: 'PUT', 
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)

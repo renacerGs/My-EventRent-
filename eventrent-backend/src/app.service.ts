@@ -999,6 +999,75 @@ export class AppService implements OnModuleInit {
     return { message: 'Berhasil diubah' };
   }
 
+  // --- FORGOT PASSWORD SYSTEM ---
+
+  async sendForgotPasswordOTP(email: string) {
+    // Cari user berdasarkan email
+    const res = await this.pool.query('SELECT id, name FROM users WHERE email = $1', [email]);
+    
+    // ANTI-ENUMERATION: Kalau email gak ada, pura-pura sukses aja biar hacker gak tau
+    if (res.rows.length === 0) {
+      return { success: true, message: 'Jika email terdaftar, kode OTP telah dikirim.' };
+    }
+
+    const user = res.rows[0];
+
+    // Bikin OTP Baru (6 Digit) & Expired (15 menit)
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiresAt = new Date(Date.now() + 15 * 60000);
+
+    // Simpan OTP ke database
+    await this.pool.query(
+      `UPDATE users SET otp_code = $1, otp_expires_at = $2 WHERE id = $3`,
+      [otpCode, otpExpiresAt, user.id]
+    );
+
+    // Kirim Email via Nodemailer
+    const mailOptions = {
+      from: '"EventRent Security" <noreply@eventrent.com>',
+      to: email,
+      subject: 'Reset Password Akun EventRent 🔒',
+      html: `
+        <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
+          <h2>Halo ${user.name},</h2>
+          <p>Kami menerima permintaan untuk mereset password Anda. Ini adalah kode OTP Anda:</p>
+          <h1 style="color: #2563EB; letter-spacing: 5px; font-size: 36px; background-color: #eff6ff; padding: 10px; border-radius: 8px; display: inline-block;">${otpCode}</h1>
+          <p style="color: #555;">Kode ini berlaku 15 menit. Jika Anda tidak meminta reset password, abaikan email ini.</p>
+        </div>
+      `,
+    };
+
+    try {
+      await this.transporter.sendMail(mailOptions);
+    } catch (mailError) {
+      console.error('Gagal kirim email OTP reset password:', mailError);
+    }
+
+    return { success: true, message: 'Jika email terdaftar, kode OTP telah dikirim.' };
+  }
+
+  async resetPasswordWithOTP(email: string, otpCode: string, newPassword: string) {
+    const res = await this.pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (res.rows.length === 0) throw new BadRequestException('Verifikasi gagal. Pastikan email dan OTP benar.');
+    
+    const user = res.rows[0];
+
+    // Validasi OTP
+    if (user.otp_code !== otpCode) throw new BadRequestException('Kode OTP salah!');
+    if (new Date() > new Date(user.otp_expires_at)) throw new BadRequestException('Kode OTP sudah kedaluwarsa. Silakan minta ulang.');
+
+    // Hash Password Baru
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update Password & Bersihkan OTP
+    await this.pool.query(
+      `UPDATE users SET password = $1, otp_code = NULL, otp_expires_at = NULL WHERE id = $2`,
+      [hashedNewPassword, user.id]
+    );
+
+    return { success: true, message: 'Password berhasil diubah!' };
+  }
+
   // --- RIWAYAT SCAN AGEN ---
   async getAgentScanHistory(userId: number) {
     try {
@@ -1168,20 +1237,30 @@ export class AppService implements OnModuleInit {
   // Tambahkan parameter default page dan limit
   async getAllActiveJobs(page: number = 1, limit: number = 10) {
     try {
-      // Hitung Offset
       const offset = (page - 1) * limit; 
       
       const query = `
-        SELECT j.*, e.title as event_title, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date
+        SELECT 
+          j.*, 
+          e.title as event_title, 
+          TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date,
+          e.image_url as event_img,
+          e.city as event_location,
+          u.name as eo_name,
+          u.picture as eo_pic
         FROM job_postings j
         JOIN events e ON j.event_id = e.id
-        WHERE j.is_active = TRUE
+        JOIN users u ON j.eo_id = u.id
+        WHERE j.is_active = TRUE 
+        AND e.event_end >= CURRENT_DATE -- 🔥 Kunci: Event basi otomatis hilang
         ORDER BY j.created_at DESC
-        LIMIT $1 OFFSET $2 -- 👇 PENTING UNTUK PAGINATION 👇
+        LIMIT $1 OFFSET $2
       `;
       const { rows } = await this.pool.query(query, [limit, offset]);
-      return rows;
+      
+      return rows; // ✅ Balikin sebagai ARRAY murni biar frontend lu gak meledak
     } catch (err) {
+      console.error('Error getAllActiveJobs:', err);
       throw new InternalServerErrorException('Gagal mengambil daftar lowongan');
     }
   }
@@ -1203,19 +1282,56 @@ export class AppService implements OnModuleInit {
 
   // 4. User Ngirim Lamaran
   async applyForJob(jobId: number, userId: number) {
+    const client = await this.pool.connect();
     try {
+      await client.query('BEGIN'); // Pakai transaction biar aman
+
+      // 1. Simpan data lamarannya
       const query = `
         INSERT INTO job_applications (job_id, user_id, status)
         VALUES ($1, $2, 'PENDING')
         RETURNING *
       `;
-      const { rows } = await this.pool.query(query, [jobId, userId]);
-      return rows[0];
+      const { rows } = await client.query(query, [jobId, userId]);
+      const application = rows[0];
+
+      // 2. Ambil info EO, Event, dan Nama si Pelamar buat isi Notif
+      const infoQuery = `
+        SELECT j.eo_id, j.event_id, j.role, u.name as applicant_name, e.title as event_title
+        FROM job_postings j
+        JOIN users u ON u.id = $2
+        JOIN events e ON j.event_id = e.id
+        WHERE j.id = $1
+      `;
+      const infoRes = await client.query(infoQuery, [jobId, userId]);
+      
+      // 3. Kirim Notif ke EO
+      if (infoRes.rows.length > 0) {
+        const info = infoRes.rows[0];
+        
+        await client.query(
+          `INSERT INTO notifications (user_id, title, message, type, related_event_id)
+           VALUES ($1, $2, $3, 'NEW_APPLICANT', $4)`,
+          [
+            info.eo_id, // Dikirim ke ID si EO
+            'Pelamar Baru! 🚀', 
+            `${info.applicant_name} melamar untuk posisi ${info.role} di event ${info.event_title}. Cek tab Recruitment sekarang!`, 
+            info.event_id
+          ]
+        );
+      }
+
+      await client.query('COMMIT');
+      return application;
     } catch (err: any) {
+      await client.query('ROLLBACK');
       if (err.code === '23505') { 
         throw new BadRequestException('Lu udah pernah ngelamar di posisi ini bro!');
       }
+      console.error(err);
       throw new InternalServerErrorException('Gagal mengirim lamaran');
+    } finally {
+      client.release();
     }
   }
 
@@ -1395,6 +1511,24 @@ export class AppService implements OnModuleInit {
       if (err instanceof UnauthorizedException) throw err;
       console.error('Error deleteJobPosting:', err);
       throw new InternalServerErrorException('Gagal menghapus lowongan kerja.');
+    }
+  }
+
+  // 👇 FUNGSI BARU BUAT AMBIL RIWAYAT DOMPET AGEN 👇
+  async getAgentPayouts(agentId: number) {
+    try {
+      const query = `
+        SELECT ap.id, ap.event_id, e.title AS event_title, ap.amount, ap.status, ap.paid_at, ap.proof_url 
+        FROM agent_payouts ap
+        JOIN events e ON ap.event_id = e.id -- 👈 Kunci utamanya di sini (JOIN)
+        WHERE ap.agent_id = $1 AND ap.status = 'PAID'
+        ORDER BY ap.paid_at DESC
+      `;
+      const result = await this.pool.query(query, [agentId]);
+      return result.rows; 
+    } catch (err) {
+      console.error(err);
+      throw new InternalServerErrorException('Gagal mengambil data pendapatan agen');
     }
   }
 }

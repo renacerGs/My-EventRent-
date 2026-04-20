@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../supabase';
 import toast from 'react-hot-toast';
 
 import CustomDatePicker from './shared/CustomDatePicker';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 const formatDateForInput = (dateStr) => {
   if (!dateStr || dateStr.includes('TBA') || dateStr.includes('-')) return '';
@@ -48,7 +44,7 @@ export default function EditPublicEvent() {
   useEffect(() => {
     if (!userId) { navigate('/'); return; }
 
-    fetch(`https://my-event-rent.vercel.app/api/events/${id}`) 
+    fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`) 
       .then(res => {
         if (!res.ok) throw new Error("Gagal load event");
         return res.json();
@@ -130,7 +126,7 @@ export default function EditPublicEvent() {
         isPrivate: false 
       };
 
-      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}?userId=${userId}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}?userId=${userId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

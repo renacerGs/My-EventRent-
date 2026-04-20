@@ -23,7 +23,7 @@ export default function WeddingInvitation() {
   useEffect(() => {
     const fetchEvent = async () => {
       try {
-        const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`);
         if (!res.ok) throw new Error('Undangan tidak ditemukan');
         const data = await res.json();
         setEvent(data);

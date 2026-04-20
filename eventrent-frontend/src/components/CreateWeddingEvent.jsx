@@ -1,16 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '../supabase';
 import toast from 'react-hot-toast';
 
 // 🔥 IMPORT KOMPONEN DARI FOLDER SHARED
 import CustomDatePicker from './shared/CustomDatePicker';
 import CustomTimePicker from './shared/CustomTimePicker';
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 const SectionAccordion = ({ title, isOpen, onToggle, children }) => (
   <div className="bg-slate-900 border border-slate-800 rounded-[24px] shadow-sm overflow-hidden mb-6 transition-all duration-300">
@@ -191,7 +187,7 @@ export default function CreateWeddingEvent() {
       const finalEventDetails = { ...eventDetails, profiles: uploadedProfiles, galleryImages: uploadedGallery };
       const payload = { ...formData, userId: user.id, img: coverUrl, eventDetails: finalEventDetails };
 
-      const response = await fetch('https://my-event-rent.vercel.app/api/events', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 
       if (response.ok) { navigate('/manage'); } 
       else { const errorData = await response.json(); toast.error("Gagal membuat undangan: " + (errorData.message || 'Server error')); }

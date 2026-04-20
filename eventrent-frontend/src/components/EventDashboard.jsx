@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { supabase } from '../supabase';
 
 export default function EventDashboard() {
   const { id } = useParams();
@@ -27,7 +28,13 @@ export default function EventDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10; 
 
-  const [activeTab, setActiveTab] = useState('attendees'); 
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(tabFromUrl || 'attendees');
+  useEffect(() => {
+    if (tabFromUrl) setActiveTab(tabFromUrl);
+  }, [tabFromUrl]);
+
   const [agents, setAgents] = useState([]);
   const [agentEmailInput, setAgentEmailInput] = useState('');
   const [agentDetailModal, setAgentDetailModal] = useState(null); 
@@ -38,7 +45,7 @@ export default function EventDashboard() {
   // STATE RECRUITMENT
   const [jobs, setJobs] = useState([]);
   const [applicants, setApplicants] = useState([]);
-  const [newJob, setNewJob] = useState({ role: '', quota: '', fee: '', description: '' });
+  const [newJob, setNewJob] = useState({ role: '', sessionName: 'Semua Sesi', quota: '', fee: '', description: '' });      
   const [isCreatingJob, setIsCreatingJob] = useState(false);
   const [showRecruitmentModal, setShowRecruitmentModal] = useState(false); 
 
@@ -47,19 +54,20 @@ export default function EventDashboard() {
   const [showPayoutModal, setShowPayoutModal] = useState(false); 
   const [selectedAgentPayout, setSelectedAgentPayout] = useState(null);
   const [payoutAmountInput, setPayoutAmountInput] = useState('');
-  // 👇 STATE BARU UNTUK ANIMASI CHECKOUT PAYOUT
   const [payoutProcessStatus, setPayoutProcessStatus] = useState('idle'); 
+  // 👇 STATE BARU: FILE BUKTI TF 👇
+  const [proofFile, setProofFile] = useState(null);
 
   const fetchData = async (isBackground = false) => {
     try {
       if (isBackground) setIsRefreshing(true);
       else setLoading(true);
       
-      const resEvent = await fetch(`https://my-event-rent.vercel.app/api/events/${id}`);
+      const resEvent = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`);
       if (!resEvent.ok) throw new Error("Gagal mengambil event");
       const eventData = await resEvent.json();
 
-      const resAttendees = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/attendees?userId=${user?.id}`);
+      const resAttendees = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/attendees?userId=${user?.id}`);
       const dataAttendees = await resAttendees.json();
 
       const groupedMap = new Map();
@@ -107,7 +115,7 @@ export default function EventDashboard() {
 
   const fetchAgents = async () => {
     try {
-      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/agents?eoId=${user?.id}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/agents?eoId=${user?.id}`);
       if (res.ok) {
         const data = await res.json();
         if(Array.isArray(data)) setAgents(data);
@@ -119,7 +127,7 @@ export default function EventDashboard() {
 
   const fetchReports = async () => {
     try {
-      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/reports?eoId=${user?.id}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/reports?eoId=${user?.id}`);
       if (res.ok) {
         const data = await res.json();
         setReports(data);
@@ -131,10 +139,10 @@ export default function EventDashboard() {
 
   const fetchRecruitmentData = async () => {
     try {
-      const resJobs = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/jobs?eoId=${user?.id}`);
+      const resJobs = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/jobs?eoId=${user?.id}`);
       if (resJobs.ok) setJobs(await resJobs.json());
 
-      const resApps = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/applicants?eoId=${user?.id}`);
+      const resApps = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/applicants?eoId=${user?.id}`);
       if (resApps.ok) setApplicants(await resApps.json());
     } catch (err) {
       console.error("Gagal narik data recruitment", err);
@@ -143,7 +151,7 @@ export default function EventDashboard() {
 
   const fetchPayouts = async () => {
     try {
-      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/payouts?eoId=${user?.id}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/payouts?eoId=${user?.id}`);
       if (res.ok) setPayouts(await res.json());
     } catch (err) {
       console.error("Gagal narik data payout", err);
@@ -153,7 +161,7 @@ export default function EventDashboard() {
   const handleResolveReport = async (reportId) => {
     const toastId = toast.loading("Memproses...");
     try {
-      const res = await fetch(`https://my-event-rent.vercel.app/api/reports/${reportId}/resolve?eoId=${user?.id}`, { method: 'PATCH' });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/reports/${reportId}/resolve?eoId=${user?.id}`, { method: 'PATCH' });
       if (res.ok) {
         toast.success("Kendala berhasil ditandai selesai!", { id: toastId });
         fetchReports();
@@ -170,14 +178,19 @@ export default function EventDashboard() {
     setIsCreatingJob(true);
     const toastId = toast.loading('Membuka lowongan...');
     
+    // 👇 TRIK CERDAS: Gabungin nama tugas sama nama sesi 👇
+    const finalRole = newJob.sessionName === 'Semua Sesi' 
+      ? newJob.role 
+      : `${newJob.role} [${newJob.sessionName}]`;
+
     try {
-      const res = await fetch('https://my-event-rent.vercel.app/api/jobs', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           eventId: id,
           eoId: user?.id,
-          role: newJob.role,
+          role: finalRole, // 👈 Kita kirim nama tugas yang udah digabung
           quota: parseInt(newJob.quota),
           fee: parseInt(newJob.fee),
           description: newJob.description
@@ -187,7 +200,8 @@ export default function EventDashboard() {
       
       if (res.ok) {
         toast.success('Lowongan berhasil dibuka!', { id: toastId });
-        setNewJob({ role: '', quota: '', fee: '', description: '' });
+        // Reset form ke awal
+        setNewJob({ role: '', sessionName: 'Semua Sesi', quota: '', fee: '', description: '' });
         fetchRecruitmentData(); 
         setShowRecruitmentModal(false); 
       } else {
@@ -210,7 +224,7 @@ export default function EventDashboard() {
 
     const toastId = toast.loading('Menghapus lowongan...');
     try {
-      const res = await fetch(`https://my-event-rent.vercel.app/api/jobs/${jobId}?eoId=${user?.id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs/${jobId}?eoId=${user?.id}`, {
         method: 'DELETE'
       });
       const data = await res.json();
@@ -232,7 +246,7 @@ export default function EventDashboard() {
     
     const toastId = toast.loading('Memproses lamaran...');
     try {
-      const res = await fetch('https://my-event-rent.vercel.app/api/jobs/respond', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs/respond`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ applicationId: appId, action: action, eoId: user?.id })
@@ -254,11 +268,11 @@ export default function EventDashboard() {
     }
   };
 
-  // 👇 FUNGSI MARK PAID YANG UDAH DI UPDATE PAKE ANIMASI & POP-UP ERROR CUSTOM 👇
+  // 👇 FUNGSI MARK PAID YANG UDAH DI UPDATE (UPLOAD BUKTI SUPABASE) 👇
   const executeMarkPaid = async () => {
     const amount = payoutAmountInput || 0;
-    if (amount <= 0) {
-      toast.error('Isi nominal transfernya dulu bro!');
+    if (amount <= 0 || !proofFile) {
+      toast.error('Isi nominal transfer dan upload bukti struknya dulu bro!');
       return;
     }
 
@@ -269,22 +283,48 @@ export default function EventDashboard() {
     setPayoutProcessStatus('processing');
 
     try {
-      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/payouts/pay`, {
+      // 1. UPLOAD GAMBAR KE SUPABASE STORAGE
+      const fileExt = proofFile.type === 'image/webp' ? 'webp' : proofFile.name ? proofFile.name.split('.').pop() : 'jpg';
+      const fileName = `receipt-${agentId}-${Date.now()}-${Math.floor(Math.random()*1000)}.${fileExt}`; 
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('payout-receipts') // Pastikan lu beneran udah bikin bucket nama ini di Supabase lu
+        .upload(fileName, proofFile, { upsert: false });
+
+      if (uploadError) {
+        throw new Error('Gagal upload bukti transfer ke Supabase');
+      }
+
+      // 2. DAPETIN PUBLIC URL GAMBARNYA
+      const { data: publicUrlData } = supabase.storage
+        .from('payout-receipts')
+        .getPublicUrl(fileName);
+        
+      const uploadedProofUrl = publicUrlData.publicUrl;
+
+      // 3. HIT API NESTJS DENGAN PROOF URL
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/payouts/pay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agentId, eoId: user?.id, amount: Number(amount) })
+        body: JSON.stringify({ 
+          agentId, 
+          eoId: user?.id, 
+          amount: Number(amount),
+          proofUrl: uploadedProofUrl 
+        })
       });
       const data = await res.json();
 
       if (res.ok) {
-        setPayoutProcessStatus('success'); // Munculin centang hijau
+        setPayoutProcessStatus('success'); 
         fetchPayouts(); 
 
         setTimeout(() => {
           setShowPayoutModal(false);
           setSelectedAgentPayout(null);
           setPayoutAmountInput('');
-          setPayoutProcessStatus('idle'); // Reset kembali normal
+          setProofFile(null); // Reset state file
+          setPayoutProcessStatus('idle'); 
         }, 2000);
       } else {
         setPayoutProcessStatus('idle');
@@ -296,10 +336,10 @@ export default function EventDashboard() {
             message: data.message || 'Gagal memproses pembayaran.', 
             type: 'error' 
           });
-        }, 300); // Kasih delay 300ms biar transisi tutup-buka modalnya smooth
+        }, 300);
       }
     } catch (err) {
-      toast.error('Terjadi kesalahan jaringan.');
+      toast.error(err.message || 'Terjadi kesalahan jaringan.');
       setPayoutProcessStatus('idle');
     }
   };
@@ -323,7 +363,7 @@ export default function EventDashboard() {
     e.preventDefault();
     if (!agentEmailInput) return;
     try {
-      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/agents?eoId=${user?.id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/agents?eoId=${user?.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: agentEmailInput, role: 'Panitia' })
@@ -346,7 +386,7 @@ export default function EventDashboard() {
     const agentId = confirmRemoveAgent.agentId;
     setConfirmRemoveAgent({ show: false, agentId: null });
     try {
-      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/agents/${agentId}?eoId=${user?.id}`, { method: 'DELETE' });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/agents/${agentId}?eoId=${user?.id}`, { method: 'DELETE' });
       if (res.ok) {
         toast.success('Agen berhasil diberhentikan.');
         fetchAgents(); 
@@ -361,7 +401,7 @@ export default function EventDashboard() {
 
   const submitEditRole = async () => {
     try {
-      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${id}/agents/${agentEditRole.agentId}?eoId=${user?.id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/agents/${agentEditRole.agentId}?eoId=${user?.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: agentEditRole.role, rating_given: agentEditRole.rating_given })
@@ -386,7 +426,7 @@ export default function EventDashboard() {
     const ticketId = confirmDialog.ticketId;
     setConfirmDialog({ show: false, ticketId: null }); 
     try {
-      const res = await fetch('https://my-event-rent.vercel.app/api/tickets/scan', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tickets/scan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticketId: ticketId, eventId: parseInt(id), userId: user?.id })
@@ -509,6 +549,22 @@ export default function EventDashboard() {
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Tugas / Posisi</label>
                 <input type="text" value={newJob.role} onChange={e => setNewJob({...newJob, role: e.target.value})} placeholder="Misal: Penjaga Pintu A" required className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" />
               </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Sesi Event</label>
+                <select 
+                  value={newJob.sessionName} 
+                  onChange={e => setNewJob({...newJob, sessionName: e.target.value})} 
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all appearance-none"
+                >
+                  <option value="Semua Sesi">Semua Sesi (Full Day)</option>
+                  {/* Looping data sesi yang udah ada di event ini */}
+                  {event?.sessions?.map(s => (
+                    <option key={s.id} value={s.name}>
+                      {s.name} {s.start_time ? `(${s.start_time.slice(0,5)} - ${s.end_time.slice(0,5)})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Kuota Orang</label>
@@ -531,20 +587,28 @@ export default function EventDashboard() {
         </div>
       )}
 
-      {/* ======================= MODAL PENGGAJIAN (UPDATE GAYA CHECKOUT) ======================= */}
+      {/* ======================= MODAL PENGGAJIAN (UPDATE UPLOAD BUKTI) ======================= */}
       {showPayoutModal && selectedAgentPayout && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
           <div className="rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl relative bg-white">
             
             {/* Tampil Pas Mode Input (Idle) */}
             {payoutProcessStatus === 'idle' && (
-              <button onClick={() => { setShowPayoutModal(false); setSelectedAgentPayout(null); setPayoutAmountInput(''); }} className="absolute top-5 right-5 rounded-full w-8 h-8 flex items-center justify-center transition-colors text-gray-400 bg-gray-100 hover:text-gray-900 z-10">
+              <button 
+                onClick={() => { 
+                  setShowPayoutModal(false); 
+                  setSelectedAgentPayout(null); 
+                  setPayoutAmountInput(''); 
+                  setProofFile(null); // Reset File saat modal ditutup
+                }} 
+                className="absolute top-5 right-5 rounded-full w-8 h-8 flex items-center justify-center transition-colors text-gray-400 bg-gray-100 hover:text-gray-900 z-10"
+              >
                 ✕
               </button>
             )}
 
             {payoutProcessStatus === 'idle' && (
-              <div className="p-8 pt-10">
+              <div className="p-8 pt-10 max-h-[90vh] overflow-y-auto hide-scrollbar">
                 <div className="w-16 h-16 bg-emerald-50 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
@@ -560,7 +624,7 @@ export default function EventDashboard() {
                    <p className="text-[10px] text-gray-500 font-bold uppercase mt-1">A.N {selectedAgentPayout.bank_account_name || '-'}</p>
                 </div>
 
-                <div className="mb-8">
+                <div className="mb-4">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block text-center">Nominal Ditransfer (Rp)</label>
                   <div className="relative">
                     <span className="absolute left-5 top-1/2 -translate-y-1/2 font-black text-gray-400">Rp</span>
@@ -575,11 +639,24 @@ export default function EventDashboard() {
                   </div>
                 </div>
 
+                {/* 👇 BAGIAN INPUT FILE BUKTI TF 👇 */}
+                <div className="mb-8">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block text-center">
+                    Upload Bukti Transfer (JPG/PNG)
+                  </label>
+                  <input 
+                    type="file"
+                    accept="image/jpeg, image/png, image/jpg"
+                    onChange={(e) => setProofFile(e.target.files[0])}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-xs font-bold text-gray-700 focus:outline-none focus:border-emerald-500 transition-all cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-[10px] file:font-black file:uppercase file:tracking-widest file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                  />
+                </div>
+
                 <button 
                   onClick={executeMarkPaid} 
                   className="w-full py-4 bg-emerald-500 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-600 shadow-xl shadow-emerald-200 transition-all active:scale-95"
                 >
-                  Konfirmasi Lunas
+                  Konfirmasi Lunas & Upload
                 </button>
               </div>
             )}
@@ -591,7 +668,7 @@ export default function EventDashboard() {
                   <>
                     <div className="w-16 h-16 border-4 rounded-full animate-spin mb-6 border-gray-100 border-t-emerald-500"></div>
                     <h3 className="text-lg font-black uppercase tracking-wide text-gray-900">Memverifikasi...</h3>
-                    <p className="text-xs mt-2 font-medium text-gray-500">Menyimpan data pembayaran</p>
+                    <p className="text-xs mt-2 font-medium text-gray-500">Mengupload bukti & menyimpan data pembayaran</p>
                   </>
                 ) : (
                   <>
@@ -599,7 +676,7 @@ export default function EventDashboard() {
                       <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                     </div>
                     <h3 className="text-2xl font-black uppercase tracking-tight text-gray-900">Pembayaran Sukses!</h3>
-                    <p className="text-sm mt-2 font-medium text-gray-500">Notifikasi gaji cair telah dikirim ke agen.</p>
+                    <p className="text-sm mt-2 font-medium text-gray-500">Bukti TF & notifikasi gaji telah dikirim ke agen.</p>
                   </>
                 )}
               </div>
@@ -1168,6 +1245,7 @@ export default function EventDashboard() {
                             onClick={() => {
                               setSelectedAgentPayout(agent);
                               setPayoutAmountInput('');
+                              setProofFile(null); // Reset file sebelum buka
                               setShowPayoutModal(true);
                             }}
                             className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-sm active:scale-95 transition-all"

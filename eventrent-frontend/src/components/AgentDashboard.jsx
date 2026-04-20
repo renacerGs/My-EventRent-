@@ -37,7 +37,7 @@ export default function AgentDashboard() {
   const fetchAssignedEvents = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`https://my-event-rent.vercel.app/api/users/${user.id}/assigned-events`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${user.id}/assigned-events`);
       if (res.ok) {
         const data = await res.json();
         setAssignedEvents(data);
@@ -61,7 +61,7 @@ export default function AgentDashboard() {
   const fetchGuestList = async (eventId) => {
     try {
       setLoadingAttendees(true);
-      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${eventId}/attendees?userId=${user.id}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${eventId}/attendees?userId=${user.id}`);
       if (res.ok) {
         const data = await res.json();
         setAttendees(data);
@@ -80,7 +80,7 @@ export default function AgentDashboard() {
     
     try {
       const toastId = toast.loading('Memproses Check-In...');
-      const res = await fetch('https://my-event-rent.vercel.app/api/tickets/scan', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tickets/scan`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ticketId: ticketId, eventId: parseInt(eventId), userId: user.id })
@@ -109,7 +109,7 @@ export default function AgentDashboard() {
     try {
       setIsSendingEmergency(true);
       // Nembak API Laporan Darurat ke TABEL BARU
-      const res = await fetch(`https://my-event-rent.vercel.app/api/events/${selectedEvent.id}/reports`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${selectedEvent.id}/reports`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
