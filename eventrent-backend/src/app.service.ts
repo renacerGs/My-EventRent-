@@ -1339,13 +1339,13 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  async markAgentPaid(eventId: number, agentId: number, eoId: number, amount: number) {
+  async markAgentPaid(eventId: number, agentId: number, eoId: number, amount: number, proofUrl: string) { // <-- Tambah parameter
     try {
       const check = await this.pool.query('SELECT id, title FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
       if (check.rows.length === 0) throw new UnauthorizedException('Akses ditolak.');
       const eventTitle = check.rows[0].title;
 
-      // 👇 TAMBAHAN: Validasi Anti Double-Payout 👇
+      // Validasi Anti Double-Payout
       const checkPaid = await this.pool.query(
         `SELECT id FROM agent_payouts WHERE event_id = $1 AND agent_id = $2 AND status = 'PAID'`,
         [eventId, agentId]
@@ -1353,22 +1353,23 @@ export class AppService implements OnModuleInit {
       if (checkPaid.rows.length > 0) {
         throw new BadRequestException('Bro, agen ini sudah lu bayar lunas sebelumnya!');
       }
-      // 👆 ===================================== 👆
 
+      // 👇 INSERT dengan tambahan proof_url 👇
       const query = `
-        INSERT INTO agent_payouts (event_id, agent_id, amount, status, paid_at)
-        VALUES ($1, $2, $3, 'PAID', NOW())
+        INSERT INTO agent_payouts (event_id, agent_id, amount, status, paid_at, proof_url)
+        VALUES ($1, $2, $3, 'PAID', NOW(), $4)
         RETURNING *;
       `;
-      const res = await this.pool.query(query, [eventId, agentId, amount]);
+      const res = await this.pool.query(query, [eventId, agentId, amount, proofUrl]);
 
+      // 👇 Update pesan notifikasi biar lebih profesional 👇
       await this.pool.query(
         `INSERT INTO notifications (user_id, title, message, type, related_event_id)
          VALUES ($1, $2, $3, 'PAYOUT_SUCCESS', $4)`,
-        [agentId, 'Gajian Cair! 💸', `EO telah mentransfer fee kamu sebesar Rp ${amount.toLocaleString('id-ID')} untuk event ${eventTitle}. Cek rekening kamu ya!`, eventId]
+        [agentId, 'Gajian Cair! 💸', `EO telah mengirimkan honor Rp ${amount.toLocaleString('id-ID')} untuk event ${eventTitle}. Cek riwayat untuk melihat bukti transfer.`, eventId]
       );
 
-      return { message: 'Berhasil ditandai lunas!', data: res.rows[0] };
+      return { message: 'Berhasil ditandai lunas dan bukti tersimpan!', data: res.rows[0] };
     } catch (err) {
       if (err instanceof UnauthorizedException || err instanceof BadRequestException) throw err;
       throw new InternalServerErrorException('Gagal memproses pembayaran agen');

@@ -372,9 +372,8 @@ export class AppController {
   @Post('events/:id/payouts/pay')
   async markPaid(
     @Param('id') eventId: string,
-    @Body() body: { agentId: number, eoId: number, amount: number }
+    @Body() body: { agentId: number, eoId: number, amount: number, proofUrl: string } 
   ) {
-    // Logic pencegahan Double-Payout di service akan otomatis menolak request jika sudah lunas
-    return await this.appService.markAgentPaid(Number(eventId), body.agentId, body.eoId, body.amount);
+    return await this.appService.markAgentPaid(Number(eventId), body.agentId, body.eoId, body.amount, body.proofUrl);
   }
 }
