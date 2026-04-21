@@ -849,21 +849,51 @@ export class AppService implements OnModuleInit {
 
   async registerUser(data: any) {
     const checkRes = await this.pool.query('SELECT * FROM users WHERE email = $1', [data.email]);
-    if (checkRes.rows.length > 0) throw new BadRequestException('Email sudah terdaftar!');
     
+    let isGoogleUserWithoutPassword = false;
+    let existingUserId = null;
+
+    if (checkRes.rows.length > 0) {
+      const existingUser = checkRes.rows[0];
+      
+      // 🔥 INI DIA KUNCINYA BRO! 🔥
+      // Kalau email udah ada, TAPI passwordnya masih kosong (NULL), kita ijinin dia lanjut!
+      if (existingUser.password === null) {
+        isGoogleUserWithoutPassword = true;
+        existingUserId = existingUser.id;
+      } else {
+        // Kalau passwordnya udah ada isinya, baru beneran kita tolak!
+        throw new BadRequestException('Email sudah terdaftar!');
+      }
+    }
+    
+    // Hash password manual yang dia ketik
     const hashedPassword = await bcrypt.hash(data.password, 10);
-    const defaultPic = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(data.name)}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4`;
-    
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpiresAt = new Date(Date.now() + 15 * 60000); 
 
-    const insertRes = await this.pool.query(
-      `INSERT INTO users (name, email, password, picture, is_verified, otp_code, otp_expires_at) 
-       VALUES ($1, $2, $3, $4, FALSE, $5, $6) RETURNING *`,
-      [data.name, data.email, hashedPassword, defaultPic, otpCode, otpExpiresAt]
-    );
-    
-    const newUser = insertRes.rows[0];
+    let newUser;
+
+    if (isGoogleUserWithoutPassword) {
+      // Kalo dia akun Google, kita UPDATE otp_code sama JANGAN LUPA simpen hashedPassword-nya
+      // Biar ngga ngerubah skema db lu, kita simpen passwordnya langsung aja, TAPI status OTP-nya kita gantungin.
+      // Kalau dia gagal verif OTP, gpp passwordnya keubah, toh dia masih bisa login pake Google-nya kan.
+      const updateRes = await this.pool.query(
+        `UPDATE users SET password = $1, otp_code = $2, otp_expires_at = $3 WHERE id = $4 RETURNING *`,
+        [hashedPassword, otpCode, otpExpiresAt, existingUserId]
+      );
+      newUser = updateRes.rows[0];
+    } else {
+      // Kalo murni user baru, jalanin kayak biasa
+      const defaultPic = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(data.name)}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4`;
+      
+      const insertRes = await this.pool.query(
+        `INSERT INTO users (name, email, password, picture, is_verified, otp_code, otp_expires_at) 
+         VALUES ($1, $2, $3, $4, FALSE, $5, $6) RETURNING *`,
+        [data.name, data.email, hashedPassword, defaultPic, otpCode, otpExpiresAt]
+      );
+      newUser = insertRes.rows[0];
+    }
 
     const mailOptions = {
       from: '"EventRent Team" <noreply@eventrent.com>',
@@ -871,7 +901,7 @@ export class AppService implements OnModuleInit {
       subject: 'Kode Verifikasi Akun EventRent 🎟️',
       html: `
         <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
-          <h2>Halo ${data.name}, selamat datang!</h2>
+          <h2>Halo ${data.name || newUser.name}, selamat datang!</h2>
           <p>Ini adalah kode verifikasi OTP kamu untuk EventRent:</p>
           <h1 style="color: #EE7354; letter-spacing: 5px; font-size: 36px; background-color: #fefce8; padding: 10px; border-radius: 8px; display: inline-block;">${otpCode}</h1>
           <p style="color: #555;">Kode ini hanya berlaku 15 menit. Jangan bagikan kepada siapapun!</p>
@@ -885,15 +915,19 @@ export class AppService implements OnModuleInit {
       console.error('Gagal kirim email OTP:', mailError);
     }
 
-    await this.pool.query(
-      `UPDATE tickets SET user_id = $1 WHERE guest_email = $2 AND user_id IS NULL`,
-      [newUser.id, newUser.email]
-    );
-    console.log(`[Auth] Auto-merged guest tickets for: ${newUser.email}`);
+    if (!isGoogleUserWithoutPassword) {
+      await this.pool.query(
+        `UPDATE tickets SET user_id = $1 WHERE guest_email = $2 AND user_id IS NULL`,
+        [newUser.id, newUser.email]
+      );
+      console.log(`[Auth] Auto-merged guest tickets for: ${newUser.email}`);
+    }
 
     return {
       success: true,
-      message: 'Registrasi berhasil. Silakan cek email untuk kode verifikasi.',
+      message: isGoogleUserWithoutPassword 
+        ? 'Akun Google terdeteksi. Silakan cek email lu buat verifikasi password manual ini.'
+        : 'Registrasi berhasil. Silakan cek email untuk kode verifikasi.',
       userId: newUser.id,
       email: newUser.email
     };
@@ -905,7 +939,9 @@ export class AppService implements OnModuleInit {
     
     const user = res.rows[0];
 
-    if (user.is_verified) throw new BadRequestException('Akun ini sudah terverifikasi');
+    // Dihapus sementara check is_verified, karena akun Google itu is_verified-nya udah TRUE sejak awal.
+    // Tapi karena dia mau nyantolin password, kita butuh OTP-nya jalan.
+    
     if (user.otp_code !== otpCode) throw new BadRequestException('Kode OTP salah!');
     if (new Date() > new Date(user.otp_expires_at)) throw new BadRequestException('Kode OTP sudah kedaluwarsa. Silakan minta kode baru.');
 
@@ -929,7 +965,9 @@ export class AppService implements OnModuleInit {
     if (res.rows.length === 0) throw new BadRequestException('User tidak ditemukan');
     
     const user = res.rows[0];
-    if (user.is_verified) throw new BadRequestException('Akun ini sudah terverifikasi');
+    
+    // Ngga masalah walaupun udah verified (karena bisa jadi ini user Google yang lagi mau set password)
+    // if (user.is_verified) throw new BadRequestException('Akun ini sudah terverifikasi');
 
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpiresAt = new Date(Date.now() + 15 * 60000); 
@@ -971,9 +1009,12 @@ export class AppService implements OnModuleInit {
       throw new UnauthorizedException('Akun belum terverifikasi! Silakan cek email Anda untuk OTP.');
     }
 
-    if (!user.password) throw new UnauthorizedException('Gunakan Login Google');
+    // Ini validasi bawaan lu, kalau dia nyoba manual tapi belum di set passwordnya, tolak.
+    if (!user.password) throw new UnauthorizedException('Gunakan Login Google atau Daftar Ulang buat bikin password!');
+    
     const isMatch = await bcrypt.compare(data.password, user.password);
     if (!isMatch) throw new UnauthorizedException('Email/Password salah');
+    
     const { password, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }
