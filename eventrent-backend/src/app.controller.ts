@@ -395,4 +395,23 @@ export class AppController {
   async getAgentWalletPayouts(@Param('id') userId: string) {
     return await this.appService.getAgentPayouts(Number(userId));
   }
+
+  @ApiTags('Payments')
+  @ApiOperation({ summary: 'Buat Tagihan Midtrans (Mendukung Filter Metode Pembayaran)' })
+  @Post('payment/test-midtrans')
+  async testMidtrans(@Body() body: { orderId: string, amount: number, name: string, email: string, enabledPayments: string[] }) {
+    return await this.appService.createMidtransTransaction(
+      body.orderId, 
+      body.amount, 
+      { name: body.name, email: body.email },
+      body.enabledPayments // 👈 Ini parameter pentingnya biar Midtrans ngikutin kemauan IO
+    );
+  }
+
+  @ApiTags('Payments')
+  @ApiOperation({ summary: 'Webhook untuk menerima notifikasi otomatis dari Midtrans' })
+  @Post('payment/webhook')
+  async midtransWebhook(@Body() payload: any) {
+    return await this.appService.handleMidtransWebhook(payload);
+  }
 }

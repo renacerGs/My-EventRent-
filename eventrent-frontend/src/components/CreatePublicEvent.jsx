@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import { supabase } from '../supabase';
 import toast from 'react-hot-toast';
+import { Landmark } from 'lucide-react'; // 🔥 Icon bank dari lucide-react
 
 // 🔥 IMPORT KOMPONEN DARI FOLDER SHARED
 import CustomDatePicker from './shared/CustomDatePicker';
@@ -46,6 +47,12 @@ export default function CreatePublicEvent() {
     title: '', description: '', eventStart: '', eventEnd: '', phone: '', category: '',
     isPrivate: false, 
     location: { namePlace: '', place: '', city: '', province: '', mapUrl: '' },
+    // 🔥 STATE BARU: Default QRIS & VA nyala, Transfer Bank mati
+    paymentMethods: {
+      qris: true,
+      va: true,
+      transferBank: false
+    },
     sessions: [
       {
         id: crypto.randomUUID(), name: '', description: '', date: '', startTime: '', endTime: '', 
@@ -99,6 +106,17 @@ export default function CreatePublicEvent() {
       console.error(e);
       toast.error('Gagal memotong gambar!');
     }
+  };
+
+  // 🔥 FUNGSI BARU: Toggle metode pembayaran
+  const togglePaymentMethod = (method) => {
+    setFormData(prev => ({
+      ...prev,
+      paymentMethods: {
+        ...prev.paymentMethods,
+        [method]: !prev.paymentMethods[method]
+      }
+    }));
   };
 
   const handleSessionChange = (index, field, value) => {
@@ -171,6 +189,14 @@ export default function CreatePublicEvent() {
     e.preventDefault();
     if (!imageBase64) return toast.error("Poster/Gambar wajib diupload!");
     if (!formData.eventStart || !formData.eventEnd) return toast.error("Harap isi Tanggal Mulai dan Selesai Event!");
+    
+    // 🔥 VALIDASI: Kalau event-nya Paid, wajib pilih minimal 1 metode bayar
+    const hasPaidSession = formData.sessions.some(s => s.typeEvent === 'Paid');
+    const hasPaymentMethod = formData.paymentMethods.qris || formData.paymentMethods.va || formData.paymentMethods.transferBank;
+    
+    if (hasPaidSession && !hasPaymentMethod) {
+      return toast.error("Pilih minimal satu metode pembayaran untuk tiket berbayar!");
+    }
     
     setIsLoading(true);
     try {
@@ -285,7 +311,6 @@ export default function CreatePublicEvent() {
                 <textarea name="description" value={formData.description} onChange={handleEventChange} rows="4" className={inputStyle} required />
               </div>
               
-              {/* 🔥 TANGGAL EVENT (Tema Public/Orange) */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelStyle}>Event Start</label>
@@ -374,7 +399,6 @@ export default function CreatePublicEvent() {
                   <textarea value={session.description} onChange={(e) => handleSessionChange(sIndex, 'description', e.target.value)} rows="3" className={inputStyle} />
                 </div>
                 
-                {/* 🔥 TANGGAL SESI */}
                 <div>
                   <label className={labelStyle}>Tanggal</label>
                   <CustomDatePicker 
@@ -385,7 +409,6 @@ export default function CreatePublicEvent() {
                   />
                 </div>
                 
-                {/* 🔥 JAM MULAI & SELESAI */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className={labelStyle}>Jam Mulai</label>
@@ -552,6 +575,56 @@ export default function CreatePublicEvent() {
                 </button>
               </div>
             ))}
+          </div>
+
+          {/* 🔥 BAGIAN 5: SETTING METODE PEMBAYARAN 🔥 */}
+          <div className="bg-white border-gray-200 rounded-[24px] shadow-sm p-8 border mt-8">
+            <h2 className="text-xl font-black mb-2 uppercase tracking-widest text-gray-900">Setting Metode Pembayaran Acara</h2>
+            <p className="text-sm text-gray-500 mb-6 font-medium">Pilih metode pembayaran yang Anda terima dari peserta.</p>
+
+            <div className="space-y-4">
+              {/* Opsi QRIS */}
+              <label className={`flex items-center p-4 md:p-5 border-2 rounded-2xl cursor-pointer transition-all ${formData.paymentMethods.qris ? 'border-[#FF6B35] bg-orange-50/50' : 'border-gray-100 hover:bg-gray-50'}`}>
+                <div className="flex items-center justify-center mr-4">
+                  <input type="checkbox" checked={formData.paymentMethods.qris} onChange={() => togglePaymentMethod('qris')} className="w-5 h-5 rounded cursor-pointer accent-[#FF6B35]" />
+                </div>
+                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mr-4 shrink-0 font-black text-xs shadow-sm">
+                  QRIS
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900 md:text-lg">QR Code (QRIS)</p>
+                  <p className="text-xs text-gray-500 mt-0.5">GOPAY, OVO, DANA, DLL.</p>
+                </div>
+              </label>
+
+              {/* Opsi VA */}
+              <label className={`flex items-center p-4 md:p-5 border-2 rounded-2xl cursor-pointer transition-all ${formData.paymentMethods.va ? 'border-[#FF6B35] bg-orange-50/50' : 'border-gray-100 hover:bg-gray-50'}`}>
+                <div className="flex items-center justify-center mr-4">
+                  <input type="checkbox" checked={formData.paymentMethods.va} onChange={() => togglePaymentMethod('va')} className="w-5 h-5 rounded cursor-pointer accent-[#FF6B35]" />
+                </div>
+                <div className="w-12 h-12 bg-gray-100 text-gray-600 rounded-xl flex items-center justify-center mr-4 shrink-0 font-black text-xs shadow-sm border border-gray-200">
+                  VA
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900 md:text-lg">Virtual Account</p>
+                  <p className="text-xs text-gray-500 mt-0.5">BCA, MANDIRI, BNI, BRI, DLL.</p>
+                </div>
+              </label>
+
+              {/* Opsi Transfer Bank */}
+              <label className={`flex items-center p-4 md:p-5 border-2 rounded-2xl cursor-pointer transition-all ${formData.paymentMethods.transferBank ? 'border-[#FF6B35] bg-orange-50/50' : 'border-gray-100 hover:bg-gray-50'}`}>
+                <div className="flex items-center justify-center mr-4">
+                  <input type="checkbox" checked={formData.paymentMethods.transferBank} onChange={() => togglePaymentMethod('transferBank')} className="w-5 h-5 rounded cursor-pointer accent-[#FF6B35]" />
+                </div>
+                <div className="w-12 h-12 bg-gray-100 text-gray-600 rounded-xl flex items-center justify-center mr-4 shrink-0 shadow-sm border border-gray-200">
+                  <Landmark className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900 md:text-lg">Transfer Bank</p>
+                  <p className="text-xs text-gray-500 mt-0.5">BCA, MANDIRI, PERMATA, DLL.</p>
+                </div>
+              </label>
+            </div>
           </div>
 
           <div className="flex justify-between items-center pt-6 border-t mt-10 border-gray-200">

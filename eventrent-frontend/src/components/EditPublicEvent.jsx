@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import toast from 'react-hot-toast';
+import { Landmark } from 'lucide-react'; // 🔥 Import icon bank
 
 import CustomDatePicker from './shared/CustomDatePicker';
 
@@ -24,12 +25,17 @@ export default function EditPublicEvent() {
   const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('user'));
   
-  // 👇 FIX 1: Ambil ID user aja buat nge-trigger useEffect, jangan full object!
   const userId = user?.id;
 
   const [formData, setFormData] = useState({
     title: '', phone: '', category: '', description: '', place: '',
-    namePlace: '', city: '', province: '', mapUrl: '', eventStart: '', eventEnd: '', oldImgUrl: ''
+    namePlace: '', city: '', province: '', mapUrl: '', eventStart: '', eventEnd: '', oldImgUrl: '',
+    // 🔥 STATE BARU: Buat nyimpen payment methods
+    paymentMethods: {
+      qris: true,
+      va: true,
+      transferBank: false
+    }
   });
   
   const [imagePreview, setImagePreview] = useState(null);
@@ -40,7 +46,6 @@ export default function EditPublicEvent() {
 
   const categories = ['Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports', 'Seminar', 'Workshop'];
 
-  // 👇 FIX 2: Ganti array dependency 'user' jadi 'userId'
   useEffect(() => {
     if (!userId) { navigate('/'); return; }
 
@@ -68,7 +73,9 @@ export default function EditPublicEvent() {
           mapUrl: found.map_url || '',
           eventStart: formatDateForInput(found.date_start), 
           eventEnd: formatDateForInput(found.date_end),
-          oldImgUrl: found.img || ''
+          oldImgUrl: found.img || '',
+          // 🔥 NANGKEP DATA DARI DATABASE
+          paymentMethods: found.paymentMethods || { qris: true, va: true, transferBank: false }
         });
         setImagePreview(found.img);
         setIsLoading(false);
@@ -78,7 +85,7 @@ export default function EditPublicEvent() {
         toast.error("Gagal memuat data edit");
         navigate('/manage');
       });
-  }, [id, navigate, userId]); // <--- SEKARANG UDAH AMAN DARI INFINITE LOOP!
+  }, [id, navigate, userId]);
 
   const handleChange = (e) => {
     if (e && e.target) {
@@ -87,6 +94,17 @@ export default function EditPublicEvent() {
     } else if (e && e.name && e.value !== undefined) {
       setFormData(prev => ({ ...prev, [e.name]: e.value }));
     }
+  };
+
+  // 🔥 FUNGSI BARU: Toggle Checkbox Pembayaran
+  const togglePaymentMethod = (method) => {
+    setFormData(prev => ({
+      ...prev,
+      paymentMethods: {
+        ...prev.paymentMethods,
+        [method]: !prev.paymentMethods[method]
+      }
+    }));
   };
 
   const handleImageChange = (e) => {
@@ -99,6 +117,12 @@ export default function EditPublicEvent() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // 🔥 Validasi minimal 1 metode pembayaran kepilih
+    if (!formData.paymentMethods.qris && !formData.paymentMethods.va && !formData.paymentMethods.transferBank) {
+      return toast.error("Minimal harus mengaktifkan satu metode pembayaran!");
+    }
+
     setIsSaving(true);
     
     try {
@@ -123,7 +147,8 @@ export default function EditPublicEvent() {
         eventStart: formData.eventStart, eventEnd: formData.eventEnd,      
         location: { place: formData.place, namePlace: formData.namePlace, city: formData.city, province: formData.province, mapUrl: formData.mapUrl },
         img: finalImageUrl, 
-        isPrivate: false 
+        isPrivate: false,
+        paymentMethods: formData.paymentMethods // 🔥 KIRIM KE DATABASE
       };
 
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}?userId=${userId}`, {
@@ -250,6 +275,56 @@ export default function EditPublicEvent() {
             <div>
               <label className={labelStyle}>Google Maps URL (Opsional)</label>
               <input type="url" name="mapUrl" value={formData.mapUrl} onChange={handleChange} placeholder="https://goo.gl/maps/..." className={inputStyle} />
+            </div>
+          </div>
+
+          {/* 🔥 BAGIAN BARU: EDIT METODE PEMBAYARAN 🔥 */}
+          <div className={sectionStyle}>
+            <h2 className="text-xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4">Setting Metode Pembayaran</h2>
+            <p className="text-sm text-gray-500 mb-6 font-medium">Ubah metode pembayaran yang Anda terima dari peserta.</p>
+
+            <div className="space-y-4">
+              {/* Card Opsi QRIS */}
+              <label className={`flex items-center p-4 md:p-5 border-2 rounded-2xl cursor-pointer transition-all ${formData.paymentMethods.qris ? 'border-[#FF6B35] bg-orange-50/50' : 'border-gray-100 hover:bg-gray-50'}`}>
+                <div className="flex items-center justify-center mr-4">
+                  <input type="checkbox" checked={formData.paymentMethods.qris} onChange={() => togglePaymentMethod('qris')} className="w-5 h-5 rounded cursor-pointer accent-[#FF6B35]" />
+                </div>
+                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mr-4 shrink-0 font-black text-xs shadow-sm">
+                  QRIS
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900 md:text-lg">QR Code (QRIS)</p>
+                  <p className="text-xs text-gray-500 mt-0.5">GOPAY, OVO, DANA, DLL.</p>
+                </div>
+              </label>
+
+              {/* Card Opsi Virtual Account */}
+              <label className={`flex items-center p-4 md:p-5 border-2 rounded-2xl cursor-pointer transition-all ${formData.paymentMethods.va ? 'border-[#FF6B35] bg-orange-50/50' : 'border-gray-100 hover:bg-gray-50'}`}>
+                <div className="flex items-center justify-center mr-4">
+                  <input type="checkbox" checked={formData.paymentMethods.va} onChange={() => togglePaymentMethod('va')} className="w-5 h-5 rounded cursor-pointer accent-[#FF6B35]" />
+                </div>
+                <div className="w-12 h-12 bg-gray-100 text-gray-600 rounded-xl flex items-center justify-center mr-4 shrink-0 font-black text-xs shadow-sm border border-gray-200">
+                  VA
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900 md:text-lg">Virtual Account</p>
+                  <p className="text-xs text-gray-500 mt-0.5">BCA, MANDIRI, BNI, BRI, DLL.</p>
+                </div>
+              </label>
+
+              {/* Card Opsi Transfer Bank */}
+              <label className={`flex items-center p-4 md:p-5 border-2 rounded-2xl cursor-pointer transition-all ${formData.paymentMethods.transferBank ? 'border-[#FF6B35] bg-orange-50/50' : 'border-gray-100 hover:bg-gray-50'}`}>
+                <div className="flex items-center justify-center mr-4">
+                  <input type="checkbox" checked={formData.paymentMethods.transferBank} onChange={() => togglePaymentMethod('transferBank')} className="w-5 h-5 rounded cursor-pointer accent-[#FF6B35]" />
+                </div>
+                <div className="w-12 h-12 bg-gray-100 text-gray-600 rounded-xl flex items-center justify-center mr-4 shrink-0 shadow-sm border border-gray-200">
+                  <Landmark className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900 md:text-lg">Transfer Bank</p>
+                  <p className="text-xs text-gray-500 mt-0.5">BCA, MANDIRI, PERMATA, DLL.</p>
+                </div>
+              </label>
             </div>
           </div>
 

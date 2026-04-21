@@ -96,11 +96,10 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   
-  // STATE NOTIFIKASI
   const [notifications, setNotifications] = useState([]);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  
   const notifRef = useRef(null);
-
   const profileRef = useRef(null);
   const navigate = useNavigate();
 
@@ -115,13 +114,11 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Fetch Notifikasi Awal & Pasang Listener Realtime
   useEffect(() => {
     if (!user?.id) return;
 
     fetchNotifications();
 
-    // 🔥 LISTENER REALTIME SUPABASE 🔥
     const notifChannel = supabase
       .channel('navbar-notification-channel')
       .on(
@@ -130,7 +127,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
           event: 'INSERT', 
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${user.id}` // Hemat egress bro!
+          filter: `user_id=eq.${user.id}`
         },
         (payload) => {
           const newNotif = payload.new;
@@ -143,7 +140,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
             { duration: 5000 }
           );
 
-          // Taruh notif baru di paling atas dropdown
           setNotifications(prevNotifs => [newNotif, ...prevNotifs]);
         }
       )
@@ -196,9 +192,8 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     }
   };
 
-  // 👇 FUNGSI NAVIGASI OTOMATIS SAAT NOTIF DI KLIK 👇
   const handleNotifClick = async (notif) => {
-    setShowNotifDropdown(false); // Tutup dropdown loncengnya
+    setShowNotifDropdown(false); 
 
     if (!notif.is_read && notif.type !== 'INVITATION_AGENT') {
       await markAsRead(notif.id);
@@ -216,6 +211,8 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
   };
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
+  // Di Navbar cuma nampilin 5 notif teratas biar rapi
+  const displayedNotifications = notifications.slice(0, 5);
 
   const toggleRole = () => {
     const newRole = isAgentMode ? 'user' : 'agent';
@@ -267,14 +264,12 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
 
           {user ? (
             <>
-              {/* 👇 TOMBOL LIKES 👇 */}
               {!isAgentMode && (
                 <Link to="/likes" className="flex items-center justify-center w-9 h-9 md:w-[42px] md:h-[42px] border border-gray-100 text-gray-400 bg-white rounded-full hover:bg-orange-50 hover:text-[#FF6B35] hover:border-orange-100 transition shadow-sm shrink-0">
                    <svg className="w-5 h-5 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
                 </Link>
               )}
 
-              {/* 👇 BELL NOTIFIKASI 👇 */}
               <div className="relative shrink-0" ref={notifRef}>
                 <button onClick={() => setShowNotifDropdown(!showNotifDropdown)} className={`relative flex items-center justify-center w-9 h-9 md:w-[42px] md:h-[42px] border rounded-full transition shadow-sm shrink-0 ${isAgentMode ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700' : 'border-gray-100 bg-white text-gray-400 hover:bg-orange-50 hover:text-[#FF6B35] hover:border-orange-100'}`}>
                   <svg className="w-5 h-5 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
@@ -285,7 +280,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                   )}
                 </button>
 
-                {/* Dropdown Notifikasi */}
                 <div className={`absolute right-0 top-full mt-3 w-[280px] md:w-[350px] bg-white rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 transform origin-top-right transition-all duration-300 z-[60] flex flex-col overflow-hidden ${showNotifDropdown ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                   
                   <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
@@ -293,23 +287,37 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                     {unreadCount > 0 && <span className="bg-[#FF6B35] text-white px-2 py-0.5 rounded-md text-[9px] font-bold">{unreadCount} Baru</span>}
                   </div>
                   
-                  <div className="max-h-[300px] overflow-y-auto">
-                    {notifications.length > 0 ? (
-                      notifications.map(notif => (
+                  <div className="max-h-[300px] overflow-y-auto overscroll-contain">
+                    {displayedNotifications.length > 0 ? (
+                      displayedNotifications.map(notif => (
                         <div 
                           key={notif.id} 
-                          className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer ${!notif.is_read ? 'bg-orange-50/30' : ''}`} 
-                          onClick={() => handleNotifClick(notif)} // 👇 FUNGSI KLIK DIPASANG DI SINI 👇
+                          // 🔥 BEDA WARNA BG, BORDER, DAN TEKS KALAU BELUM DIBACA 🔥
+                          className={`p-4 border-b hover:bg-gray-50 transition-colors cursor-pointer flex gap-3 ${
+                            !notif.is_read 
+                              ? 'bg-orange-50/60 border-l-4 border-l-[#FF6B35] border-b-orange-100/50' 
+                              : 'bg-white border-l-4 border-l-transparent border-b-gray-50'
+                          }`} 
+                          onClick={() => handleNotifClick(notif)}
                         >
-                          <p className="font-bold text-gray-900 text-sm mb-1">{notif.title}</p>
-                          <p className="text-xs text-gray-500 mb-2 leading-relaxed">{notif.message}</p>
-                          
-                          {notif.type === 'INVITATION_AGENT' && !notif.is_read && (
-                            <div className="flex gap-2 mt-3">
-                              <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'reject'); }} className="flex-1 bg-red-50 text-red-500 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-colors">Tolak</button>
-                              <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'accept'); }} className="flex-1 bg-[#FF6B35] text-white py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-colors shadow-md">Terima</button>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className={`font-bold text-sm ${!notif.is_read ? 'text-[#FF6B35]' : 'text-gray-900'}`}>
+                                {notif.title}
+                              </p>
+                              {!notif.is_read && <span className="w-2 h-2 rounded-full bg-[#FF6B35] shadow-sm shadow-orange-200"></span>}
                             </div>
-                          )}
+                            <p className={`text-xs leading-relaxed ${!notif.is_read ? 'text-gray-700 font-medium' : 'text-gray-500'}`}>
+                              {notif.message}
+                            </p>
+                            
+                            {notif.type === 'INVITATION_AGENT' && !notif.is_read && (
+                              <div className="flex gap-2 mt-3">
+                                <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'reject'); }} className="flex-1 bg-red-50 text-red-500 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-colors">Tolak</button>
+                                <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'accept'); }} className="flex-1 bg-[#FF6B35] text-white py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-colors shadow-md">Terima</button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       ))
                     ) : (
@@ -347,7 +355,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                 <div className={`absolute right-0 top-full mt-3 w-[220px] md:w-[260px] bg-white rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 transform origin-top-right transition-all duration-300 z-[60] overflow-hidden ${isDropdownOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                   <div className="p-2 flex flex-col gap-1">
                     
-                    {/* MENU BERBEDA TERGANTUNG ROLE */}
                     {!isAgentMode ? (
                       <>
                         <button onClick={() => { navigate('/'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35] rounded-xl transition-all group">
@@ -389,7 +396,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                           RIWAYAT SCAN
                         </button>
 
-                        {/* 👇 MENU CARI JOB WARNA IKUTAN BIRU 👇 */}
                         <button onClick={() => { navigate('/jobs'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-blue-500 rounded-xl transition-all group">
                           <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                           CARI JOB (FREELANCE)

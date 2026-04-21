@@ -70,8 +70,8 @@ export default function Checkout() {
   const [formAnswers, setFormAnswers] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // State Modal (Dipakai cuma buat nampilin loading/sukses setelah Midtrans)
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState(null); 
   const [paymentStatus, setPaymentStatus] = useState('idle'); 
 
   const [popup, setPopup] = useState({ isOpen: false, message: '', type: 'info' });
@@ -160,30 +160,113 @@ export default function Checkout() {
 
   const canAddNewSession = event?.sessions?.some(s => s.stock > 0 && !cart.some(item => String(item.sessionId) === String(s.id)));
 
-  const handleOpenPaymentModal = (e) => {
+  // ========================================================
+  // 🔥 FUNGSI BARU: TRIGGER MIDTRANS PAYMENT
+  // ========================================================
+  const handlePayWithMidtrans = async (e) => {
     e.preventDefault(); 
 
-    if (cart.length === 0) {
-      showPopup("Keranjang tiket kosong!", "error");
+    if (cart.length === 0) return showPopup("Keranjang tiket kosong!", "error");
+    if (cart.find(item => item.qty < 1)) return showPopup("Jumlah tiket minimal 1 per kategori!", "error");
+
+    const totalAmount = calculateTotal();
+
+    // 1. KALO TIKET GRATIS: Langsung eksekusi tanpa Midtrans
+    if (totalAmount === 0) {
+      setShowPaymentModal(true);
+      executeRealPayment();
       return;
     }
-    const invalidItem = cart.find(item => item.qty < 1);
-    if (invalidItem) {
-      showPopup("Jumlah tiket minimal 1 per kategori!", "error");
-      return;
-    }
-    
-    setShowPaymentModal(true); 
-    if (calculateTotal() === 0) {
-      setPaymentMethod('free'); 
-    } else {
-      setPaymentMethod(null); 
+
+    // 2. KALO BAYAR: Siapin data customer & minta token Midtrans
+    setIsSubmitting(true);
+    try {
+      let emailTamu = user?.email || ''; 
+      let namaTamu = user?.name || 'Tamu EventRent'; 
+      
+      // Ambil email/nama dari form pertama kalau blm login
+      if (!emailTamu && cart.length > 0) {
+        const firstCartItem = cart[0];
+        emailTamu = formAnswers[`cart-${firstCartItem.id}-ticket-0-email`] || 'guest@email.com';
+        namaTamu = formAnswers[`cart-${firstCartItem.id}-ticket-0-nama`] || 'Tamu';
+      }
+
+      const orderId = `TKT-${event.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+      // 🔥 LOGIKA FILTER METODE PEMBAYARAN (FIXED) 🔥
+      let activePayments = event?.paymentMethods || { qris: true, va: true, transferBank: false };
+      
+      // Kalau dari database PostgreSQL bentuknya string JSON, kita parse dulu
+      if (typeof activePayments === 'string') {
+        try { 
+          activePayments = JSON.parse(activePayments); 
+        } catch(e) {
+          console.error("Gagal parse paymentMethods:", e);
+        }
+      }
+
+      let allowedInMidtrans = [];
+      
+      // Terjemahin ke kode Midtrans yang bener
+      if (activePayments.qris) {
+        allowedInMidtrans.push("gopay", "shopeepay", "other_qris");
+      }
+      if (activePayments.va || activePayments.transferBank) {
+        allowedInMidtrans.push("bca_va", "bni_va", "bri_va", "permata_va", "echannel", "other_va");
+      }
+
+      // Jaga-jaga kalau ternyata gak ada yang aktif, paksa nyalain QRIS
+      if (allowedInMidtrans.length === 0) {
+        allowedInMidtrans.push("other_qris");
+      }
+
+      // Nembak API backend yg kita bikin tadi
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/payment/test-midtrans`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: orderId,
+          amount: totalAmount,
+          name: namaTamu,
+          email: emailTamu,
+          enabledPayments: allowedInMidtrans // 👈 INI PARAMETER PENTINGNYA
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.token) {
+        // 🔥 PANGGIL POP-UP MIDTRANS 🔥
+        window.snap.pay(data.token, {
+          onSuccess: function(result) {
+            console.log("Sukses dibayar:", result);
+            setShowPaymentModal(true); // Buka animasi loading temen lu
+            executeRealPayment(); // Simpan tiket ke database Supabase!
+          },
+          onPending: function(result) {
+            showPopup("Status Pending! Selesaikan pembayaran VA/Transfer kamu.", "info");
+          },
+          onError: function(result) {
+            showPopup("Pembayaran gagal. Silakan coba lagi.", "error");
+          },
+          onClose: function() {
+            showPopup("Kamu menutup pop-up sebelum menyelesaikan pembayaran.", "error");
+          }
+        });
+      } else {
+        showPopup("Gagal mendapatkan token pembayaran dari server.", "error");
+      }
+    } catch (err) {
+      console.error(err);
+      showPopup("Terjadi kesalahan jaringan.", "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  // Fungsi simpan tiket ke DB (Dipanggil otomatis setelah Midtrans sukses)
   const executeRealPayment = async () => {
     setPaymentStatus('processing');
-    setIsSubmitting(true);
     
     try {
       let emailTamu = user?.email || ''; 
@@ -214,23 +297,18 @@ export default function Checkout() {
           navigate(`/event/${id}`); 
         }, 2000);
       } else {
-        showPopup("Gagal memproses: " + (data.message || 'Terjadi kesalahan di server'), "error");
+        showPopup("Gagal memproses tiket: " + (data.message || 'Error server'), "error");
         setShowPaymentModal(false);
-        setPaymentStatus('idle');
       }
     } catch (err) {
       console.error(err);
-      showPopup("Terjadi kesalahan jaringan atau server mati.", "error");
+      showPopup("Terjadi kesalahan sistem saat mencetak tiket.", "error");
       setShowPaymentModal(false);
-      setPaymentStatus('idle');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-400">Loading Form...</div>;
 
-  // TEMA KHUSUS PUBLIC EVENT (Terang & Segar)
   const inputStyle = `w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-1 bg-white text-gray-900 border border-gray-300 placeholder-gray-400 focus:border-[#FF6B35] focus:ring-[#FF6B35]`;
   const labelStyle = `block text-xs font-bold mb-2 uppercase tracking-widest text-gray-700`;
 
@@ -271,7 +349,7 @@ export default function Checkout() {
         )}
       </AnimatePresence>
 
-      <form onSubmit={handleOpenPaymentModal}>
+      <form onSubmit={handlePayWithMidtrans}>
         
         <div className="max-w-7xl mx-auto px-4 md:px-8">
           <div className="flex items-center gap-4 mb-8">
@@ -466,7 +544,7 @@ export default function Checkout() {
               disabled={isSubmitting || cart.length === 0}
               className={`px-8 py-4 font-bold rounded-xl uppercase tracking-widest text-sm shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed bg-gray-900 hover:bg-black text-white`}
             >
-              {isSubmitting ? 'Memproses...' : 'Lanjut Bayar'}
+              {isSubmitting ? 'Memproses...' : (calculateTotal() === 0 ? 'Klaim Tiket Gratis' : 'Bayar Sekarang')}
             </button>
           </div>
         </div>
@@ -474,129 +552,33 @@ export default function Checkout() {
       </form>
 
       {/* ======================================================= */}
-      {/* POP UP PAYMENT GATEWAY MOCKUP                           */}
+      {/* ANIMASI LOADING & SUKSES SETELAH MIDTRANS               */}
       {/* ======================================================= */}
       {showPaymentModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className={`rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl relative bg-white`}>
             
-            {paymentStatus === 'idle' && (
-              <button 
-                type="button"
-                onClick={() => { setShowPaymentModal(false); setPaymentMethod(null); }} 
-                className={`absolute top-5 right-5 rounded-full w-8 h-8 flex items-center justify-center transition-colors text-gray-400 bg-gray-100 hover:text-gray-900`}
-              >
-                ✕
-              </button>
-            )}
-
-            {paymentStatus === 'idle' && !paymentMethod && calculateTotal() > 0 && (
-              <div className="p-8">
-                <h3 className="text-xl font-black text-gray-900 mb-2">Pilih Pembayaran</h3>
-                <p className="text-sm text-gray-500 mb-8 font-medium">Total: <strong className="text-[#FF6B35]">Rp {calculateTotal().toLocaleString('id-ID')}</strong></p>
-                
-                <div className="space-y-4">
-                  <button type="button" onClick={() => setPaymentMethod('qris')} className="w-full flex items-center justify-between p-4 border border-gray-200 rounded-2xl hover:border-[#FF6B35] hover:bg-orange-50 transition-all text-left group">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 font-black text-xs">QRIS</div>
-                      <div>
-                        <p className="font-bold text-gray-900 group-hover:text-[#FF6B35]">QR Code (QRIS)</p>
-                        <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">Gopay, OVO, Dana, dll</p>
-                      </div>
-                    </div>
-                    <svg className="w-5 h-5 text-gray-300 group-hover:text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
-                  </button>
-
-                  <button type="button" onClick={() => setPaymentMethod('va')} className="w-full flex items-center justify-between p-4 border border-gray-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left group">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center text-gray-600 font-black text-xs">VA</div>
-                      <div>
-                        <p className="font-bold text-gray-900 group-hover:text-blue-600">Virtual Account</p>
-                        <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-1">BCA, Mandiri, BNI, BRI</p>
-                      </div>
-                    </div>
-                    <svg className="w-5 h-5 text-gray-300 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {paymentStatus === 'idle' && paymentMethod && (
-              <div className="p-8 text-center">
-                {paymentMethod !== 'free' && (
-                  <button type="button" onClick={() => setPaymentMethod(null)} className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hover:text-gray-900 mb-6 flex items-center justify-center w-full transition-colors">
-                    ← Ganti Metode
-                  </button>
-                )}
-
-                {paymentMethod === 'free' ? (
-                  <>
-                    <h3 className={`text-2xl font-black mb-2 text-gray-900`}>Tiket Gratis! 🎉</h3>
-                    <p className={`text-sm mb-8 font-medium text-gray-500`}>
-                      Asyik, kamu gak perlu bayar sepeserpun untuk event ini.
-                    </p>
-                    <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center mb-8 border-[8px] bg-green-50 text-green-500 border-green-100`}>
-                      <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>
-                    </div>
-                  </>
-                ) : paymentMethod === 'qris' ? (
-                  <>
-                    <h3 className="text-xl font-black text-gray-900 mb-2">Scan QRIS</h3>
-                    <p className="text-xs text-gray-500 mb-6 font-medium">Buka aplikasi e-wallet / m-banking kamu</p>
-                    <div className="w-48 h-48 mx-auto bg-gray-100 border-4 border-[#FF6B35] rounded-3xl p-3 shadow-lg mb-6 relative">
-                       <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg" alt="QR Code" className="w-full h-full opacity-80 mix-blend-multiply" />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="text-xl font-black text-gray-900 mb-2">Transfer ke VA</h3>
-                    <p className="text-xs text-gray-500 mb-6 font-medium">Salin nomor rekening di bawah ini</p>
-                    <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 mb-6">
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Bank BCA</p>
-                      <p className="text-2xl font-black text-gray-900 tracking-[0.2em]">8800 1234 5678</p>
-                    </div>
-                  </>
-                )}
-
-                {paymentMethod !== 'free' && (
-                  <div className="bg-orange-50 text-[#FF6B35] p-4 rounded-xl font-black text-xl mb-8 border border-orange-100">
-                    Rp {calculateTotal().toLocaleString('id-ID')}
+            <div className="p-12 text-center flex flex-col items-center justify-center min-h-[300px]">
+              {paymentStatus === 'processing' ? (
+                <>
+                  <div className={`w-16 h-16 border-4 rounded-full animate-spin mb-6 border-gray-100 border-t-[#FF6B35]`}></div>
+                  <h3 className={`text-lg font-black uppercase tracking-wide text-gray-900`}>Memproses Tiket...</h3>
+                  <p className={`text-xs mt-2 font-medium text-gray-500`}>Sedang menyimpan dan mengirim email tiket kamu.</p>
+                </>
+              ) : (
+                <>
+                  <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 border-[6px] animate-bounce bg-green-50 text-green-500 border-green-100`}>
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                   </div>
-                )}
-
-                <button 
-                  type="button"
-                  onClick={executeRealPayment}
-                  className={`w-full py-4 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl transition-all active:scale-95 bg-gray-900 hover:bg-black text-white`}
-                >
-                  {paymentMethod === 'free' ? 'Dapatkan Tiket' : 'Saya Sudah Bayar'}
-                </button>
-              </div>
-            )}
-
-            {paymentStatus !== 'idle' && (
-              <div className="p-12 text-center flex flex-col items-center justify-center min-h-[300px]">
-                {paymentStatus === 'processing' ? (
-                  <>
-                    <div className={`w-16 h-16 border-4 rounded-full animate-spin mb-6 border-gray-100 border-t-[#FF6B35]`}></div>
-                    <h3 className={`text-lg font-black uppercase tracking-wide text-gray-900`}>Memverifikasi...</h3>
-                    <p className={`text-xs mt-2 font-medium text-gray-500`}>Jangan tutup halaman ini</p>
-                  </>
-                ) : (
-                  <>
-                    <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 border-[6px] animate-bounce bg-green-50 text-green-500 border-green-100`}>
-                      <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                    </div>
-                    <h3 className={`text-2xl font-black uppercase tracking-tight text-gray-900`}>
-                      {paymentMethod === 'free' ? 'Tiket Diklaim!' : 'Pembayaran Sukses!'}
-                    </h3>
-                    <p className={`text-sm mt-2 font-medium text-gray-500`}>
-                       Tiket kamu sedang disiapkan...
-                    </p>
-                  </>
-                )}
-              </div>
-            )}
+                  <h3 className={`text-2xl font-black uppercase tracking-tight text-gray-900`}>
+                    Tiket Berhasil Dicetak!
+                  </h3>
+                  <p className={`text-sm mt-2 font-medium text-gray-500`}>
+                     Cek email kamu untuk melihat barcode tiket.
+                  </p>
+                </>
+              )}
+            </div>
 
           </div>
         </div>

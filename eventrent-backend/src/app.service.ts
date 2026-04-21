@@ -4,12 +4,15 @@ import * as bcrypt from 'bcrypt';
 import * as nodemailer from 'nodemailer';
 import * as dotenv from 'dotenv'; 
 import * as QRCode from 'qrcode';
+import * as midtransClient from 'midtrans-client';
+import * as crypto from 'crypto';
 
 dotenv.config(); 
 
 @Injectable()
 export class AppService implements OnModuleInit {
   private pool: Pool;
+  private snap: any;
   private transporter: nodemailer.Transporter;
 
   constructor() {
@@ -29,6 +32,11 @@ export class AppService implements OnModuleInit {
         user: process.env.EMAIL_USER, 
         pass: process.env.EMAIL_PASS  
       }
+    });
+    this.snap = new midtransClient.Snap({
+      isProduction: false,
+      serverKey: process.env.MIDTRANS_SERVER_KEY,
+      clientKey: process.env.MIDTRANS_CLIENT_KEY
     });
   }
 
@@ -1527,5 +1535,68 @@ export class AppService implements OnModuleInit {
       console.error(err);
       throw new InternalServerErrorException('Gagal mengambil data pendapatan agen');
     }
+  }
+
+  async createMidtransTransaction(orderId: string, grossAmount: number, customer: { name: string, email: string }, enabledPayments?: string[]) {
+    try {
+      const parameter: any = {
+        transaction_details: {
+          order_id: orderId, 
+          gross_amount: grossAmount 
+        },
+        customer_details: {
+          first_name: customer.name,
+          email: customer.email
+        }
+      };
+
+      // 🔥 Kalau ada request metode spesifik dari Checkout Frontend, kita masukin filternya!
+      if (enabledPayments && enabledPayments.length > 0) {
+        parameter.enabled_payments = enabledPayments;
+      }
+
+      // Minta token ke Midtrans
+      const transaction = await this.snap.createTransaction(parameter);
+      
+      // Balikin token-nya ke frontend
+      return {
+        token: transaction.token,
+        redirect_url: transaction.redirect_url
+      };
+    } catch (err) {
+      console.error('Midtrans Error:', err);
+      throw new InternalServerErrorException('Gagal membuat tagihan pembayaran Midtrans');
+    }
+  }
+
+  async handleMidtransWebhook(payload: any) {
+    const { order_id, status_code, gross_amount, signature_key, transaction_status } = payload;
+
+    // 1. VERIFIKASI SIGNATURE (Standar Keamanan Vercel & Production)
+    const serverKey = process.env.MIDTRANS_SERVER_KEY;
+    const stringToHash = order_id + status_code + gross_amount + serverKey;
+    const hashed = crypto.createHash('sha512').update(stringToHash).digest('hex');
+
+    if (hashed !== signature_key) {
+      console.error('🚨 [WEBHOOK] Signature tidak valid! Ada indikasi manipulasi.');
+      throw new BadRequestException('Invalid Signature');
+    }
+
+    console.log(`💬 [WEBHOOK] Status Transaksi ${order_id}: ${transaction_status}`);
+
+    // 2. LOGIKA BISNIS (Bisa dikembangin nanti buat update DB)
+    if (transaction_status === 'settlement' || transaction_status === 'capture') {
+      console.log(`✅ [WEBHOOK SUCCESS] PESANAN ${order_id} TELAH DIBAYAR LUNAS SEBESAR Rp ${gross_amount}!`);
+
+      // Nanti kalau lu butuh, lu bisa tambahin fungsi nyimpen/update status tiket di sini
+
+    } else if (transaction_status === 'pending') {
+      console.log(`⏳ [WEBHOOK PENDING] Menunggu user mentransfer pembayaran untuk ${order_id}...`);
+    } else if (transaction_status === 'expire' || transaction_status === 'cancel' || transaction_status === 'deny') {
+      console.log(`❌ [WEBHOOK FAILED] Transaksi ${order_id} gagal/kadaluarsa.`);
+    }
+
+    // 3. WAJIB BALES MIDTRANS BIAR DIA BERHENTI NELPON SERVER VERCEL LU
+    return { status: 'OK' };
   }
 }
