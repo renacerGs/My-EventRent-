@@ -17,8 +17,9 @@ export default function JobBoard() {
   // 👇 STATE BARU BUAT MODAL KONFIRMASI LAMAR 👇
   const [confirmApply, setConfirmApply] = useState({ show: false, jobId: null });
 
+  // 🔥 FIX 1: Ganti dependency dari [user] jadi [user?.id] biar GAK KEDIP-KEDIP!
   useEffect(() => {
-    if (!user) {
+    if (!user || !user.id) {
       toast.error('Lo harus login dulu bro buat nyari job!');
       navigate('/');
       return;
@@ -28,12 +29,19 @@ export default function JobBoard() {
     // Load data lamaran dari localStorage (sementara nunggu API backend)
     const savedApplications = JSON.parse(localStorage.getItem(`applied_jobs_${user.id}`)) || [];
     setAppliedJobs(savedApplications);
-  }, [user, navigate]);
+  }, [user?.id, navigate]);
 
+  // 🔥 FIX 2: Tambah Token di Headers saat narik lowongan
   const fetchJobs = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs`);
+      const token = localStorage.getItem('supabase_token');
+
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs`, {
+        headers: {
+          'Authorization': `Bearer ${token}` // 👈 Ini KTP lu bro!
+        }
+      });
       
       if (res.ok) {
         const data = await res.json();
@@ -58,7 +66,7 @@ export default function JobBoard() {
     setConfirmApply({ show: true, jobId });
   };
 
-  // Eksekusi API pas klik Yakin
+  // 🔥 FIX 3: Tambah Token & Buang userId saat mengeksekusi lamaran
   const executeApply = async () => {
     const jobId = confirmApply.jobId;
     setConfirmApply({ show: false, jobId: null }); // Tutup modal
@@ -66,11 +74,16 @@ export default function JobBoard() {
     try {
       setApplyingId(jobId);
       const toastId = toast.loading('Mengirim lamaran...');
+      const token = localStorage.getItem('supabase_token');
 
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs/apply`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: jobId, userId: user.id })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // 👈 Ini KTP lu bro!
+        },
+        // 👇 userId DIHAPUS, karena backend baca dari Token
+        body: JSON.stringify({ jobId: jobId }) 
       });
       
       const data = await res.json();

@@ -170,6 +170,7 @@ export default function CreateWeddingEvent() {
     const { data: publicUrlData } = supabase.storage.from('event-posters').getPublicUrl(fileName); return publicUrlData.publicUrl;
   };
 
+  // 🔥 FUNGSI YANG DIUBAH: Penambahan Token Headers
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!imageBase64) return toast.error("Poster/Cover Utama wajib diupload!");
@@ -177,6 +178,9 @@ export default function CreateWeddingEvent() {
 
     setIsLoading(true);
     try {
+      // 1. AMBIL TOKEN DARI LOKAL STORAGE
+      const token = localStorage.getItem('supabase_token');
+
       const coverUrl = await uploadImageToSupabase(imageBase64, 'cover');
       const uploadedProfiles = await Promise.all(eventDetails.profiles.map(async (prof) => {
          if (prof.photoUrl && prof.photoUrl.startsWith('data:image')) { const url = await uploadImageToSupabase(prof.photoUrl, `profile-${prof.id}`); return { ...prof, photoUrl: url }; }
@@ -185,14 +189,33 @@ export default function CreateWeddingEvent() {
       const uploadedGallery = await Promise.all(galleryFiles.map(async (gf) => { return await uploadImageToSupabase(gf.file, `gallery`); }));
       
       const finalEventDetails = { ...eventDetails, profiles: uploadedProfiles, galleryImages: uploadedGallery };
-      const payload = { ...formData, userId: user.id, img: coverUrl, eventDetails: finalEventDetails };
+      
+      // 2. HAPUS userId DARI PAYLOAD (Udah diurus Satpam)
+      const payload = { ...formData, img: coverUrl, eventDetails: finalEventDetails };
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      // 3. TEMBAK API POST DENGAN TOKEN DI HEADER
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events`, { 
+        method: 'POST', 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // 👈 INI KTP-NYA!
+        }, 
+        body: JSON.stringify(payload) 
+      });
 
-      if (response.ok) { navigate('/manage'); } 
-      else { const errorData = await response.json(); toast.error("Gagal membuat undangan: " + (errorData.message || 'Server error')); }
-    } catch (error) { console.error(error); toast.error(error.message || "Gagal terhubung ke server."); }
-    finally { setIsLoading(false); }
+      if (response.ok) { 
+        toast.success("Undangan pernikahan berhasil dibuat!");
+        navigate('/manage'); 
+      } else { 
+        const errorData = await response.json(); 
+        toast.error("Gagal membuat undangan: " + (errorData.message || 'Server error')); 
+      }
+    } catch (error) { 
+      console.error(error); 
+      toast.error(error.message || "Gagal terhubung ke server."); 
+    } finally { 
+      setIsLoading(false); 
+    }
   };
 
   const inputStyle = `w-full rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-1 transition-all bg-slate-800 text-white border border-slate-700 placeholder-gray-500 focus:border-[#D4AF37] focus:ring-[#D4AF37]`;

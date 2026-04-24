@@ -40,15 +40,26 @@ export default function ManageEvent() {
 
   const navigate = useNavigate();
   const menuRef = useRef(null);
+  
+  // Tetap ngambil user dari localStorage buat validasi awal (biar gak error kalau belum login)
   const user = JSON.parse(localStorage.getItem('user'));
 
   useEffect(() => {
     if (!user) { navigate('/'); return; }
     fetchEvents();
-  }, []);
+  }, [user?.id]); 
 
+  // 1️⃣ 🔥 PERUBAHAN KE-1: TARIK DATA (GET) BAWA TOKEN
   const fetchEvents = () => {
-    fetch(`${import.meta.env.VITE_API_URL}/api/events/my?userId=${user.id}`)
+    const token = localStorage.getItem('supabase_token');
+    if (!token) return;
+
+    // Hapus ?userId= karena udah diurus Satpam backend
+    fetch(`${import.meta.env.VITE_API_URL}/api/events/my`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
       .then(res => res.json())
       .then(data => { 
         setMyEvents(Array.isArray(data) ? data : []); 
@@ -88,13 +99,11 @@ export default function ManageEvent() {
     }
   };
 
-  // 👇👇👇 FUNGSI BARU: SHARE LINK DINAMIS 👇👇👇
   const handleShare = (e, event) => {
     e.stopPropagation();
     setActiveMenuId(null);
     
     let path = '';
-    // Tentukan rute yang benar berdasarkan tipe event
     if (event.category === 'Personal') {
       path = `/party/${event.id}`;
     } else if (event.category === 'Wedding' || event.is_private === true || event.is_private === 'true') {
@@ -103,10 +112,8 @@ export default function ManageEvent() {
       path = `/event/${event.id}`;
     }
 
-    // Gabungkan domain origin dengan path
     const fullUrl = `${window.location.origin}${path}`;
     
-    // Copy ke clipboard
     navigator.clipboard.writeText(fullUrl)
       .then(() => toast.success('Link event berhasil disalin! Silakan share.'))
       .catch(() => toast.error('Gagal menyalin link.'));
@@ -132,15 +139,26 @@ export default function ManageEvent() {
     setActiveMenuId(null);
   };
 
+  // 2️⃣ 🔥 PERUBAHAN KE-2: HAPUS EVENT (DELETE) BAWA TOKEN
   const confirmDelete = async () => {
     if (!eventToDelete) return;
+    const token = localStorage.getItem('supabase_token');
+
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${eventToDelete}?userId=${user.id}`, { method: 'DELETE' });
+      // Hapus ?userId=
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${eventToDelete}`, { 
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       if (res.ok) {
         setMyEvents(prev => prev.filter(event => event.id !== eventToDelete));
         setEventToDelete(null); 
+        toast.success("Event berhasil dihapus!");
       } else {
         console.error("Gagal menghapus event");
+        toast.error("Gagal menghapus event.");
         setEventToDelete(null);
       }
     } catch (err) { 
@@ -149,20 +167,33 @@ export default function ManageEvent() {
     }
   };
 
+  // 3️⃣ 🔥 PERUBAHAN KE-3: UBAH VISIBILITAS (PATCH) BAWA TOKEN
   const handleToggleVisibility = async (e, eventId, currentPrivateStatus) => {
     e.stopPropagation(); 
+    
+    // Optimistic UI Update (Ubah di layar duluan biar kerasa cepet)
     setMyEvents(prev => prev.map(event => 
       event.id === eventId ? { ...event, is_private: !currentPrivateStatus } : event
     ));
 
+    const token = localStorage.getItem('supabase_token');
+
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${eventId}/visibility?userId=${user.id}`, {
+      // Hapus ?userId=
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${eventId}/visibility`, {
         method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
       if (!res.ok) throw new Error("Gagal update di server");
+      
+      // Kasih toast biar informatif
+      toast.success(!currentPrivateStatus ? "Event sekarang Private!" : "Event sekarang Publik!");
     } catch (err) {
       console.error(err);
       toast.error("Oops! Gagal merubah visibilitas. Coba lagi.");
+      // Rollback (Balikin lagi) UI-nya kalau server gagal
       setMyEvents(prev => prev.map(event => 
         event.id === eventId ? { ...event, is_private: currentPrivateStatus } : event
       ));

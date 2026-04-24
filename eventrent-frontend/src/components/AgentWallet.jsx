@@ -8,17 +8,27 @@ export default function AgentWallet() {
   const [payouts, setPayouts] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // 🔥 FIX 1: Ganti dependency array biar GAK KEDIP-KEDIP
   useEffect(() => {
     if (!user || user.role !== 'agent') {
       navigate('/');
       return;
     }
     fetchPayouts();
-  }, [user, navigate]);
+  }, [user?.id, user?.role, navigate]);
 
+  // 🔥 FIX 2: Bawa Token Supabase di Headers
   const fetchPayouts = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${user.id}/payouts`);
+      setLoading(true);
+      const token = localStorage.getItem('supabase_token');
+
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${user.id}/payouts`, {
+        headers: {
+          'Authorization': `Bearer ${token}` // 👈 Ini KTP lu bro!
+        }
+      });
+      
       if (res.ok) {
         const data = await res.json();
         setPayouts(data);
@@ -74,7 +84,6 @@ export default function AgentWallet() {
                   <div>
                     <span className="inline-block px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-widest rounded-md mb-2">Sukses Masuk Rekening</span>
                     
-                    {/* 👇 INI YANG BERUBAH 👇 */}
                     <h4 className="font-bold text-slate-100 mb-1">{payout.event_title || `Event ID: ${payout.event_id}`}</h4>
                     
                     <p className="text-xs text-slate-400">{new Date(payout.paid_at).toLocaleString('id-ID', { dateStyle: 'long', timeStyle: 'short' })}</p>

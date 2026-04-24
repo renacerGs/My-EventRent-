@@ -1,95 +1,103 @@
 // src/app.controller.ts
-import { Controller, Get, Post, Body, Query, Delete, Param, Put, Patch, HttpException, HttpStatus } from '@nestjs/common'; 
+import { Controller, Get, Post, Body, Query, Delete, Param, Put, Patch, UseGuards, Req } from '@nestjs/common'; 
 import { AppService } from './app.service';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { BuyTicketDto } from './dto/buy-ticket.dto';
+
+// 👇 IMPORT SATPAM KITA (Pastikan path-nya sesuai dengan lokasi file supabase.guard.ts lu ya!)
+import { SupabaseGuard } from './supabase.guard'; 
 
 @Controller('api')
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
+  // ==========================================
   // --- EVENTS ---
+  // ==========================================
   @ApiTags('Events') 
   @ApiOperation({ summary: 'Mendapatkan semua event' })
   @Get('events') 
   async getEvents() {
-    return await this.appService.getEvents();
+    return await this.appService.getEvents(); // Public (Bebas akses)
   }
 
   @ApiTags('Events')
   @ApiOperation({ summary: 'Mendapatkan event yang dibuat oleh user tertentu' })
-  @ApiQuery({ name: 'userId', required: true, type: Number, description: 'ID dari user pembuat event' })
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Get('events/my')
-  async getMyEvents(@Query('userId') userId: number) {
-    return await this.appService.getMyEvents(userId);
+  async getMyEvents(@Req() req) {
+    return await this.appService.getMyEvents(req.user.id);
   }
 
   @ApiTags('Events')
   @ApiOperation({ summary: 'Mendapatkan detail satu event beserta sesinya' })
-  @ApiParam({ name: 'id', required: true, description: 'ID Event' })
   @Get('events/:id')
   async getEventById(@Param('id') id: number) {
-    return await this.appService.getEventById(id);
+    return await this.appService.getEventById(id); // Public (Bebas akses)
   }
 
   @ApiTags('Events')
   @ApiOperation({ summary: 'Membuat event baru' })
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Post('events')
-  async createEvent(@Body() eventData: any) {
+  async createEvent(@Req() req, @Body() eventData: any) {
+    eventData.userId = req.user.id; // Otomatis pakai ID dari token
     return await this.appService.createEvent(eventData);
   }
 
   @ApiTags('Events')
   @ApiOperation({ summary: 'Menghapus event' })
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Delete('events/:id')
-  async deleteEvent(@Param('id') id: number, @Query('userId') userId: number) {
-    return await this.appService.deleteEvent(id, userId);
+  async deleteEvent(@Param('id') id: number, @Req() req) {
+    return await this.appService.deleteEvent(id, req.user.id);
   }
 
   @ApiTags('Events')
   @ApiOperation({ summary: 'Mengubah data event' })
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Put('events/:id')
-  async updateEvent(@Param('id') id: number, @Query('userId') userId: number, @Body() eventData: any) {
-    return await this.appService.updateEvent(id, userId, eventData);
+  async updateEvent(@Param('id') id: number, @Req() req, @Body() eventData: any) {
+    return await this.appService.updateEvent(id, req.user.id, eventData);
   }
 
   @ApiTags('Events')
   @ApiOperation({ summary: 'Menambah jumlah tayangan (views) event' })
   @Post('events/:id/view')
   async incrementView(@Param('id') id: number) {
-    return await this.appService.incrementView(id);
+    return await this.appService.incrementView(id); // Public
   }
 
   @ApiTags('Events')
-  @ApiOperation({ summary: 'Menyalakan/mematikan visibilitas event di halaman utama (Public/Private)' })
+  @ApiOperation({ summary: 'Menyalakan/mematikan visibilitas event' })
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Patch('events/:id/visibility')
-  async toggleVisibility(@Param('id') id: number, @Query('userId') userId: number) {
-    return await this.appService.toggleEventVisibility(id, userId);
+  async toggleVisibility(@Param('id') id: number, @Req() req) {
+    return await this.appService.toggleEventVisibility(id, req.user.id);
   }
 
+  // ==========================================
   // --- LIKES ---
-  @ApiTags('Likes (Wishlist)')
-  @ApiOperation({ summary: 'Menambah atau menghapus event dari wishlist' })
-  @ApiBody({ schema: { example: { userId: 1, eventId: 32 } } })
+  // ==========================================
+  @ApiTags('Likes')
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Post('likes/toggle')
-  async toggleLike(@Body() data: { userId: number; eventId: number }) {
-    return await this.appService.toggleLike(data.userId, data.eventId);
+  async toggleLike(@Req() req, @Body() data: { eventId: number }) {
+    return await this.appService.toggleLike(req.user.id, data.eventId);
   }
 
-  @ApiTags('Likes (Wishlist)')
-  @ApiOperation({ summary: 'Mendapatkan daftar wishlist user' })
+  @ApiTags('Likes')
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Get('likes/my')
-  async getMyLikes(@Query('userId') userId: number) {
-    return await this.appService.getMyLikes(userId);
+  async getMyLikes(@Req() req) {
+    return await this.appService.getMyLikes(req.user.id);
   }
 
+  // ==========================================
   // --- TICKETS ---
+  // ==========================================
   @ApiTags('Tickets')
-  @ApiOperation({ summary: 'Membeli tiket (Checkout Public) atau RSVP (Personal Event)' })
-  @ApiBody({ 
-    description: 'Bisa menerima format Cart (Public Event) ATAU format RSVP (Personal Event)',
-    type: BuyTicketDto
-  })
+  @ApiOperation({ summary: 'Membeli tiket (Bebas Satpam biar Guest bisa beli)' })
   @Post('tickets/buy')
   async buyTicket(@Body() data: BuyTicketDto) { 
     let finalCart = data.cart;
@@ -102,314 +110,241 @@ export class AppController {
         quantity: typeof data.pax === 'string' ? parseInt(data.pax) : (data.pax || 1),
         price: 0
       }];
-      
-      finalAnswers = {
-        ...data.custom_answers,
-        "attendee_name": data.attendee_name,
-        "greeting": data.greeting
-      };
+      finalAnswers = { ...data.custom_answers, "attendee_name": data.attendee_name, "greeting": data.greeting };
     }
 
-    return await this.appService.buyTicket(
-      data.userId || null, 
-      data.eventId, 
-      finalCart || [], 
-      finalAnswers, 
-      email
-    );
+    // 🔥 FIX ERROR 500 UUID: Kalau userId bentuknya string(UUID), kita null-kan biar database nggak crash.
+    const safeUserId = typeof data.userId === 'number' ? data.userId : null;
+
+    return await this.appService.buyTicket(safeUserId, data.eventId, finalCart || [], finalAnswers, email);
   }
 
   @ApiTags('Tickets')
-  @ApiOperation({ summary: 'Mendapatkan daftar tiket yang dibeli user (My Tickets)' })
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Get('tickets/my')
-  async getMyTickets(@Query('userId') userId: number) {
-    return await this.appService.getMyTickets(userId);
+  async getMyTickets(@Req() req) {
+    return await this.appService.getMyTickets(req.user.id);
   }
 
   @ApiTags('Tickets')
-  @ApiOperation({ summary: 'Melacak/Mencari tiket (Guest Checkout) menggunakan Order ID dan Email' })
-  @ApiBody({ schema: { example: { ticketId: "TKT-A9X2B1", email: "tamu@gmail.com" } } })
   @Post('tickets/track')
   async trackTicket(@Body() data: { ticketId: string; email: string }) { 
-    return await this.appService.trackTicket(data.ticketId, data.email);
+    return await this.appService.trackTicket(data.ticketId, data.email); // Public
   }
 
   @ApiTags('Tickets')
-  @ApiOperation({ summary: 'Mendapatkan daftar peserta (Dashboard Panitia)' })
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Get('events/:id/attendees')
-  async getAttendees(@Param('id') id: number, @Query('userId') userId: number) {
-    return await this.appService.getEventAttendees(id, userId);
+  async getAttendees(@Param('id') id: number, @Req() req) {
+    return await this.appService.getEventAttendees(id, req.user.id);
   }
 
   @ApiTags('Tickets')
-  @ApiOperation({ summary: 'Melakukan validasi/scan kehadiran tiket' })
-  @ApiBody({ schema: { example: { ticketId: "TKT-A9X2B1", eventId: 32, userId: 1 } } })
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Post('tickets/scan')
-  async scanTicket(@Body() body: { ticketId: string, eventId: number, userId: number }) {
-    return this.appService.scanTicket(body.ticketId, body.eventId, body.userId);
+  async scanTicket(@Req() req, @Body() body: { ticketId: string, eventId: number }) {
+    return this.appService.scanTicket(body.ticketId, body.eventId, req.user.id);
   }
 
-  // 👇👇👇 API AGENTS (KEPANITIAAN) 👇👇👇
-  @ApiTags('Agents (Kepanitiaan)')
-  @ApiOperation({ summary: 'Menambahkan agen baru ke dalam event' })
+  // ==========================================
+  // --- AGENTS (KEPANITIAAN) ---
+  // ==========================================
+  @ApiTags('Agents')
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Post('events/:id/agents')
-  async addAgent(
-    @Param('id') eventId: number, 
-    @Query('eoId') eoId: number, 
-    @Body() body: { email: string; role?: string }
-  ) {
-    return await this.appService.addAgent(eventId, eoId, body.email, body.role);
+  async addAgent(@Param('id') eventId: number, @Req() req, @Body() body: { email: string; role?: string }) {
+    return await this.appService.addAgent(eventId, req.user.id, body.email, body.role);
   }
 
-  @ApiTags('Agents (Kepanitiaan)')
-  @ApiOperation({ summary: 'Mendapatkan daftar agen di sebuah event (Untuk Dashboard EO)' })
+  @ApiTags('Agents')
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Get('events/:id/agents')
-  async getEventAgents(@Param('id') eventId: number, @Query('eoId') eoId: number) {
-    return await this.appService.getEventAgents(eventId, eoId);
+  async getEventAgents(@Param('id') eventId: number, @Req() req) {
+    return await this.appService.getEventAgents(eventId, req.user.id);
   }
 
-  @ApiTags('Agents (Kepanitiaan)')
-  @ApiOperation({ summary: 'Mengubah peran (role) atau memberikan rating ke agen' })
+  @ApiTags('Agents')
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Put('events/:id/agents/:agentId')
-  async updateAgent(
-    @Param('id') eventId: number, 
-    @Param('agentId') agentId: number, 
-    @Query('eoId') eoId: number, 
-    @Body() body: { role?: string; rating_given?: number }
-  ) {
-    return await this.appService.updateAgent(eventId, eoId, agentId, body);
+  async updateAgent(@Param('id') eventId: number, @Param('agentId') agentId: number, @Req() req, @Body() body: { role?: string; rating_given?: number }) {
+    return await this.appService.updateAgent(eventId, req.user.id, agentId, body);
   }
 
-  @ApiTags('Agents (Kepanitiaan)')
-  @ApiOperation({ summary: 'Menghapus/memecat agen dari event' })
+  @ApiTags('Agents')
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Delete('events/:id/agents/:agentId')
-  async removeAgent(
-    @Param('id') eventId: number, 
-    @Param('agentId') agentId: number, 
-    @Query('eoId') eoId: number
-  ) {
-    return await this.appService.removeAgent(eventId, eoId, agentId);
+  async removeAgent(@Param('id') eventId: number, @Param('agentId') agentId: number, @Req() req) {
+    return await this.appService.removeAgent(eventId, req.user.id, agentId);
   }
 
-  @ApiTags('Agents (Kepanitiaan)')
-  @ApiOperation({ summary: 'Mendapatkan daftar event di mana user ditugaskan sebagai agen (Dashboard Agen)' })
+  @ApiTags('Agents')
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM (Dan Fix UUID di URL)
   @Get('users/:id/assigned-events')
-  async getAssignedEvents(@Param('id') agentId: number) {
-    return await this.appService.getAssignedEvents(agentId);
-  }
-  
-  // --- AUTH & USERS ---
-  @ApiTags('Authentication & Users')
-  @ApiOperation({ summary: 'Login menggunakan akun Google' })
-  @Post('auth/google')
-  async googleLogin(@Body() userData: any) {
-    return await this.appService.loginWithGoogle(userData);
+  async getAssignedEvents(@Req() req) {
+    return await this.appService.getAssignedEvents(req.user.id);
   }
 
-  @ApiTags('Authentication & Users')
-  @ApiOperation({ summary: 'Registrasi user baru manual' })
-  @Post('auth/register')
-  async register(@Body() userData: any) {
-    return await this.appService.registerUser(userData);
-  }
-
-  @ApiTags('Authentication & Users')
-  @ApiOperation({ summary: 'Verifikasi Kode OTP dari Email' })
-  @ApiBody({ schema: { example: { email: "user@gmail.com", otpCode: "123456" } } })
-  @Post('auth/verify-otp')
-  async verifyOtp(@Body() body: { email: string; otpCode: string }) {
-    return await this.appService.verifyOTP(body.email, body.otpCode);
-  }
-
-  @ApiTags('Authentication & Users')
-  @ApiOperation({ summary: 'Kirim Ulang Kode OTP ke Email' })
-  @ApiBody({ schema: { example: { email: "user@gmail.com" } } })
-  @Post('auth/resend-otp')
-  async resendOtp(@Body() body: { email: string }) {
-    return await this.appService.resendOTP(body.email);
-  }
-
-  @ApiTags('Authentication & Users')
-  @ApiOperation({ summary: 'Login manual (Email & Password)' })
-  @Post('auth/login')
-  async login(@Body() userData: any) {
-    return await this.appService.loginUser(userData);
-  }
-
-  @ApiTags('Authentication & Users')
-  @ApiOperation({ summary: 'Update profil (Nama & Foto)' })
+  // ==========================================
+  // --- USERS & PROFILES ---
+  // ==========================================
+  @ApiTags('Users')
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM (Fix UUID di URL)
   @Put('users/:id')
-  async updateProfile(@Param('id') id: number, @Body() data: any) {
-    return await this.appService.updateProfile(id, data);
+  async updateProfile(@Req() req, @Body() data: any) {
+    return await this.appService.updateProfile(req.user.id, data);
   }
 
-  @ApiTags('Authentication & Users')
-  @ApiOperation({ summary: 'Ganti Password' })
-  @Put('users/:id/password')
-  async changePassword(@Param('id') id: number, @Body() data: any) {
-    return await this.appService.changePassword(id, data);
-  }
-
-  @ApiTags('Authentication & Users')
-  @ApiOperation({ summary: 'Minta OTP untuk Lupa Password' })
-  @Post('auth/forgot-password')
-  async forgotPassword(@Body() body: { email: string }) {
-    return await this.appService.sendForgotPasswordOTP(body.email);
-  }
-
-  @ApiTags('Authentication & Users')
-  @ApiOperation({ summary: 'Reset Password dengan OTP' })
-  @Post('auth/reset-password')
-  async resetPassword(@Body() body: { email: string; otpCode: string; newPassword: string }) {
-    return await this.appService.resetPasswordWithOTP(body.email, body.otpCode, body.newPassword);
-  }
-
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM (Fix UUID di URL)
   @Get('users/:id/scan-history')
-  async getScanHistory(@Param('id') id: string) {
-    return this.appService.getAgentScanHistory(Number(id));
+  async getScanHistory(@Req() req) {
+    return this.appService.getAgentScanHistory(req.user.id);
   }
 
+  @ApiTags('Authentication & Users')
+  @UseGuards(SupabaseGuard)
+  @Get('auth/me')
+  async getMe(@Req() req) {
+    // Karena Satpam udah ngebawa data lengkap, kita tinggal lempar balik ke Frontend
+    return req.user;
+  }
+
+  // ==========================================
   // --- NOTIFICATIONS ---
+  // ==========================================
   @ApiTags('Notifications')
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM (Fix UUID di URL)
   @Get('users/:id/notifications')
-  async getNotifications(@Param('id') id: number) {
-    return await this.appService.getNotifications(id);
+  async getNotifications(@Req() req) {
+    return await this.appService.getNotifications(req.user.id);
   }
 
   @ApiTags('Notifications')
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Post('notifications/:id/respond')
-  async respondInvitation(
-    @Param('id') notifId: number,
-    @Query('userId') userId: number,
-    @Body() body: { action: 'accept' | 'reject' }
-  ) {
-    return await this.appService.respondAgentInvitation(notifId, userId, body.action);
+  async respondInvitation(@Param('id') notifId: number, @Req() req, @Body() body: { action: 'accept' | 'reject' }) {
+    return await this.appService.respondAgentInvitation(notifId, req.user.id, body.action);
   }
 
   @ApiTags('Notifications')
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Patch('notifications/:id/read')
-  async markNotifRead(@Param('id') notifId: number, @Query('userId') userId: number) {
-    return await this.appService.markNotificationRead(notifId, userId);
+  async markNotifRead(@Param('id') notifId: number, @Req() req) {
+    return await this.appService.markNotificationRead(notifId, req.user.id);
   }
 
-  // --- REPORTS / KENDALA LAPANGAN ---
+  // ==========================================
+  // --- REPORTS / KENDALA ---
+  // ==========================================
   @ApiTags('Reports')
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Post('events/:id/reports')
-  async createReport(@Param('id') eventId: number, @Body() body: { agentId: number, message: string }) {
-    return await this.appService.createEventReport(eventId, body.agentId, body.message);
+  async createReport(@Param('id') eventId: number, @Req() req, @Body() body: { message: string }) {
+    return await this.appService.createEventReport(eventId, req.user.id, body.message);
   }
 
   @ApiTags('Reports')
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Get('events/:id/reports')
-  async getReports(@Param('id') eventId: number, @Query('eoId') eoId: number) {
-    return await this.appService.getEventReports(eventId, eoId);
+  async getReports(@Param('id') eventId: number, @Req() req) {
+    return await this.appService.getEventReports(eventId, req.user.id);
   }
 
   @ApiTags('Reports')
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Patch('reports/:id/resolve')
-  async resolveReport(@Param('id') reportId: number, @Query('eoId') eoId: number) {
-    return await this.appService.resolveEventReport(reportId, eoId);
+  async resolveReport(@Param('id') reportId: number, @Req() req) {
+    return await this.appService.resolveEventReport(reportId, req.user.id);
   }
 
   // ==========================================
-  // 👇 API RECRUITMENT (JOB BOARD) 👇
+  // --- RECRUITMENT (JOB BOARD) ---
   // ==========================================
-
   @ApiTags('Recruitment')
-  @ApiOperation({ summary: 'EO Bikin Lowongan Baru' })
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Post('jobs')
-  async createJob(@Body() body: any) {
+  async createJob(@Req() req, @Body() body: any) {
+    body.eoId = req.user.id;
     return await this.appService.createJobPosting(body);
   }
 
   @ApiTags('Recruitment')
-  @ApiOperation({ summary: 'User Lihat Semua Lowongan (Mendukung Pagination)' })
   @Get('jobs')
-  async getAllJobs(
-    @Query('page') page?: string, 
-    @Query('limit') limit?: string
-  ) {
+  async getAllJobs(@Query('page') page?: string, @Query('limit') limit?: string) {
     const pageNum = page ? Number(page) : 1;
     const limitNum = limit ? Number(limit) : 10;
-    return await this.appService.getAllActiveJobs(pageNum, limitNum);
+    return await this.appService.getAllActiveJobs(pageNum, limitNum); // Public (biar gampang dicari)
   }
 
   @ApiTags('Recruitment')
-  @ApiOperation({ summary: 'EO Lihat Lowongannya Sendiri di Dashboard' })
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Get('events/:id/jobs')
-  async getEventJobs(@Param('id') eventId: string, @Query('eoId') eoId: string) {
-    return await this.appService.getJobsByEvent(Number(eventId), Number(eoId));
+  async getEventJobs(@Param('id') eventId: string, @Req() req) {
+    return await this.appService.getJobsByEvent(Number(eventId), req.user.id);
   }
 
   @ApiTags('Recruitment')
-  @ApiOperation({ summary: 'User Ngirim Lamaran' })
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Post('jobs/apply')
-  async applyJob(@Body() body: any) {
-    return await this.appService.applyForJob(body.jobId, body.userId);
+  async applyJob(@Req() req, @Body() body: any) {
+    return await this.appService.applyForJob(body.jobId, req.user.id);
   }
 
   @ApiTags('Recruitment')
-  @ApiOperation({ summary: 'EO Lihat Daftar Pelamar' })
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Get('events/:id/applicants')
-  async getEventApplicants(@Param('id') eventId: string, @Query('eoId') eoId: string) {
-    return await this.appService.getApplicantsByEvent(Number(eventId), Number(eoId));
+  async getEventApplicants(@Param('id') eventId: string, @Req() req) {
+    return await this.appService.getApplicantsByEvent(Number(eventId), req.user.id);
   }
 
   @ApiTags('Recruitment')
-  @ApiOperation({ summary: 'EO Terima/Tolak Pelamar' })
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Post('jobs/respond')
-  async respondApplicant(@Body() body: any) {
-    return await this.appService.respondToApplicant(body.applicationId, body.action, body.eoId);
+  async respondApplicant(@Req() req, @Body() body: any) {
+    return await this.appService.respondToApplicant(body.applicationId, body.action, req.user.id);
   }
 
   @ApiTags('Recruitment')
-  @ApiOperation({ summary: 'EO Menghapus atau Membatalkan Lowongan' })
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Delete('jobs/:id')
-  async deleteJob(@Param('id') jobId: string, @Query('eoId') eoId: string) {
-    return await this.appService.deleteJobPosting(Number(jobId), Number(eoId));
+  async deleteJob(@Param('id') jobId: string, @Req() req) {
+    return await this.appService.deleteJobPosting(Number(jobId), req.user.id);
   }
 
   // ==========================================
-  // 👇 API PAYOUT / PENGGAJIAN AGEN 👇
+  // --- PAYOUT / PENGGAJIAN AGEN ---
   // ==========================================
-
   @ApiTags('Payout')
-  @ApiOperation({ summary: 'Daftar Gaji Agen di Event' })
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Get('events/:id/payouts')
-  async getPayouts(@Param('id') eventId: string, @Query('eoId') eoId: string) {
-    return await this.appService.getEventPayouts(Number(eventId), Number(eoId));
+  async getPayouts(@Param('id') eventId: string, @Req() req) {
+    return await this.appService.getEventPayouts(Number(eventId), req.user.id);
   }
 
   @ApiTags('Payout')
-  @ApiOperation({ summary: 'Tandai Gaji Agen Lunas' })
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
   @Post('events/:id/payouts/pay')
-  async markPaid(
-    @Param('id') eventId: string,
-    @Body() body: { agentId: number, eoId: number, amount: number, proofUrl: string } 
-  ) {
-    return await this.appService.markAgentPaid(Number(eventId), body.agentId, body.eoId, body.amount, body.proofUrl);
+  async markPaid(@Param('id') eventId: string, @Req() req, @Body() body: { agentId: number, amount: number, proofUrl: string }) {
+    return await this.appService.markAgentPaid(Number(eventId), body.agentId, req.user.id, body.amount, body.proofUrl);
   }
 
-  // 👇 ENDPOINT BARU UNTUK HALAMAN DOMPET AGEN 👇
+  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM (Fix UUID URL)
   @Get('users/:id/payouts')
-  async getAgentWalletPayouts(@Param('id') userId: string) {
-    return await this.appService.getAgentPayouts(Number(userId));
+  async getAgentWalletPayouts(@Req() req) {
+    return await this.appService.getAgentPayouts(req.user.id);
   }
 
+  // ==========================================
+  // --- PAYMENTS (MIDTRANS) ---
+  // ==========================================
   @ApiTags('Payments')
-  @ApiOperation({ summary: 'Buat Tagihan Midtrans (Mendukung Filter Metode Pembayaran)' })
   @Post('payment/test-midtrans')
   async testMidtrans(@Body() body: { orderId: string, amount: number, name: string, email: string, enabledPayments: string[] }) {
     return await this.appService.createMidtransTransaction(
-      body.orderId, 
-      body.amount, 
-      { name: body.name, email: body.email },
-      body.enabledPayments // 👈 Ini parameter pentingnya biar Midtrans ngikutin kemauan IO
+      body.orderId, body.amount, { name: body.name, email: body.email }, body.enabledPayments
     );
   }
 
   @ApiTags('Payments')
-  @ApiOperation({ summary: 'Webhook untuk menerima notifikasi otomatis dari Midtrans' })
   @Post('payment/webhook')
   async midtransWebhook(@Body() payload: any) {
     return await this.appService.handleMidtransWebhook(payload);

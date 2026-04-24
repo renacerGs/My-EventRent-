@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit, InternalServerErrorException, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { Pool } from 'pg';
-import * as bcrypt from 'bcrypt'; 
+// bcrypt dihapus karena udah gak ngurusin hash password lagi
 import * as nodemailer from 'nodemailer';
 import * as dotenv from 'dotenv'; 
 import * as QRCode from 'qrcode';
@@ -610,13 +610,11 @@ export class AppService implements OnModuleInit {
 
   async getEventAttendees(eventId: number, userId: number) {
     try {
-      // 1. Cek apakah dia Pemilik Event (EO)
       const eventCheck = await this.pool.query('SELECT created_by FROM events WHERE id = $1', [eventId]);
       if (eventCheck.rows.length === 0) throw new BadRequestException('Event tidak ditemukan');
       
       const isOwner = eventCheck.rows[0].created_by == userId;
 
-      // 2. Cek apakah dia Agen di event ini (Jika bukan owner)
       let isAgent = false;
       if (!isOwner) {
         const agentCheck = await this.pool.query(
@@ -626,7 +624,6 @@ export class AppService implements OnModuleInit {
         isAgent = agentCheck.rows.length > 0;
       }
 
-      // 3. Tolak kalau bukan EO dan bukan Agen
       if (!isOwner && !isAgent) {
         throw new UnauthorizedException('Akses ditolak! Bukan panitia atau pemilik event.');
       }
@@ -654,20 +651,17 @@ export class AppService implements OnModuleInit {
 
   async scanTicket(ticketCode: string, eventId: number, userId: number) {
     try {
-      // 1. Cek apakah dia Pemilik Event (EO)
       const eventCheck = await this.pool.query('SELECT created_by FROM events WHERE id = $1', [eventId]);
       if (eventCheck.rows.length === 0) throw new BadRequestException('Event tidak ditemukan');
       
       const isOwner = eventCheck.rows[0].created_by == userId;
 
-      // 2. Cek apakah dia Agen di event ini (Jika bukan owner)
       let isAgent = false;
       if (!isOwner) {
         const agentCheck = await this.pool.query('SELECT id FROM event_agents WHERE event_id = $1 AND user_id = $2', [eventId, userId]);
         isAgent = agentCheck.rows.length > 0;
       }
 
-      // 3. Kalau bukan bos dan bukan agen, tolak!
       if (!isOwner && !isAgent) {
         throw new UnauthorizedException('Akses ditolak! Kamu bukan pembuat event atau panitia di event ini.');
       }
@@ -826,206 +820,7 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // --- AUTH & PROFILE ---
-
-  async loginWithGoogle(user: any) {
-    try {
-      const checkRes = await this.pool.query('SELECT * FROM users WHERE email = $1', [user.email]);
-      if (checkRes.rows.length > 0) return checkRes.rows[0];
-      
-      const defaultPic = user.picture || `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(user.name)}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4`;
-      
-      const insertRes = await this.pool.query(
-        `INSERT INTO users (email, name, picture, google_id, is_verified) VALUES ($1, $2, $3, $4, TRUE) RETURNING *`,
-        [user.email, user.name, defaultPic, user.googleId]
-      );
-      
-      const newUser = insertRes.rows[0];
-
-      await this.pool.query(
-        `UPDATE tickets SET user_id = $1 WHERE guest_email = $2 AND user_id IS NULL`,
-        [newUser.id, newUser.email]
-      );
-      console.log(`[Auth] Auto-merged guest tickets for: ${newUser.email}`);
-
-      return newUser;
-    } catch (err) {
-      console.error(err);
-      throw new InternalServerErrorException('Gagal login Google');
-    }
-  }
-
-  async registerUser(data: any) {
-    const checkRes = await this.pool.query('SELECT * FROM users WHERE email = $1', [data.email]);
-    
-    let isGoogleUserWithoutPassword = false;
-    let existingUserId = null;
-
-    if (checkRes.rows.length > 0) {
-      const existingUser = checkRes.rows[0];
-      
-      // 🔥 INI DIA KUNCINYA BRO! 🔥
-      // Kalau email udah ada, TAPI passwordnya masih kosong (NULL), kita ijinin dia lanjut!
-      if (existingUser.password === null) {
-        isGoogleUserWithoutPassword = true;
-        existingUserId = existingUser.id;
-      } else {
-        // Kalau passwordnya udah ada isinya, baru beneran kita tolak!
-        throw new BadRequestException('Email sudah terdaftar!');
-      }
-    }
-    
-    // Hash password manual yang dia ketik
-    const hashedPassword = await bcrypt.hash(data.password, 10);
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiresAt = new Date(Date.now() + 15 * 60000); 
-
-    let newUser;
-
-    if (isGoogleUserWithoutPassword) {
-      // Kalo dia akun Google, kita UPDATE otp_code sama JANGAN LUPA simpen hashedPassword-nya
-      // Biar ngga ngerubah skema db lu, kita simpen passwordnya langsung aja, TAPI status OTP-nya kita gantungin.
-      // Kalau dia gagal verif OTP, gpp passwordnya keubah, toh dia masih bisa login pake Google-nya kan.
-      const updateRes = await this.pool.query(
-        `UPDATE users SET password = $1, otp_code = $2, otp_expires_at = $3 WHERE id = $4 RETURNING *`,
-        [hashedPassword, otpCode, otpExpiresAt, existingUserId]
-      );
-      newUser = updateRes.rows[0];
-    } else {
-      // Kalo murni user baru, jalanin kayak biasa
-      const defaultPic = `https://api.dicebear.com/7.x/adventurer/svg?seed=${encodeURIComponent(data.name)}&backgroundColor=ffdfbf,ffd5dc,d1d4f9,c0aede,b6e3f4`;
-      
-      const insertRes = await this.pool.query(
-        `INSERT INTO users (name, email, password, picture, is_verified, otp_code, otp_expires_at) 
-         VALUES ($1, $2, $3, $4, FALSE, $5, $6) RETURNING *`,
-        [data.name, data.email, hashedPassword, defaultPic, otpCode, otpExpiresAt]
-      );
-      newUser = insertRes.rows[0];
-    }
-
-    const mailOptions = {
-      from: '"EventRent Team" <noreply@eventrent.com>',
-      to: data.email,
-      subject: 'Kode Verifikasi Akun EventRent 🎟️',
-      html: `
-        <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
-          <h2>Halo ${data.name || newUser.name}, selamat datang!</h2>
-          <p>Ini adalah kode verifikasi OTP kamu untuk EventRent:</p>
-          <h1 style="color: #EE7354; letter-spacing: 5px; font-size: 36px; background-color: #fefce8; padding: 10px; border-radius: 8px; display: inline-block;">${otpCode}</h1>
-          <p style="color: #555;">Kode ini hanya berlaku 15 menit. Jangan bagikan kepada siapapun!</p>
-        </div>
-      `,
-    };
-
-    try {
-      await this.transporter.sendMail(mailOptions);
-    } catch (mailError) {
-      console.error('Gagal kirim email OTP:', mailError);
-    }
-
-    if (!isGoogleUserWithoutPassword) {
-      await this.pool.query(
-        `UPDATE tickets SET user_id = $1 WHERE guest_email = $2 AND user_id IS NULL`,
-        [newUser.id, newUser.email]
-      );
-      console.log(`[Auth] Auto-merged guest tickets for: ${newUser.email}`);
-    }
-
-    return {
-      success: true,
-      message: isGoogleUserWithoutPassword 
-        ? 'Akun Google terdeteksi. Silakan cek email lu buat verifikasi password manual ini.'
-        : 'Registrasi berhasil. Silakan cek email untuk kode verifikasi.',
-      userId: newUser.id,
-      email: newUser.email
-    };
-  }
-
-  async verifyOTP(email: string, otpCode: string) {
-    const res = await this.pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (res.rows.length === 0) throw new BadRequestException('User tidak ditemukan');
-    
-    const user = res.rows[0];
-
-    // Dihapus sementara check is_verified, karena akun Google itu is_verified-nya udah TRUE sejak awal.
-    // Tapi karena dia mau nyantolin password, kita butuh OTP-nya jalan.
-    
-    if (user.otp_code !== otpCode) throw new BadRequestException('Kode OTP salah!');
-    if (new Date() > new Date(user.otp_expires_at)) throw new BadRequestException('Kode OTP sudah kedaluwarsa. Silakan minta kode baru.');
-
-    const updateRes = await this.pool.query(
-      `UPDATE users SET is_verified = TRUE, otp_code = NULL, otp_expires_at = NULL WHERE id = $1 RETURNING *`,
-      [user.id]
-    );
-
-    const verifiedUser = updateRes.rows[0];
-    const { password, ...userWithoutPassword } = verifiedUser;
-    
-    return {
-      success: true,
-      message: 'Verifikasi berhasil! Silakan login.',
-      user: userWithoutPassword
-    };
-  }
-
-  async resendOTP(email: string) {
-    const res = await this.pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (res.rows.length === 0) throw new BadRequestException('User tidak ditemukan');
-    
-    const user = res.rows[0];
-    
-    // Ngga masalah walaupun udah verified (karena bisa jadi ini user Google yang lagi mau set password)
-    // if (user.is_verified) throw new BadRequestException('Akun ini sudah terverifikasi');
-
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiresAt = new Date(Date.now() + 15 * 60000); 
-
-    await this.pool.query(
-      `UPDATE users SET otp_code = $1, otp_expires_at = $2 WHERE id = $3`,
-      [otpCode, otpExpiresAt, user.id]
-    );
-
-    const mailOptions = {
-      from: '"EventRent Team" <noreply@eventrent.com>',
-      to: email,
-      subject: 'KODE BARU: Verifikasi Akun EventRent 🎟️',
-      html: `
-        <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
-          <h2>Halo ${user.name}, ini kode OTP barumu.</h2>
-          <h1 style="color: #EE7354; letter-spacing: 5px; font-size: 36px; background-color: #fefce8; padding: 10px; border-radius: 8px; display: inline-block;">${otpCode}</h1>
-          <p style="color: #555;">Kode ini berlaku 15 menit.</p>
-        </div>
-      `,
-    };
-
-    try {
-      await this.transporter.sendMail(mailOptions);
-    } catch (mailError) {
-      console.error('Gagal kirim ulang email OTP:', mailError);
-      throw new InternalServerErrorException('Gagal mengirim email OTP.');
-    }
-
-    return { success: true, message: 'Kode OTP baru telah dikirim ke email.' };
-  }
-
-  async loginUser(data: any) {
-    const res = await this.pool.query('SELECT * FROM users WHERE email = $1', [data.email]);
-    if (res.rows.length === 0) throw new UnauthorizedException('Email/Password salah');
-    const user = res.rows[0];
-    
-    if (!user.is_verified) {
-      throw new UnauthorizedException('Akun belum terverifikasi! Silakan cek email Anda untuk OTP.');
-    }
-
-    // Ini validasi bawaan lu, kalau dia nyoba manual tapi belum di set passwordnya, tolak.
-    if (!user.password) throw new UnauthorizedException('Gunakan Login Google atau Daftar Ulang buat bikin password!');
-    
-    const isMatch = await bcrypt.compare(data.password, user.password);
-    if (!isMatch) throw new UnauthorizedException('Email/Password salah');
-    
-    const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
-  }
+  // --- PROFILE DATA (Update doang) ---
 
   async updateProfile(userId: number, data: any) {
     const res = await this.pool.query(
@@ -1043,78 +838,8 @@ export class AppService implements OnModuleInit {
     return res.rows[0];
   }
 
-  async changePassword(userId: number, data: any) {
-    const res = await this.pool.query('SELECT password FROM users WHERE id = $1', [userId]);
-    const user = res.rows[0];
-    if (!user?.password) throw new BadRequestException('User tidak punya password');
-    if (!(await bcrypt.compare(data.oldPass, user.password))) throw new BadRequestException('Password lama salah!');
-    const hashedNew = await bcrypt.hash(data.newPass, 10);
-    await this.pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedNew, userId]);
-    return { message: 'Berhasil diubah' };
-  }
-
-  // --- FORGOT PASSWORD SYSTEM ---
-
-  async sendForgotPasswordOTP(email: string) {
-    const res = await this.pool.query('SELECT id, name FROM users WHERE email = $1', [email]);
-    
-    if (res.rows.length === 0) {
-      return { success: true, message: 'Jika email terdaftar, kode OTP telah dikirim.' };
-    }
-
-    const user = res.rows[0];
-
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpiresAt = new Date(Date.now() + 15 * 60000);
-
-    await this.pool.query(
-      `UPDATE users SET otp_code = $1, otp_expires_at = $2 WHERE id = $3`,
-      [otpCode, otpExpiresAt, user.id]
-    );
-
-    const mailOptions = {
-      from: '"EventRent Security" <noreply@eventrent.com>',
-      to: email,
-      subject: 'Reset Password Akun EventRent 🔒',
-      html: `
-        <div style="font-family: Arial, sans-serif; text-align: center; padding: 20px;">
-          <h2>Halo ${user.name},</h2>
-          <p>Kami menerima permintaan untuk mereset password Anda. Ini adalah kode OTP Anda:</p>
-          <h1 style="color: #2563EB; letter-spacing: 5px; font-size: 36px; background-color: #eff6ff; padding: 10px; border-radius: 8px; display: inline-block;">${otpCode}</h1>
-          <p style="color: #555;">Kode ini berlaku 15 menit. Jika Anda tidak meminta reset password, abaikan email ini.</p>
-        </div>
-      `,
-    };
-
-    try {
-      await this.transporter.sendMail(mailOptions);
-    } catch (mailError) {
-      console.error('Gagal kirim email OTP reset password:', mailError);
-    }
-
-    return { success: true, message: 'Jika email terdaftar, kode OTP telah dikirim.' };
-  }
-
-  async resetPasswordWithOTP(email: string, otpCode: string, newPassword: string) {
-    const res = await this.pool.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (res.rows.length === 0) throw new BadRequestException('Verifikasi gagal. Pastikan email dan OTP benar.');
-    
-    const user = res.rows[0];
-
-    if (user.otp_code !== otpCode) throw new BadRequestException('Kode OTP salah!');
-    if (new Date() > new Date(user.otp_expires_at)) throw new BadRequestException('Kode OTP sudah kedaluwarsa. Silakan minta ulang.');
-
-    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
-
-    await this.pool.query(
-      `UPDATE users SET password = $1, otp_code = NULL, otp_expires_at = NULL WHERE id = $2`,
-      [hashedNewPassword, user.id]
-    );
-
-    return { success: true, message: 'Password berhasil diubah!' };
-  }
-
   // --- RIWAYAT SCAN AGEN ---
+  
   async getAgentScanHistory(userId: number) {
     try {
       const query = `
@@ -1142,6 +867,7 @@ export class AppService implements OnModuleInit {
   }
 
   // --- NOTIFICATIONS SYSTEM ---
+
   async getNotifications(userId: number) {
     try {
       const { rows } = await this.pool.query('SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
@@ -1198,6 +924,7 @@ export class AppService implements OnModuleInit {
   }
 
   // --- EVENT REPORTS SYSTEM ---
+
   async createEventReport(eventId: number, agentId: number, message: string) {
     try {
       await this.pool.query(
@@ -1261,10 +988,9 @@ export class AppService implements OnModuleInit {
   }
 
   // ==========================================
-  // FITUR RECRUITMENT (JOB BOARD) - FIX UNTUK POSTGRES
+  // FITUR RECRUITMENT (JOB BOARD)
   // ==========================================
 
-  // 1. EO Bikin Lowongan
   async createJobPosting(data: any) {
     try {
       const query = `
@@ -1280,7 +1006,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // Tambahkan parameter default page dan limit
   async getAllActiveJobs(page: number = 1, limit: number = 10) {
     try {
       const offset = (page - 1) * limit; 
@@ -1298,20 +1023,19 @@ export class AppService implements OnModuleInit {
         JOIN events e ON j.event_id = e.id
         JOIN users u ON j.eo_id = u.id
         WHERE j.is_active = TRUE 
-        AND e.event_end >= CURRENT_DATE -- 🔥 Kunci: Event basi otomatis hilang
+        AND e.event_end >= CURRENT_DATE 
         ORDER BY j.created_at DESC
         LIMIT $1 OFFSET $2
       `;
       const { rows } = await this.pool.query(query, [limit, offset]);
       
-      return rows; // ✅ Balikin sebagai ARRAY murni biar frontend lu gak meledak
+      return rows; 
     } catch (err) {
       console.error('Error getAllActiveJobs:', err);
       throw new InternalServerErrorException('Gagal mengambil daftar lowongan');
     }
   }
 
-  // 3. EO Lihat Lowongannya Sendiri di Dashboard
   async getJobsByEvent(eventId: number, eoId: number) {
     try {
       const query = `
@@ -1326,13 +1050,11 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 4. User Ngirim Lamaran
   async applyForJob(jobId: number, userId: number) {
     const client = await this.pool.connect();
     try {
-      await client.query('BEGIN'); // Pakai transaction biar aman
+      await client.query('BEGIN'); 
 
-      // 1. Simpan data lamarannya
       const query = `
         INSERT INTO job_applications (job_id, user_id, status)
         VALUES ($1, $2, 'PENDING')
@@ -1341,7 +1063,6 @@ export class AppService implements OnModuleInit {
       const { rows } = await client.query(query, [jobId, userId]);
       const application = rows[0];
 
-      // 2. Ambil info EO, Event, dan Nama si Pelamar buat isi Notif
       const infoQuery = `
         SELECT j.eo_id, j.event_id, j.role, u.name as applicant_name, e.title as event_title
         FROM job_postings j
@@ -1351,7 +1072,6 @@ export class AppService implements OnModuleInit {
       `;
       const infoRes = await client.query(infoQuery, [jobId, userId]);
       
-      // 3. Kirim Notif ke EO
       if (infoRes.rows.length > 0) {
         const info = infoRes.rows[0];
         
@@ -1359,7 +1079,7 @@ export class AppService implements OnModuleInit {
           `INSERT INTO notifications (user_id, title, message, type, related_event_id)
            VALUES ($1, $2, $3, 'NEW_APPLICANT', $4)`,
           [
-            info.eo_id, // Dikirim ke ID si EO
+            info.eo_id, 
             'Pelamar Baru! 🚀', 
             `${info.applicant_name} melamar untuk posisi ${info.role} di event ${info.event_title}. Cek tab Recruitment sekarang!`, 
             info.event_id
@@ -1381,7 +1101,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 5. EO Lihat Daftar Pelamar
   async getApplicantsByEvent(eventId: number, eoId: number) {
     try {
       const query = `
@@ -1401,7 +1120,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 6. EO Terima/Tolak Pelamar
   async respondToApplicant(applicationId: number, action: string, eoId: number) {
     const client = await this.pool.connect();
     try {
@@ -1501,13 +1219,12 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  async markAgentPaid(eventId: number, agentId: number, eoId: number, amount: number, proofUrl: string) { // <-- Tambah parameter
+  async markAgentPaid(eventId: number, agentId: number, eoId: number, amount: number, proofUrl: string) { 
     try {
       const check = await this.pool.query('SELECT id, title FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
       if (check.rows.length === 0) throw new UnauthorizedException('Akses ditolak.');
       const eventTitle = check.rows[0].title;
 
-      // Validasi Anti Double-Payout
       const checkPaid = await this.pool.query(
         `SELECT id FROM agent_payouts WHERE event_id = $1 AND agent_id = $2 AND status = 'PAID'`,
         [eventId, agentId]
@@ -1516,7 +1233,6 @@ export class AppService implements OnModuleInit {
         throw new BadRequestException('Bro, agen ini sudah lu bayar lunas sebelumnya!');
       }
 
-      // 👇 INSERT dengan tambahan proof_url 👇
       const query = `
         INSERT INTO agent_payouts (event_id, agent_id, amount, status, paid_at, proof_url)
         VALUES ($1, $2, $3, 'PAID', NOW(), $4)
@@ -1524,7 +1240,6 @@ export class AppService implements OnModuleInit {
       `;
       const res = await this.pool.query(query, [eventId, agentId, amount, proofUrl]);
 
-      // 👇 Update pesan notifikasi biar lebih profesional 👇
       await this.pool.query(
         `INSERT INTO notifications (user_id, title, message, type, related_event_id)
          VALUES ($1, $2, $3, 'PAYOUT_SUCCESS', $4)`,
@@ -1540,7 +1255,6 @@ export class AppService implements OnModuleInit {
 
   async deleteJobPosting(jobId: number, eoId: number) {
     try {
-      // 1. Cek dulu apakah lowongan ini emang punya EO yang request
       const checkQuery = 'SELECT id FROM job_postings WHERE id = $1 AND eo_id = $2';
       const checkRes = await this.pool.query(checkQuery, [jobId, eoId]);
 
@@ -1548,7 +1262,6 @@ export class AppService implements OnModuleInit {
         throw new UnauthorizedException('Lowongan tidak ditemukan atau lo bukan pemiliknya bro.');
       }
 
-      // 2. Eksekusi Hapus (Ingat: Foreign Key di job_applications harus ON DELETE CASCADE biar lamarannya ikut kehapus)
       const deleteQuery = 'DELETE FROM job_postings WHERE id = $1 AND eo_id = $2 RETURNING id';
       await this.pool.query(deleteQuery, [jobId, eoId]);
 
@@ -1560,13 +1273,12 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 👇 FUNGSI BARU BUAT AMBIL RIWAYAT DOMPET AGEN 👇
   async getAgentPayouts(agentId: number) {
     try {
       const query = `
         SELECT ap.id, ap.event_id, e.title AS event_title, ap.amount, ap.status, ap.paid_at, ap.proof_url 
         FROM agent_payouts ap
-        JOIN events e ON ap.event_id = e.id -- 👈 Kunci utamanya di sini (JOIN)
+        JOIN events e ON ap.event_id = e.id 
         WHERE ap.agent_id = $1 AND ap.status = 'PAID'
         ORDER BY ap.paid_at DESC
       `;
@@ -1591,15 +1303,12 @@ export class AppService implements OnModuleInit {
         }
       };
 
-      // 🔥 Kalau ada request metode spesifik dari Checkout Frontend, kita masukin filternya!
       if (enabledPayments && enabledPayments.length > 0) {
         parameter.enabled_payments = enabledPayments;
       }
 
-      // Minta token ke Midtrans
       const transaction = await this.snap.createTransaction(parameter);
       
-      // Balikin token-nya ke frontend
       return {
         token: transaction.token,
         redirect_url: transaction.redirect_url
@@ -1613,7 +1322,6 @@ export class AppService implements OnModuleInit {
   async handleMidtransWebhook(payload: any) {
     const { order_id, status_code, gross_amount, signature_key, transaction_status } = payload;
 
-    // 1. VERIFIKASI SIGNATURE (Standar Keamanan Vercel & Production)
     const serverKey = process.env.MIDTRANS_SERVER_KEY;
     const stringToHash = order_id + status_code + gross_amount + serverKey;
     const hashed = crypto.createHash('sha512').update(stringToHash).digest('hex');
@@ -1625,19 +1333,14 @@ export class AppService implements OnModuleInit {
 
     console.log(`💬 [WEBHOOK] Status Transaksi ${order_id}: ${transaction_status}`);
 
-    // 2. LOGIKA BISNIS (Bisa dikembangin nanti buat update DB)
     if (transaction_status === 'settlement' || transaction_status === 'capture') {
       console.log(`✅ [WEBHOOK SUCCESS] PESANAN ${order_id} TELAH DIBAYAR LUNAS SEBESAR Rp ${gross_amount}!`);
-
-      // Nanti kalau lu butuh, lu bisa tambahin fungsi nyimpen/update status tiket di sini
-
     } else if (transaction_status === 'pending') {
       console.log(`⏳ [WEBHOOK PENDING] Menunggu user mentransfer pembayaran untuk ${order_id}...`);
     } else if (transaction_status === 'expire' || transaction_status === 'cancel' || transaction_status === 'deny') {
       console.log(`❌ [WEBHOOK FAILED] Transaksi ${order_id} gagal/kadaluarsa.`);
     }
 
-    // 3. WAJIB BALES MIDTRANS BIAR DIA BERHENTI NELPON SERVER VERCEL LU
     return { status: 'OK' };
   }
 }

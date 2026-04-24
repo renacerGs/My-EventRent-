@@ -84,6 +84,17 @@ export default function App() {
     return children;
   };
 
+  // 🔥 FUNGSI GLOBAL BUAT NANGANIN LOGIN SUCCESS (Biar DRY) 🔥
+  const handleLoginSuccess = (userData) => {
+    setUser(userData); 
+    try {
+      localStorage.setItem('user', JSON.stringify(userData)); 
+    } catch (error) {
+      localStorage.setItem('user', JSON.stringify({ ...userData, picture: null }));
+    }
+    setIsLoginOpen(false); 
+  };
+
   return (
     <div className="bg-white min-h-screen font-sans flex flex-col">
       
@@ -107,10 +118,13 @@ export default function App() {
           onSearchSelect={(title) => setSearchQuery(title)}
           onOpenLogin={() => setIsLoginOpen(true)}
           onLogout={() => {
+            // Cukup bersihin state lokal aja, urusan token Supabase udah diberesin sama Navbar lu
             setUser(null);
             localStorage.removeItem('user');
             toast.success('Berhasil logout bro!'); 
           }}
+          // 🔥 TAMBAHAN UTAMA: Biar Navbar bisa ngabarin App.jsx kalau ada deteksi login dari Google
+          onLoginSuccess={handleLoginSuccess}
         />
       )}
 
@@ -174,13 +188,7 @@ export default function App() {
         isOpen={isLoginOpen} 
         onClose={() => setIsLoginOpen(false)} 
         onLoginSuccess={(userData) => {
-          setUser(userData); 
-          try {
-            localStorage.setItem('user', JSON.stringify(userData)); 
-          } catch (error) {
-            localStorage.setItem('user', JSON.stringify({ ...userData, picture: null }));
-          }
-          setIsLoginOpen(false); 
+          handleLoginSuccess(userData); // Pakai fungsi global yang udah dibikin
           
           if (userData.role === 'agent') {
             toast.success(`Berhasil masuk portal agen, ${userData.name}!`);

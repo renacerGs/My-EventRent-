@@ -65,13 +65,26 @@ export default function MyTickets() {
 
   useEffect(() => {
     const fetchMyTickets = async () => {
-      if (!user || !user.id) {
+      if (!user) {
         setLoading(false);
         return;
       }
+
+      // 🔥 AMBIL TOKEN DARI BRANKAS
+      const token = localStorage.getItem('supabase_token');
+
+      if (!token) {
+        setLoading(false);
+        return; // Jangan nembak kalau nggak ada token
+      }
+
       try {
-        // ✅ URL VERCEL
-        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/tickets/my?userId=${user.id}`);
+        // 🔥 TAMBAHIN HEADERS & HAPUS `?userId=${user.id}` KARENA UDAH DIAMBIL ALIH SATPAM
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/tickets/my`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         
         // ✅ SABUK PENGAMAN (Cek apakah response beneran Array)
         const rawTickets = Array.isArray(response.data) ? response.data : [];

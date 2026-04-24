@@ -19,6 +19,7 @@ export default function Scanner() {
     }
   }, [user, navigate]);
 
+  // 🔥 FUNGSI YANG DIUBAH: Tambah Token & Buang userId di payload
   const processTicket = async (ticketIdStr) => {
     setScanResult('processing');
     
@@ -33,11 +34,19 @@ export default function Scanner() {
     }
 
     try {
+      // AMBIL TOKEN DARI LOKAL STORAGE
+      const token = localStorage.getItem('supabase_token');
+
+      // TEMBAK API DENGAN TOKEN
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tickets/scan`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticketId, eventId, userId: user?.id })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // 👈 INI KTP-NYA!
+        },
+        body: JSON.stringify({ ticketId, eventId }) // 👈 userId DIHAPUS DARI SINI
       });
+      
       const data = await res.json();
 
       if (res.ok && data.valid) {

@@ -45,17 +45,28 @@ export default function Likes() {
 
   useEffect(() => {
     const fetchLikedEvents = async () => {
-      if (!user || !user.id) {
+      if (!user) {
         setLoading(false);
         return;
       }
+
+      // 🔥 AMBIL TOKEN
+      const token = localStorage.getItem('supabase_token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
-        // ✅ URL VERCEL UDAH DISESUAIKAN DI SINI
-        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/likes/my?userId=${user.id}`);
+        // 🔥 HAPUS ?userId DAN TAMBAH HEADER TOKEN
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/likes/my`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         
         if (response.data) {
-          // ✅ SABUK PENGAMAN BIAR GAK ERROR .map is not a function
           const validData = Array.isArray(response.data) ? response.data : [];
           setLikedEvents(validData);
           localStorage.setItem('likedEvents', JSON.stringify(validData));
@@ -68,7 +79,7 @@ export default function Likes() {
       }
     };
     fetchLikedEvents();
-  }, [user?.id]); 
+  }, [user?.id]); // 👈 Kuncinya udah bener, aman dari infinite loop
 
   const triggerUnlikeConfirmation = (e, eventId) => {
     e.preventDefault(); 
@@ -79,20 +90,31 @@ export default function Likes() {
   const confirmUnlike = async () => {
     if (!eventToUnlike) return;
     
+    // Optimistic UI Update (Ubah di layar duluan)
     const updatedLikes = likedEvents.filter(event => event.id !== eventToUnlike);
     setLikedEvents(updatedLikes);
     localStorage.setItem('likedEvents', JSON.stringify(updatedLikes)); 
+    const currentEventId = eventToUnlike;
     setEventToUnlike(null);
     
+    // 🔥 AMBIL TOKEN
+    const token = localStorage.getItem('supabase_token');
+
     try {
-      // ✅ URL VERCEL (Ini udah bener dari lu sebelumnya)
-      await axios.post(`${import.meta.env.VITE_API_URL}/api/likes/toggle`, {
-        userId: user.id,
-        eventId: eventToUnlike
+      // 🔥 HAPUS userId DARI BODY DAN TAMBAH HEADER TOKEN
+      await axios.post(`${import.meta.env.VITE_API_URL}/api/likes/toggle`, 
+      {
+        eventId: currentEventId
+      }, 
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
     } catch (error) {
       console.error("Gagal unlike event:", error);
       showPopup("Gagal menghapus event dari wishlist.", "error");
+      // Rollback jika gagal (opsional)
     }
   };
 

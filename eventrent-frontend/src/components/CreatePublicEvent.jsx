@@ -200,6 +200,9 @@ export default function CreatePublicEvent() {
     
     setIsLoading(true);
     try {
+      // 🔥 1. AMBIL TOKEN DARI LOKAL STORAGE
+      const token = localStorage.getItem('supabase_token');
+
       const resBase64 = await fetch(imageBase64);
       const imageBlob = await resBase64.blob();
       
@@ -213,19 +216,24 @@ export default function CreatePublicEvent() {
 
       const { data: publicUrlData } = supabase.storage.from('event-posters').getPublicUrl(fileName);
       
+      // 🔥 2. HAPUS `userId` KARENA BACKEND UDAH UBAH PAKE TOKEN
       const payload = {
           ...formData,
-          userId: user.id,
           img: publicUrlData.publicUrl 
       };
 
+      // 🔥 3. TEMBAK API POST DENGAN TOKEN DI HEADER
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` // 👈 INI KTP-NYA!
+          },
           body: JSON.stringify(payload)
       });
 
       if (response.ok) {
+          toast.success("Event berhasil dibuat!"); // Kasih notif biar seneng
           navigate('/manage'); 
       } else {
           const errorData = await response.json();

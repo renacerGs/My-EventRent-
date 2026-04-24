@@ -3,6 +3,9 @@ import { useGoogleLogin } from '@react-oauth/google';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, CheckCircle2, RefreshCw, ArrowLeft, UserCircle2, Briefcase, KeyRound } from 'lucide-react'; 
 
+// 👇 IMPORT SUPABASE LU DI SINI (Sesuaikan path foldernya ya!)
+import { supabase } from '../supabase'; 
+
 const AnimatedEyeToggle = ({ isVisible }) => {
   const strokeColor = "#9ca3af"; 
   const activeColor = "#FF6B35"; 
@@ -29,19 +32,25 @@ const OtpVerification = ({ email, onVerified, onCancel, isAgentMode }) => {
     setError('');
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otpCode: codeToVerify }),
+      // 🚀 SUPABASE: Verifikasi OTP Register
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        email,
+        token: codeToVerify,
+        type: 'signup' // Tipe OTP untuk akun baru
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Verifikasi gagal');
+      if (verifyError) throw verifyError;
       
-      const finalUser = { ...data.user, role: isAgentMode ? 'agent' : 'user' };
+      // Simpan token biar langsung login
+      if (data.session) {
+        localStorage.setItem('supabase_token', data.session.access_token);
+      }
+
+      const finalUser = { ...data.user, name: data.user.user_metadata?.full_name, role: isAgentMode ? 'agent' : 'user' };
       onVerified(finalUser); 
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Verifikasi gagal');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -83,13 +92,13 @@ const OtpVerification = ({ email, onVerified, onCancel, isAgentMode }) => {
     setIsLoading(true);
     setError('');
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/resend-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+      // 🚀 SUPABASE: Kirim Ulang OTP
+      const { error: resendError } = await supabase.auth.resend({
+        type: 'signup',
+        email: email
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message);
+      
+      if (resendError) throw resendError;
       
       setResendCooldown(60);
       const timer = setInterval(() => {
@@ -98,7 +107,11 @@ const OtpVerification = ({ email, onVerified, onCancel, isAgentMode }) => {
           return prev - 1;
         });
       }, 1000);
-    } catch (err) { setError(err.message); } finally { setIsLoading(false); }
+    } catch (err) { 
+      setError(err.message); 
+    } finally { 
+      setIsLoading(false); 
+    }
   };
 
   return (
@@ -132,9 +145,8 @@ const OtpVerification = ({ email, onVerified, onCancel, isAgentMode }) => {
   );
 };
 
-// 👇 KOMPONEN BARU: LUPA PASSWORD 👇
 const ForgotPasswordScreen = ({ onCancel, onPasswordResetSuccess }) => {
-  const [step, setStep] = useState(1); // 1 = Input Email, 2 = Input OTP & Password Baru
+  const [step, setStep] = useState(1); 
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -150,24 +162,15 @@ const ForgotPasswordScreen = ({ onCancel, onPasswordResetSuccess }) => {
     setIsLoading(true);
     setErrorMsg('');
     try {
-      // Panggil endpoint forgot-password (Nanti kita bikin di backend)
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json();
+      // 🚀 SUPABASE: Minta OTP Lupa Password
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
       
-      // Mengikuti saran anti-enumeration: Selalu lanjut ke tahap OTP walaupun gagal
-      if (res.ok) {
-        setStep(2);
-        setSuccessMsg(data.message);
-      } else {
-        // Tetap lanjut, tapi aslinya gagal di server (biar hacker bingung)
-        setStep(2);
-      }
+      if (error) throw error;
+      
+      setStep(2);
+      setSuccessMsg('Kode OTP pemulihan telah dikirim ke email lu!');
     } catch (err) {
-      setErrorMsg("Koneksi gagal bro, cek internet lu.");
+      setErrorMsg(err.message);
     } finally {
       setIsLoading(false);
     }
@@ -181,21 +184,29 @@ const ForgotPasswordScreen = ({ onCancel, onPasswordResetSuccess }) => {
     setErrorMsg('');
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, otpCode, newPassword }),
+      // 🚀 SUPABASE: 1. Verifikasi OTP Lupa Password
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        email,
+        token: otpCode,
+        type: 'recovery'
       });
-      const data = await res.json();
       
-      if (!res.ok) throw new Error(data.message || 'Gagal reset password');
+      if (verifyError) throw verifyError;
+
+      // 🚀 SUPABASE: 2. Ganti Password Baru
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (updateError) throw updateError;
       
       setSuccessMsg('Password berhasil direset! Silakan login.');
       setTimeout(() => {
-        onPasswordResetSuccess(); // Balik ke halaman login
+        onPasswordResetSuccess(); 
       }, 2000);
     } catch (err) {
       setErrorMsg(err.message);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -214,7 +225,6 @@ const ForgotPasswordScreen = ({ onCancel, onPasswordResetSuccess }) => {
 
   return (
     <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full h-full flex flex-col justify-center items-center bg-white p-6 sm:p-8">
-      
       <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-6">
         <KeyRound className="w-8 h-8" />
       </div>
@@ -278,7 +288,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
   const [showPassword, setShowPassword] = useState(false);
   
   const [showOtpScreen, setShowOtpScreen] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false); // 👈 STATE LUPA PASSWORD
+  const [showForgotPassword, setShowForgotPassword] = useState(false); 
   const [registeredEmail, setRegisteredEmail] = useState('');
   const [isAgentMode, setIsAgentMode] = useState(false);
 
@@ -302,62 +312,76 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const loginWithGoogle = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      try {
-        setIsLoading(true);
-        setErrorMsg('');
-        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-        });
-        const googleUser = await res.json();
-        
-        const backendRes = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/google`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: googleUser.email, name: googleUser.name, picture: googleUser.picture, googleId: googleUser.sub }),
-        });
-        
-        if (!backendRes.ok) throw new Error("Gagal login dengan Google dari Server");
-        
-        let loggedInUser = await backendRes.json();
-        loggedInUser = { ...loggedInUser, role: isAgentMode ? 'agent' : 'user' };
-        
-        onLoginSuccess(loggedInUser); 
-        onClose(); 
-        
-      } catch (err) { setErrorMsg("Koneksi ke server gagal. Coba lagi."); } finally { setIsLoading(false); }
-    },
-    onError: () => setErrorMsg('Akses Google ditolak!'),
-  });
+  // 🚀 SUPABASE: Login pake Google
+  const handleGoogleLogin = async () => {
+    try {
+      setIsLoading(true);
+      setErrorMsg('');
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+      });
+      if (error) throw error;
+      // Catatan: OAuth Google akan me-redirect halaman browser lu secara otomatis
+    } catch (err) {
+      setErrorMsg(err.message || 'Akses Google ditolak!');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMsg('');
     setSuccessMsg('');
-    const endpoint = isSignUp ? 'register' : 'login';
-    const payload = isSignUp ? { name: formData.name, email: formData.email, password: formData.password } : { email: formData.email, password: formData.password };
 
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      let data = await res.json();
-      
-      if (!res.ok) throw new Error(data.message || 'Authentication failed');
-
       if (isSignUp) {
+        // 🚀 SUPABASE: Register User Baru
+        const { error } = await supabase.auth.signUp({
+          email: formData.email,
+          password: formData.password,
+          options: {
+            data: {
+              full_name: formData.name, // 👈 Ini bakal ngisi database berkat Trigger lu!
+            }
+          }
+        });
+        
+        if (error) throw error;
+
+        // Buka layar verifikasi OTP bawaan lu
         setRegisteredEmail(formData.email);
         setShowOtpScreen(true);
+        
       } else {
-        data = { ...data, role: isAgentMode ? 'agent' : 'user' };
-        onLoginSuccess(data);
+        // 🚀 SUPABASE: Login Normal
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
+        });
+
+        if (error) throw error;
+
+        // 🔥 SIMPAN TOKEN UNTUK NEMBAK NESTJS NANTI 🔥
+        const token = data.session.access_token;
+        localStorage.setItem('supabase_token', token);
+
+        // Nyiapin data user buat frontend lu
+        const loggedInUser = { 
+          ...data.user, 
+          name: data.user.user_metadata?.full_name || 'User',
+          role: isAgentMode ? 'agent' : 'user' 
+        };
+        
+        onLoginSuccess(loggedInUser);
         onClose(); 
       }
-    } catch (err) { setErrorMsg(err.message); } finally { setIsLoading(false); }
+    } catch (err) { 
+      setErrorMsg(err.message || 'Autentikasi gagal'); 
+    } finally { 
+      setIsLoading(false); 
+    }
   };
 
   const handleOtpSuccess = (userData) => {
@@ -428,7 +452,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
 
               <div className="text-center mb-5 mt-2 md:mt-0">
                 <div className="flex gap-4 justify-center">
-                  <button type="button" onClick={() => loginWithGoogle()} className="w-12 h-12 md:w-10 md:h-10 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-all shadow-sm active:scale-90 bg-white">
+                  {/* 👇 TOMBOL GOOGLE SEKARANG PAKAI SUPABASE JUGA 👇 */}
+                  <button type="button" onClick={handleGoogleLogin} className="w-12 h-12 md:w-10 md:h-10 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-all shadow-sm active:scale-90 bg-white">
                     <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 md:w-4 md:h-4" alt="Google" />
                   </button>
                 </div>
@@ -450,7 +475,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                       </button>
                     </div>
 
-                    {/* 👇 TOMBOL LUPA PASSWORD 👇 */}
                     {!isSignUp && (
                       <div className="flex justify-end w-full">
                         <button type="button" onClick={() => setShowForgotPassword(true)} className="text-[10px] font-bold text-gray-500 hover:text-blue-500 transition-colors uppercase tracking-widest cursor-pointer">

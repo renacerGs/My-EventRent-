@@ -17,13 +17,14 @@ export default function RiwayatScan() {
   // State nyimpen event mana yang lagi diklik/dibuka detailnya
   const [activeEventTracker, setActiveEventTracker] = useState(null);
 
+  // 🔥 FIX 1: Ganti dependency dari [user] jadi [user?.id] biar GAK KEDIP-KEDIP!
   useEffect(() => {
-    if (!user) {
+    if (!user || !user.id) {
       navigate('/');
       return;
     }
     fetchHistory();
-  }, [user, navigate]);
+  }, [user?.id, navigate]);
 
   // Reset Sesi tiap kali ganti halaman detail event
   useEffect(() => {
@@ -31,11 +32,19 @@ export default function RiwayatScan() {
     setSearchQuery('');
   }, [activeEventTracker]);
 
+  // 🔥 FIX 2: Bawa Token Supabase di Headers
   const fetchHistory = async () => {
     try {
       setLoading(true);
-      // 👇 SUDAH DISESUAIKAN DENGAN ENV API URL 👇
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${user.id}/scan-history`);
+      
+      const token = localStorage.getItem('supabase_token');
+      
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${user.id}/scan-history`, {
+        headers: {
+          'Authorization': `Bearer ${token}` // 👈 Ini KTP lu bro!
+        }
+      });
+      
       if (res.ok) {
         const data = await res.json();
         setScanHistory(data);

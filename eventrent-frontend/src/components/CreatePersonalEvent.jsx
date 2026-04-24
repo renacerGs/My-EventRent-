@@ -287,6 +287,7 @@ export default function CreatePersonalEvent() {
     return publicUrlData.publicUrl;
   };
 
+  // 🔥 FUNGSI YANG DIUBAH: Penambahan Token Headers & Penghapusan userId dari body
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!imageBase64) return toast.error("Poster/Cover Utama wajib diupload!");
@@ -294,6 +295,9 @@ export default function CreatePersonalEvent() {
     
     setIsLoading(true);
     try {
+      // 1. AMBIL TOKEN DARI LOKAL STORAGE
+      const token = localStorage.getItem('supabase_token');
+
       const coverUrl = await uploadImageToSupabase(imageBase64, 'cover');
       const uploadedProfiles = await Promise.all(eventDetails.profiles.map(async (prof) => {
          if (prof.photoUrl && prof.photoUrl.startsWith('data:image')) {
@@ -315,20 +319,25 @@ export default function CreatePersonalEvent() {
          galleryCaptions: galleryCaptions 
       };
 
+      // 2. HAPUS userId DARI PAYLOAD (Udah diurus Satpam Backend)
       const payload = {
           ...formData,
-          userId: user.id,
           img: coverUrl,
           eventDetails: finalEventDetails 
       };
 
+      // 3. TEMBAK API POST DENGAN TOKEN DI HEADER
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}` // 👈 INI KTP-NYA!
+          },
           body: JSON.stringify(payload)
       });
 
       if (response.ok) {
+          toast.success("Undangan pesta berhasil dibuat!");
           navigate('/manage'); 
       } else {
           const errorData = await response.json();

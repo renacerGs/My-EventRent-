@@ -46,14 +46,24 @@ export default function EventDetail() {
   useEffect(() => {
     const fetchEventDetail = async () => {
       try {
-        // ✅ URL VERCEL
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`);
+        // 🔥 AMBIL TOKEN DARI LOKAL STORAGE (Buat jaga-jaga kalau eventnya Private)
+        const token = localStorage.getItem('supabase_token');
+        const headers = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        // 🔥 TAMBAHIN HEADER TOKEN (OPSIONAL BAGI GUEST)
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`, { headers });
         if (!response.ok) throw new Error('Gagal mengambil data event');
         const data = await response.json();
         setEvent(data);
         
-        // ✅ URL VERCEL
-        fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/view`, { method: 'POST' }).catch(() => {});
+        // Hit API View (Boleh bawa token juga biar akurat)
+        fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/view`, { 
+          method: 'POST',
+          headers: headers 
+        }).catch(() => {});
         
         // 👇👇 FIX LIKES (SABUK PENGAMAN KETAT) 👇👇
         const parsedLikes = JSON.parse(localStorage.getItem('likedEvents'));
@@ -61,7 +71,7 @@ export default function EventDetail() {
         setIsLiked(savedLikes.some(item => String(item.id) === String(id)));
       } catch (error) {
         console.error(error);
-        showPopup("Acara tidak ditemukan!", "error");
+        showPopup("Acara tidak ditemukan atau Akses Ditolak!", "error");
         setTimeout(() => navigate('/'), 2000);
       } finally {
         setLoading(false);
@@ -70,16 +80,22 @@ export default function EventDetail() {
 
     fetchEventDetail();
     window.scrollTo(0, 0);
-  }, [id, navigate]);
+  }, [id, navigate]); // 👈 Aman sentosa, gak bakal infinite loop!
 
+  // 🔥 FUNGSI YANG DIUBAH: Pake Token & Buang userId
   const handleLikeClick = async () => {
     if (!user) return showPopup("Login dulu bro buat nyimpen ke Wishlist!", "error");
+    
     try {
-      // ✅ URL VERCEL
+      const token = localStorage.getItem('supabase_token');
+
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/likes/toggle`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id, eventId: event.id })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // 👈 KTP SUPABASE!
+        },
+        body: JSON.stringify({ eventId: event.id }) // 👈 userId DIHAPUS DARI SINI
       });
       if (res.ok) setIsLiked(!isLiked);
     } catch (error) { console.error(error); }

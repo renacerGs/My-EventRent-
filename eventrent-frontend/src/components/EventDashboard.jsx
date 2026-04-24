@@ -58,7 +58,11 @@ export default function EventDashboard() {
   // 👇 STATE BARU: FILE BUKTI TF 👇
   const [proofFile, setProofFile] = useState(null);
 
+  // 🔥 UBAHAN KE-1: TARIK DATA EVENT & PESERTA
   const fetchData = async (isBackground = false) => {
+    const token = localStorage.getItem('supabase_token');
+    if (!token) return;
+
     try {
       if (isBackground) setIsRefreshing(true);
       else setLoading(true);
@@ -67,7 +71,10 @@ export default function EventDashboard() {
       if (!resEvent.ok) throw new Error("Gagal mengambil event");
       const eventData = await resEvent.json();
 
-      const resAttendees = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/attendees?userId=${user?.id}`);
+      // Hilangkan ?userId= dan tambahkan header
+      const resAttendees = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/attendees`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       const dataAttendees = await resAttendees.json();
 
       const groupedMap = new Map();
@@ -113,9 +120,14 @@ export default function EventDashboard() {
     }
   };
 
+  // 🔥 UBAHAN KE-2: TARIK AGEN
   const fetchAgents = async () => {
+    const token = localStorage.getItem('supabase_token');
+    if (!token) return;
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/agents?eoId=${user?.id}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/agents`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         if(Array.isArray(data)) setAgents(data);
@@ -125,9 +137,14 @@ export default function EventDashboard() {
     }
   };
 
+  // 🔥 UBAHAN KE-3: TARIK LAPORAN
   const fetchReports = async () => {
+    const token = localStorage.getItem('supabase_token');
+    if (!token) return;
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/reports?eoId=${user?.id}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/reports`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setReports(data);
@@ -137,31 +154,48 @@ export default function EventDashboard() {
     }
   };
 
+  // 🔥 UBAHAN KE-4: TARIK DATA REKRUTMEN
   const fetchRecruitmentData = async () => {
+    const token = localStorage.getItem('supabase_token');
+    if (!token) return;
     try {
-      const resJobs = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/jobs?eoId=${user?.id}`);
+      const resJobs = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/jobs`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (resJobs.ok) setJobs(await resJobs.json());
 
-      const resApps = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/applicants?eoId=${user?.id}`);
+      const resApps = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/applicants`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (resApps.ok) setApplicants(await resApps.json());
     } catch (err) {
       console.error("Gagal narik data recruitment", err);
     }
   };
 
+  // 🔥 UBAHAN KE-5: TARIK DATA PAYOUT
   const fetchPayouts = async () => {
+    const token = localStorage.getItem('supabase_token');
+    if (!token) return;
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/payouts?eoId=${user?.id}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/payouts`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) setPayouts(await res.json());
     } catch (err) {
       console.error("Gagal narik data payout", err);
     }
   };
 
+  // 🔥 UBAHAN KE-6: SELESAIKAN LAPORAN
   const handleResolveReport = async (reportId) => {
+    const token = localStorage.getItem('supabase_token');
     const toastId = toast.loading("Memproses...");
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/reports/${reportId}/resolve?eoId=${user?.id}`, { method: 'PATCH' });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/reports/${reportId}/resolve`, { 
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
         toast.success("Kendala berhasil ditandai selesai!", { id: toastId });
         fetchReports();
@@ -173,12 +207,13 @@ export default function EventDashboard() {
     }
   };
 
+  // 🔥 UBAHAN KE-7: BIKIN LOWONGAN
   const handleCreateJob = async (e) => {
     e.preventDefault();
     setIsCreatingJob(true);
+    const token = localStorage.getItem('supabase_token');
     const toastId = toast.loading('Membuka lowongan...');
     
-    // 👇 TRIK CERDAS: Gabungin nama tugas sama nama sesi 👇
     const finalRole = newJob.sessionName === 'Semua Sesi' 
       ? newJob.role 
       : `${newJob.role} [${newJob.sessionName}]`;
@@ -186,11 +221,13 @@ export default function EventDashboard() {
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           eventId: id,
-          eoId: user?.id,
-          role: finalRole, // 👈 Kita kirim nama tugas yang udah digabung
+          role: finalRole, 
           quota: parseInt(newJob.quota),
           fee: parseInt(newJob.fee),
           description: newJob.description
@@ -200,7 +237,6 @@ export default function EventDashboard() {
       
       if (res.ok) {
         toast.success('Lowongan berhasil dibuka!', { id: toastId });
-        // Reset form ke awal
         setNewJob({ role: '', sessionName: 'Semua Sesi', quota: '', fee: '', description: '' });
         fetchRecruitmentData(); 
         setShowRecruitmentModal(false); 
@@ -218,14 +254,17 @@ export default function EventDashboard() {
     setConfirmDeleteJob({ show: true, jobId: jobId });
   };
 
+  // 🔥 UBAHAN KE-8: HAPUS LOWONGAN
   const executeDeleteJob = async () => {
     const jobId = confirmDeleteJob.jobId;
     setConfirmDeleteJob({ show: false, jobId: null });
+    const token = localStorage.getItem('supabase_token');
 
     const toastId = toast.loading('Menghapus lowongan...');
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs/${jobId}?eoId=${user?.id}`, {
-        method: 'DELETE'
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs/${jobId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
 
@@ -240,16 +279,21 @@ export default function EventDashboard() {
     }
   };
 
+  // 🔥 UBAHAN KE-9: RESPOND PELAMAR
   const executeRespondApplicant = async () => {
     const { appId, action } = confirmRespondApp;
     setConfirmRespondApp({ show: false, appId: null, action: null });
+    const token = localStorage.getItem('supabase_token');
     
     const toastId = toast.loading('Memproses lamaran...');
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs/respond`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ applicationId: appId, action: action, eoId: user?.id })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ applicationId: appId, action: action })
       });
       const data = await res.json();
 
@@ -268,7 +312,7 @@ export default function EventDashboard() {
     }
   };
 
-  // 👇 FUNGSI MARK PAID YANG UDAH DI UPDATE (UPLOAD BUKTI SUPABASE) 👇
+  // 🔥 UBAHAN KE-10: MARK PAID (BAYAR AGEN)
   const executeMarkPaid = async () => {
     const amount = payoutAmountInput || 0;
     if (amount <= 0 || !proofFile) {
@@ -278,37 +322,36 @@ export default function EventDashboard() {
 
     if (!selectedAgentPayout) return;
     const agentId = selectedAgentPayout.agent_id;
+    const token = localStorage.getItem('supabase_token');
 
-    // Ganti ke animasi loading
     setPayoutProcessStatus('processing');
 
     try {
-      // 1. UPLOAD GAMBAR KE SUPABASE STORAGE
       const fileExt = proofFile.type === 'image/webp' ? 'webp' : proofFile.name ? proofFile.name.split('.').pop() : 'jpg';
       const fileName = `receipt-${agentId}-${Date.now()}-${Math.floor(Math.random()*1000)}.${fileExt}`; 
       
       const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('payout-receipts') // Pastikan lu beneran udah bikin bucket nama ini di Supabase lu
+        .from('payout-receipts') 
         .upload(fileName, proofFile, { upsert: false });
 
       if (uploadError) {
         throw new Error('Gagal upload bukti transfer ke Supabase');
       }
 
-      // 2. DAPETIN PUBLIC URL GAMBARNYA
       const { data: publicUrlData } = supabase.storage
         .from('payout-receipts')
         .getPublicUrl(fileName);
         
       const uploadedProofUrl = publicUrlData.publicUrl;
 
-      // 3. HIT API NESTJS DENGAN PROOF URL
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/payouts/pay`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ 
           agentId, 
-          eoId: user?.id, 
           amount: Number(amount),
           proofUrl: uploadedProofUrl 
         })
@@ -323,7 +366,7 @@ export default function EventDashboard() {
           setShowPayoutModal(false);
           setSelectedAgentPayout(null);
           setPayoutAmountInput('');
-          setProofFile(null); // Reset state file
+          setProofFile(null); 
           setPayoutProcessStatus('idle'); 
         }, 2000);
       } else {
@@ -359,13 +402,19 @@ export default function EventDashboard() {
     setCurrentPage(1);
   }, [searchQuery, selectedSessionFilter, selectedStatusFilter]); 
 
+  // 🔥 UBAHAN KE-11: TAMBAH AGEN MANUAL
   const handleAddAgent = async (e) => {
     e.preventDefault();
     if (!agentEmailInput) return;
+    const token = localStorage.getItem('supabase_token');
+
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/agents?eoId=${user?.id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/agents`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ email: agentEmailInput, role: 'Panitia' })
       });
       const data = await res.json();
@@ -382,11 +431,17 @@ export default function EventDashboard() {
     }
   };
 
+  // 🔥 UBAHAN KE-12: HAPUS AGEN
   const executeRemoveAgent = async () => {
     const agentId = confirmRemoveAgent.agentId;
     setConfirmRemoveAgent({ show: false, agentId: null });
+    const token = localStorage.getItem('supabase_token');
+
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/agents/${agentId}?eoId=${user?.id}`, { method: 'DELETE' });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/agents/${agentId}`, { 
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
         toast.success('Agen berhasil diberhentikan.');
         fetchAgents(); 
@@ -399,11 +454,16 @@ export default function EventDashboard() {
     }
   };
 
+  // 🔥 UBAHAN KE-13: EDIT TUGAS & RATING
   const submitEditRole = async () => {
+    const token = localStorage.getItem('supabase_token');
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/agents/${agentEditRole.agentId}?eoId=${user?.id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/agents/${agentEditRole.agentId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ role: agentEditRole.role, rating_given: agentEditRole.rating_given })
       });
       if (res.ok) {
@@ -422,14 +482,20 @@ export default function EventDashboard() {
   const toggleExpand = (orderId) => setExpandedRow(expandedRow === orderId ? null : orderId);
   const initiateManualCheckIn = (ticketId) => setConfirmDialog({ show: true, ticketId: ticketId }); 
 
+  // 🔥 UBAHAN KE-14: CHECK-IN MANUAL
   const confirmManualCheckIn = async () => {
     const ticketId = confirmDialog.ticketId;
     setConfirmDialog({ show: false, ticketId: null }); 
+    const token = localStorage.getItem('supabase_token');
+
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tickets/scan`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticketId: ticketId, eventId: parseInt(id), userId: user?.id })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ ticketId: ticketId, eventId: parseInt(id) })
       });
       if (res.ok) {
         setPopup({ show: true, message: "Check-In Manual Berhasil!", type: 'success' });
@@ -587,7 +653,7 @@ export default function EventDashboard() {
         </div>
       )}
 
-      {/* ======================= MODAL PENGGAJIAN (UPDATE UPLOAD BUKTI) ======================= */}
+      {/* ======================= MODAL PENGGAJIAN ======================= */}
       {showPayoutModal && selectedAgentPayout && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
           <div className="rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl relative bg-white">
@@ -927,7 +993,7 @@ export default function EventDashboard() {
         {/* TAB NAVIGATION */}
         <div className="bg-white p-2 rounded-2xl md:rounded-full shadow-sm border border-gray-100 mb-8 overflow-x-auto hide-scrollbar flex items-center gap-2 relative z-10 w-full sm:w-max">
           <button onClick={() => setActiveTab('attendees')} className={`flex items-center gap-2 px-6 py-3 rounded-xl md:rounded-full font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-all duration-300 ${activeTab === 'attendees' ? 'bg-[#FF6B35] text-white shadow-md shadow-orange-200 scale-100' : 'text-gray-500 hover:bg-gray-50 scale-95'}`}>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
             Data {isWed ? 'Tamu' : 'Peserta'}
           </button>
           <button onClick={() => setActiveTab('agents')} className={`flex items-center gap-2 px-6 py-3 rounded-xl md:rounded-full font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-all duration-300 ${activeTab === 'agents' ? 'bg-purple-600 text-white shadow-md shadow-purple-200 scale-100' : 'text-gray-500 hover:bg-gray-50 scale-95'}`}>

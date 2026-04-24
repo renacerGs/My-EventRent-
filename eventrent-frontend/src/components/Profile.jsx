@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// 👇 IMPORT SUPABASE LU DI SINI
+import { supabase } from '../supabase'; 
+
 export default function Profile() {
   const navigate = useNavigate();
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null);
@@ -91,10 +94,23 @@ export default function Profile() {
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
     setIsLoadingProfile(true);
+    
+    // 🔥 INI DIA: AMBIL TOKEN DARI BRANKAS 🔥
+    const token = localStorage.getItem('supabase_token');
+
     try {
+      // 🚀 BONUS PRO: Update nama di Auth Supabase juga biar sinkron kalau relogin
+      if (name !== user.name) {
+        await supabase.auth.updateUser({ data: { full_name: name } });
+      }
+
+      // 🔥 SELIPIN TOKEN DI HEADERS BUAT NEMBAK NESTJS 🔥
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${user.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // <--- POLA YANG HARUS LU COPAS KE FILE LAIN
+        },
         body: JSON.stringify({ 
           name, 
           phone, 
@@ -130,7 +146,7 @@ export default function Profile() {
         
         showPopup("Profil & Data Bank berhasil diperbarui!", "success", () => window.location.reload());
       } else {
-        showPopup("Gagal memperbarui profil", "error");
+        showPopup(data.message || "Gagal memperbarui profil", "error");
       }
     } catch (err) {
       console.error(err);
@@ -153,17 +169,16 @@ export default function Profile() {
 
     setIsLoadingPass(true);
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${user.id}/password`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ oldPass: passData.oldPass, newPass: passData.newPass })
+      // 🔥 UBAH PASSWORD SEKARANG PAKE SUPABASE LANGSUNG 🔥
+      const { error } = await supabase.auth.updateUser({
+        password: passData.newPass
       });
-      const data = await res.json();
-      if (res.ok) {
+
+      if (!error) {
         showPopup("Password berhasil diubah!", "success");
         setPassData({ oldPass: '', newPass: '', confirmPass: '' });
       } else {
-        showPopup(data.message || "Gagal mengubah password", "error");
+        showPopup(error.message || "Gagal mengubah password", "error");
       }
     } catch (err) {
       console.error(err);
@@ -315,7 +330,6 @@ export default function Profile() {
                   </div>
 
                   <div className="pt-6">
-                    {/* 👇 FIX: Logika Shadow yang Cerdas 👇 */}
                     <button 
                       type="submit" 
                       disabled={isLoadingProfile}

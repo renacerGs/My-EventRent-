@@ -264,10 +264,13 @@ export default function Checkout() {
     }
   };
 
-  // Fungsi simpan tiket ke DB (Dipanggil otomatis setelah Midtrans sukses)
+  // 🔥 FUNGSI YANG DIUBAH: Fungsi simpan tiket ke DB (Bawa Token)
   const executeRealPayment = async () => {
     setPaymentStatus('processing');
     
+    // Ambil Token buat dikirim sebagai KTP
+    const token = localStorage.getItem('supabase_token');
+
     try {
       let emailTamu = user?.email || ''; 
       if (!emailTamu && cart.length > 0) {
@@ -277,16 +280,22 @@ export default function Checkout() {
       }
       
       const payload = { 
-        userId: user ? user.id : null, 
+        userId: user ? user.id : null, // Backend udah disetting nerima null buat guest
         guestEmail: emailTamu, 
         eventId: event.id, 
         cart: cart, 
         formAnswers: formAnswers 
       };
       
+      // Siapkan header (Kalau ada token, selipin. Kalau Guest, tetep jalan)
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tickets/buy`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: headers, // 👈 Pake header yang udah dimodif
         body: JSON.stringify(payload)
       });
       const data = await res.json();

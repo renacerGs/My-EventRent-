@@ -32,12 +32,17 @@ export default function AgentDashboard() {
       return;
     }
     fetchAssignedEvents();
-  }, [user?.id, user?.role, navigate]);
+  }, [user?.id, user?.role, navigate]); // 👈 Kuncian React hooks udah aman, no infinite loop!
 
+  // 🔥 PERUBAHAN 1: Ambil data tugas bawa Token
   const fetchAssignedEvents = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${user.id}/assigned-events`);
+      const token = localStorage.getItem('supabase_token');
+      
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${user.id}/assigned-events`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setAssignedEvents(data);
@@ -58,10 +63,16 @@ export default function AgentDashboard() {
     fetchGuestList(eventData.id);
   };
 
+  // 🔥 PERUBAHAN 2: Ambil daftar tamu bawa Token & Hapus userId di URL
   const fetchGuestList = async (eventId) => {
     try {
       setLoadingAttendees(true);
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${eventId}/attendees?userId=${user.id}`);
+      const token = localStorage.getItem('supabase_token');
+      
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${eventId}/attendees`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
       if (res.ok) {
         const data = await res.json();
         setAttendees(data);
@@ -75,15 +86,21 @@ export default function AgentDashboard() {
     }
   };
 
+  // 🔥 PERUBAHAN 3: Check-in Manual bawa Token & Hapus userId di Body
   const handleManualCheckIn = async (ticketId, eventId) => {
     if (!window.confirm("Yakin ingin Check-In manual tamu ini?")) return;
     
     try {
       const toastId = toast.loading('Memproses Check-In...');
+      const token = localStorage.getItem('supabase_token');
+      
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tickets/scan`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticketId: ticketId, eventId: parseInt(eventId), userId: user.id })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ ticketId: ticketId, eventId: parseInt(eventId) })
       });
       
       const data = await res.json();
@@ -99,7 +116,7 @@ export default function AgentDashboard() {
     }
   };
 
-  // 👇 FUNGSI KIRIM LAPORAN EMERGENCY KE DATABASE 👇
+  // 🔥 PERUBAHAN 4: Kirim Emergency Laporan bawa Token & Hapus agentId di Body
   const handleSendEmergency = async () => {
     if (!emergencyMessage.trim()) {
       toast.error("Tulis pesan kendala lu dulu bro!");
@@ -108,14 +125,15 @@ export default function AgentDashboard() {
 
     try {
       setIsSendingEmergency(true);
-      // Nembak API Laporan Darurat ke TABEL BARU
+      const token = localStorage.getItem('supabase_token');
+      
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${selectedEvent.id}/reports`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agentId: user.id,
-          message: emergencyMessage
-        })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ message: emergencyMessage })
       });
 
       if (res.ok) {
@@ -173,7 +191,6 @@ export default function AgentDashboard() {
     ? (ratedEvents.reduce((sum, ev) => sum + ev.rating_given, 0) / ratedEvents.length).toFixed(1) 
     : 'N/A';
 
-  // LOGIKA FILTER EVENT AKTIF & HISTORY BERDASARKAN TANGGAL SEKARANG
   const now = new Date();
   
   const activeEvents = assignedEvents.filter(ev => {
@@ -190,7 +207,6 @@ export default function AgentDashboard() {
 
   const displayedEvents = activeTab === 'active' ? activeEvents : historyEvents;
 
-  // PERHITUNGAN STATISTIK CHECK-IN UNTUK PROGRESS BAR
   const totalGuests = attendees.length;
   const checkedInGuests = attendees.filter(t => t.is_scanned === true).length;
   const progressPercentage = totalGuests === 0 ? 0 : Math.round((checkedInGuests / totalGuests) * 100);

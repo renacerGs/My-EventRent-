@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast'; 
-// 👇 IMPORT SUPABASE 👇
 import { supabase } from '../supabase';
 
 const AnimatedSearchNavbar = ({ events, searchQuery, onSearchSelect }) => {
@@ -92,7 +91,7 @@ const AnimatedSearchNavbar = ({ events, searchQuery, onSearchSelect }) => {
   );
 };
 
-export default function Navbar({ user, events, searchQuery, onSearchSelect, onOpenLogin, onLogout }) {
+export default function Navbar({ user, events, searchQuery, onSearchSelect, onOpenLogin, onLogout, onLoginSuccess }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   
@@ -106,6 +105,44 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
   const isAgentMode = user?.role === 'agent';
 
   useEffect(() => {
+    const syncUserProfile = async (session) => {
+      try {
+        const token = session.access_token;
+        localStorage.setItem('supabase_token', token);
+
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/auth/me`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (res.ok) {
+          const richUser = await res.json();
+          richUser.role = localStorage.getItem('agentMode') === 'true' ? 'agent' : (richUser.role || 'user');
+          if (onLoginSuccess) onLoginSuccess(richUser);
+        }
+      } catch (err) {
+        console.error("Gagal sync user:", err);
+      }
+    };
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) syncUserProfile(session);
+    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        syncUserProfile(session);
+      } else if (event === 'SIGNED_OUT') {
+        localStorage.removeItem('supabase_token');
+        if(onLogout) onLogout();
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
     const handleClickOutside = (event) => {
       if (profileRef.current && !profileRef.current.contains(event.target)) setIsDropdownOpen(false);
       if (notifRef.current && !notifRef.current.contains(event.target)) setShowNotifDropdown(false);
@@ -114,20 +151,22 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // 1. 🔥 FIX: AMBIL NOTIF & FILTER WEBSOCKET 🔥
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) return; 
 
     fetchNotifications();
 
     const notifChannel = supabase
-      .channel('navbar-notification-channel')
+      // 👇 BIKIN NAMA CHANNEL UNIK PER USER BIAR GAK NYASAR/TABRAKAN 👇
+      .channel(`navbar-notif-${user.id}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT', 
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${user.id}`
+          filter: `user_id=eq.${user.id}` 
         },
         (payload) => {
           const newNotif = payload.new;
@@ -148,25 +187,36 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     return () => {
       supabase.removeChannel(notifChannel);
     };
-  }, [user]);
+  }, [user?.id]); 
 
+  // 2. FETCH NOTIF PAKE TOKEN
   const fetchNotifications = async () => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${user.id}/notifications`);
+      const token = localStorage.getItem('supabase_token');
+      if (!token) return;
+
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/me/notifications`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       if (res.ok) {
-        const data = await res.json();
-        setNotifications(data);
+        const notifData = await res.json();
+        setNotifications(notifData);
       }
     } catch (err) {
-      console.error(err);
+      console.error("Error fetch notif:", err);
     }
   };
 
+  // 3. RESPOND NOTIF PAKE TOKEN
   const handleRespondNotif = async (notifId, action) => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications/${notifId}/respond?userId=${user.id}`, {
+      const token = localStorage.getItem('supabase_token');
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications/${notifId}/respond`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ action })
       });
       const data = await res.json();
@@ -181,9 +231,14 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     }
   };
 
+  // 4. READ NOTIF PAKE TOKEN
   const markAsRead = async (notifId) => {
     try {
-      await fetch(`${import.meta.env.VITE_API_URL}/api/notifications/${notifId}/read?userId=${user.id}`, { method: 'PATCH' });
+      const token = localStorage.getItem('supabase_token');
+      await fetch(`${import.meta.env.VITE_API_URL}/api/notifications/${notifId}/read`, { 
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       setNotifications(prev => prev.map(n => n.id === notifId ? { ...n, is_read: true } : n));
       return true;
     } catch (err) {
@@ -211,15 +266,24 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
   };
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
-  // Di Navbar cuma nampilin 5 notif teratas biar rapi
   const displayedNotifications = notifications.slice(0, 5);
 
   const toggleRole = () => {
     const newRole = isAgentMode ? 'user' : 'agent';
     const updatedUser = { ...user, role: newRole };
-    localStorage.setItem('user', JSON.stringify(updatedUser));
+    
+    localStorage.setItem('agentMode', !isAgentMode);
+    
+    if(onLoginSuccess) onLoginSuccess(updatedUser); 
+
     setIsDropdownOpen(false);
     window.location.href = isAgentMode ? '/' : '/agent'; 
+  };
+
+  const handleActualLogout = async () => {
+    setShowLogoutModal(false);
+    await supabase.auth.signOut(); 
+    navigate('/');
   };
 
   return (
@@ -292,7 +356,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                       displayedNotifications.map(notif => (
                         <div 
                           key={notif.id} 
-                          // 🔥 BEDA WARNA BG, BORDER, DAN TEKS KALAU BELUM DIBACA 🔥
                           className={`p-4 border-b hover:bg-gray-50 transition-colors cursor-pointer flex gap-3 ${
                             !notif.is_read 
                               ? 'bg-orange-50/60 border-l-4 border-l-[#FF6B35] border-b-orange-100/50' 
@@ -452,11 +515,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                 Batal
               </button>
               <button 
-                onClick={() => { 
-                  setShowLogoutModal(false); 
-                  onLogout(); 
-                  navigate('/'); 
-                }} 
+                onClick={handleActualLogout} 
                 className="flex-1 py-3.5 bg-red-500 text-white rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-widest hover:bg-red-600 shadow-md shadow-red-200 transition-all active:scale-95"
               >
                 Yakin, Keluar
