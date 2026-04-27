@@ -103,10 +103,6 @@ export default function Profile() {
     const token = localStorage.getItem('supabase_token');
 
     try {
-      if (name !== user.name) {
-        await supabase.auth.updateUser({ data: { full_name: name } });
-      }
-
       let finalImageUrl = user.picture;
 
       // 🔥 ALUR BARU: UPLOAD FOTO KE BUCKET AVATARS DULU 🔥
@@ -132,6 +128,16 @@ export default function Profile() {
           .getPublicUrl(fileName);
 
         finalImageUrl = publicUrl;
+      }
+
+      // 🔥 LAPOR KE POS SATPAM (SUPABASE AUTH METADATA) 🔥
+      // Biar sinkron sama cara kerja Mobile App (Lapis 1)
+      const authMetadata = {};
+      if (name !== user.name) authMetadata.full_name = name;
+      if (imageFile) authMetadata.avatar_url = finalImageUrl;
+      
+      if (Object.keys(authMetadata).length > 0) {
+        await supabase.auth.updateUser({ data: authMetadata });
       }
 
       // 🔥 SELIPIN TOKEN DI HEADERS BUAT NEMBAK NESTJS (PAKAI URL ASLI SUPABASE) 🔥
