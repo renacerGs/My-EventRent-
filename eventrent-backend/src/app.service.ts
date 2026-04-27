@@ -108,23 +108,22 @@ export class AppService implements OnModuleInit {
       const eventData = eventRes.rows[0];
 
       const sessionQuery = `
-        SELECT id, name, description, TO_CHAR(session_date, 'Dy, DD Mon YYYY') as date, 
-               start_time, end_time, contact_person, event_type, price, stock,
-               name_place, place, city, province, map_url 
-        FROM event_sessions
-        WHERE event_id = $1
-        ORDER BY session_date ASC, start_time ASC
+        SELECT s.id, s.name, s.description, TO_CHAR(s.session_date, 'Dy, DD Mon YYYY') as date, 
+               s.start_time, s.end_time, s.contact_person, s.event_type, s.price, s.stock,
+               s.name_place, s.place, s.city, s.province, s.map_url,
+               COALESCE(
+                 json_agg(
+                   json_build_object('id', q.id, 'question_text', q.question_text, 'answer_type', q.answer_type, 'is_required', q.is_required, 'options', q.options)
+                 ) FILTER (WHERE q.id IS NOT NULL), '[]'
+               ) as questions
+        FROM event_sessions s
+        LEFT JOIN session_questions q ON s.id = q.session_id
+        WHERE s.event_id = $1
+        GROUP BY s.id
+        ORDER BY s.session_date ASC, s.start_time ASC
       `;
       const sessionRes = await this.pool.query(sessionQuery, [eventId]);
-      const sessions = sessionRes.rows;
-
-      for (let session of sessions) {
-        const qQuery = `SELECT id, question_text, answer_type, is_required, options FROM session_questions WHERE session_id = $1`;
-        const qRes = await this.pool.query(qQuery, [session.id]);
-        session.questions = qRes.rows;
-      }
-
-      eventData.sessions = sessions;
+      eventData.sessions = sessionRes.rows;
 
       const greetingsQuery = `
         SELECT name, greeting, time FROM (
@@ -1467,6 +1466,43 @@ export class AppService implements OnModuleInit {
     } catch (err) {
       console.error("Error Get My Orders:", err);
       throw new InternalServerErrorException('Gagal mengambil daftar pesanan');
+    }
+  }
+
+  // Ambil daftar peserta/tiket berdasarkan Event ID
+  async getEventTickets(eventId: number) {
+    try {
+      const res = await this.pool.query(
+        `SELECT id, ticket_code, attendee_name, attendee_email, pax, is_attending, custom_answers, created_at 
+         FROM tickets 
+         WHERE event_id = $1 
+         ORDER BY created_at DESC`,
+        [eventId]
+      );
+      return res.rows;
+    } catch (error) {
+      console.error('Error fetching tickets:', error);
+      throw new InternalServerErrorException('Gagal mengambil data peserta');
+    }
+  }
+
+  // Ambil daftar notifikasi milik user yang lagi login
+  async getMyNotifications(userId: number) {
+    try {
+      // Kita query ke tabel notifications berdasarkan ID user
+      const res = await this.pool.query(
+        `SELECT id, title, message, is_read, created_at 
+         FROM notifications 
+         WHERE user_id = $1 
+         ORDER BY created_at DESC`,
+        [userId]
+      );
+      return res.rows;
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      // Kalau misal lu belum bikin tabel notifications di Supabase, 
+      // kita balikin array kosong [] dulu biar App Flutternya gak error/crash
+      return []; 
     }
   }
 }
