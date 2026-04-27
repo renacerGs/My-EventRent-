@@ -30,7 +30,9 @@ export default function MyOrders() {
     try {
       if (!isBackground) setLoading(true); 
       
-      const sessionStr = localStorage.getItem('sb-mwtnmrlntouorscweckt-auth-token'); 
+       // 🔥 Trik jitu: Cari otomatis kunci yang belakangnya '-auth-token'
+      const authKey = Object.keys(localStorage).find(key => key.endsWith('-auth-token'));
+      const sessionStr = authKey ? localStorage.getItem(authKey) : null;
       let token = '';
 
       if (sessionStr) {
@@ -192,7 +194,7 @@ export default function MyOrders() {
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg> Batal / Kadaluarsa
                     </span>
                   )}
-                </div>
+                </div>const sessionStr = localStorage.getItem('sb-mwtnmrlntouorscweckt-auth-token');
 
               </div>
             ))}
