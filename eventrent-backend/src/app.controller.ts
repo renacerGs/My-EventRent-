@@ -100,6 +100,7 @@ export class AppController {
   @UseGuards(SupabaseGuard)
   @Post('orders/checkout')
   async checkoutOrder(@Req() req, @Body() data: any) {
+    // Panggil fungsi checkout di service
     return await this.appService.createCheckoutOrder(req.user.id, data);
   }
 
@@ -114,6 +115,8 @@ export class AppController {
   // ==========================================
   // --- TICKETS ---
   // ==========================================
+  
+  // 🔥 FIX: Nangkap orderId buat dikirim ke AppService
   @ApiTags('Tickets')
   @ApiOperation({ summary: 'Membeli tiket (Bebas Satpam biar Guest bisa beli)' })
   @Post('tickets/buy')
@@ -133,6 +136,7 @@ export class AppController {
 
     const safeUserId = typeof data.userId === 'number' || typeof data.userId === 'string' ? data.userId : null;
 
+    // 🔥 KITA LEMPAR data.orderId KE BELAKANG SINI:
     return await this.appService.buyTicket(safeUserId, data.eventId, finalCart || [], finalAnswers, email, data.orderId);
   }
 
@@ -161,14 +165,6 @@ export class AppController {
   @Post('tickets/scan')
   async scanTicket(@Req() req, @Body() body: { ticketId: string, eventId: number }) {
     return this.appService.scanTicket(body.ticketId, body.eventId, req.user.id);
-  }
-
-  // 🔥 Rute baru buat list peserta di Event Dashboard Agen
-  @ApiTags('Tickets')
-  @UseGuards(SupabaseGuard)
-  @Get('events/:eventId/tickets')
-  async getEventTickets(@Param('eventId') eventId: string) {
-    return this.appService.getEventTickets(Number(eventId));
   }
 
   // ==========================================
@@ -235,16 +231,6 @@ export class AppController {
   // ==========================================
   // --- NOTIFICATIONS ---
   // ==========================================
-  
-  // 🔥 Rute baru sesuai request App Flutter
-  @ApiTags('Notifications')
-  @UseGuards(SupabaseGuard)
-  @Get('notifications')
-  async getMyNotifications(@Req() req) {
-    return await this.appService.getMyNotifications(req.user.id);
-  }
-
-  // Rute notifikasi lama (tetap dibiarkan biar web nggak error kalau masih pakai ini)
   @ApiTags('Notifications')
   @UseGuards(SupabaseGuard)
   @Get('users/:id/notifications')
