@@ -200,12 +200,10 @@ export default function Checkout() {
       if (activePayments.va || activePayments.transferBank) allowedInMidtrans.push("bca_va", "bni_va", "bri_va", "permata_va", "echannel", "other_va");
       if (allowedInMidtrans.length === 0) allowedInMidtrans.push("other_qris");
 
-      // 🔥 LOGIKA BARU: PISAHIN GUEST SAMA USER LOGIN 🔥
       let tokenMidtrans = null;
       const isGuest = !user;
 
       if (isGuest) {
-        // Kalo Guest, nggak masuk My Orders, hit API lama.
         const res = await fetch(`${import.meta.env.VITE_API_URL}/api/payment/test-midtrans`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -216,7 +214,6 @@ export default function Checkout() {
         const data = await res.json();
         tokenMidtrans = data.token;
       } else {
-        // Kalo Login, hit API My Orders!
         const supabaseToken = localStorage.getItem('supabase_token');
         const res = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/checkout`, {
           method: 'POST',
@@ -236,7 +233,7 @@ export default function Checkout() {
         window.snap.pay(tokenMidtrans, {
           onSuccess: function(result) {
             setShowPaymentModal(true); 
-            executeRealPayment(); // Tiket dicetak di sini
+            executeRealPayment(); 
           },
           onPending: function(result) {
             if (!isGuest) {
@@ -364,9 +361,10 @@ export default function Checkout() {
         
         <div className="max-w-7xl mx-auto px-4 md:px-8">
           <div className="flex items-center gap-4 mb-8">
+            {/* 🔥 INI YANG KITA UBAH! LANGSUNG TEMBAK BALIK KE HALAMAN EVENT 🔥 */}
             <button 
               type="button" 
-              onClick={() => navigate(-1)} 
+              onClick={() => navigate(`/event/${id}`)} 
               className={`w-12 h-12 flex items-center justify-center rounded-full border shadow-sm transition-all active:scale-95 bg-white border-gray-200 text-gray-500 hover:text-[#FF6B35] hover:border-[#FF6B35]`} 
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>

@@ -364,18 +364,14 @@ export class AppService implements OnModuleInit {
 
   // --- TICKETS, ATTENDEES, & SCANNER ---
   
-  // 🔥 FIX: Tambahin orderId di belakang & GEMBOK ANTI-DOUBLE TIKET
   async buyTicket(userId: number | null, eventId: number, cart: any[], formAnswers: any, guestEmail?: string, orderId?: string) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN'); 
 
-      // 🛑 GEMBOK ANTI-DOUBLE TIKET (MENCEGAH TAB KEMBAR) 🛑
       if (orderId) {
-        // FOR UPDATE bikin database ngunci baris ini biar nggak ada yang bisa baca/tulis barengan
         const checkOrder = await client.query('SELECT payment_status FROM orders WHERE order_id = $1 FOR UPDATE', [orderId]);
         
-        // Kalau ternyata statusnya UDAH LUNAS (berarti tab sebelah udah nge-eksekusi ini duluan)
         if (checkOrder.rows.length > 0 && checkOrder.rows[0].payment_status === 'SUCCESS') {
           await client.query('ROLLBACK');
           console.log(`[BLOKIR] Pesanan ${orderId} udah dicetak tiketnya. Cegah double print!`);
@@ -409,7 +405,6 @@ export class AppService implements OnModuleInit {
           [eventId, dummySessionId, userId, 0, targetEmail || null, formAnswers.attendee_name || 'Tamu', formAnswers.email || targetEmail || '', '[]', 0, formAnswers.greeting, false, ticketCode]
         );
         
-        // 🔥 UBAH STATUS JADI LUNAS 🔥
         if (orderId) {
           await client.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [orderId]);
         }
@@ -467,7 +462,6 @@ export class AppService implements OnModuleInit {
         }
       }
 
-      // 🔥 UBAH STATUS JADI LUNAS 🔥
       if (orderId) {
         await client.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [orderId]);
       }
@@ -1030,6 +1024,27 @@ export class AppService implements OnModuleInit {
     }
   }
 
+  // 🔥 INI DIA FUNGSI EDIT YANG UDAH GUE FIX 🔥
+  async updateJobPosting(jobId: number, eoId: number, data: any) {
+    try {
+      const res = await this.pool.query(
+        `UPDATE job_postings 
+         SET role = $1, quota = $2, fee = $3, description = $4
+         WHERE id = $5 AND eo_id = $6 
+         RETURNING *`,
+        [data.role, data.quota, data.fee, data.description, jobId, eoId]
+      );
+      
+      if (res.rowCount === 0) {
+        throw new Error('Lowongan tidak ditemukan atau Anda tidak berhak mengeditnya');
+      }
+      return res.rows[0];
+    } catch (error) {
+      console.error('Error updating job:', error);
+      throw new Error('Gagal mengubah lowongan');
+    }
+  }
+
   async getAllActiveJobs(page: number = 1, limit: number = 10) {
     try {
       const offset = (page - 1) * limit; 
@@ -1357,7 +1372,6 @@ export class AppService implements OnModuleInit {
 
     console.log(`💬 [WEBHOOK] Status Transaksi ${order_id}: ${transaction_status}`);
 
-    // 🔥 INI TAMBAHANNYA: UPDATE DATABASE SESUAI STATUS 🔥
     if (transaction_status === 'settlement' || transaction_status === 'capture') {
       console.log(`✅ [WEBHOOK SUCCESS] PESANAN ${order_id} TELAH DIBAYAR LUNAS SEBESAR Rp ${gross_amount}!`);
       await this.pool.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [order_id]);
@@ -1377,17 +1391,14 @@ export class AppService implements OnModuleInit {
   // FITUR ORDERS (PESANAN SAYA)
   // ==========================================
 
-  // 🔥 FIX HARGA & TIPE DATA USER_ID 🔥
   async createCheckoutOrder(userId: number, data: any) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
 
-      // 1. Generate Order ID
       const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       let totalPrice = 0;
       
-      // 2. 🔥 AMBIL HARGA ASLI DARI DATABASE BIAR AMAN 🔥
       if (data.cart && data.cart.length > 0) {
         for (const item of data.cart) {
           const sessionRes = await client.query('SELECT price FROM event_sessions WHERE id = $1', [item.sessionId]);
@@ -1396,12 +1407,10 @@ export class AppService implements OnModuleInit {
         }
       }
 
-      // 3. Tembak Midtrans buat dapet Snap Token
       let snapToken = null;
       let redirectUrl = null;
 
       if (totalPrice > 0) {
-        // Ambil data user buat email
         const userRes = await client.query('SELECT name, email FROM users WHERE id = $1', [userId]);
         const user = userRes.rows[0] || { name: 'Guest', email: 'guest@eventrent.com' };
 
@@ -1415,7 +1424,6 @@ export class AppService implements OnModuleInit {
         redirectUrl = midtrans.redirect_url;
       }
 
-      // 4. Simpan ke tabel orders
       const query = `
         INSERT INTO orders (order_id, user_id, event_id, total_price, snap_token, payment_status, ticket_details)
         VALUES ($1, $2, $3, $4, $5, 'PENDING', $6)
@@ -1450,7 +1458,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 🔥 FIX TIPE DATA USER_ID & LOGIKA SORTING PENDING DI ATAS 🔥
   async getMyOrders(userId: number) {
     try {
       const query = `
@@ -1470,7 +1477,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // Ambil daftar peserta/tiket berdasarkan Event ID
   async getEventTickets(eventId: number) {
     try {
       const res = await this.pool.query(
@@ -1487,10 +1493,8 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // Ambil daftar notifikasi milik user yang lagi login
   async getMyNotifications(userId: number) {
     try {
-      // Kita query ke tabel notifications berdasarkan ID user
       const res = await this.pool.query(
         `SELECT id, title, message, is_read, created_at 
          FROM notifications 

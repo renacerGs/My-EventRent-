@@ -318,6 +318,13 @@ export class AppController {
 
   @ApiTags('Recruitment')
   @UseGuards(SupabaseGuard)
+  @Put('jobs/:id')
+  async updateJob(@Param('id') jobId: string, @Req() req, @Body() body: any) {
+    return await this.appService.updateJobPosting(Number(jobId), req.user.id, body);
+  }
+
+  @ApiTags('Recruitment')
+  @UseGuards(SupabaseGuard)
   @Post('jobs/apply')
   async applyJob(@Req() req, @Body() body: any) {
     return await this.appService.applyForJob(body.jobId, req.user.id);

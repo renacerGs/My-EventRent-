@@ -49,13 +49,17 @@ export default function EventDashboard() {
   const [isCreatingJob, setIsCreatingJob] = useState(false);
   const [showRecruitmentModal, setShowRecruitmentModal] = useState(false); 
 
+  // 🔥 STATE BARU BUAT EDIT LOWONGAN 🔥
+  const [showEditJobModal, setShowEditJobModal] = useState(false);
+  const [isUpdatingJob, setIsUpdatingJob] = useState(false);
+  const [editJobData, setEditJobData] = useState({ id: null, role: '', sessionName: 'Semua Sesi', quota: '', fee: '', description: '' });
+
   // STATE PAYOUT (PENGGAJIAN)
   const [payouts, setPayouts] = useState([]);
   const [showPayoutModal, setShowPayoutModal] = useState(false); 
   const [selectedAgentPayout, setSelectedAgentPayout] = useState(null);
   const [payoutAmountInput, setPayoutAmountInput] = useState('');
   const [payoutProcessStatus, setPayoutProcessStatus] = useState('idle'); 
-  // 👇 STATE BARU: FILE BUKTI TF 👇
   const [proofFile, setProofFile] = useState(null);
 
   // 🔥 UBAHAN KE-1: TARIK DATA EVENT & PESERTA
@@ -71,7 +75,6 @@ export default function EventDashboard() {
       if (!resEvent.ok) throw new Error("Gagal mengambil event");
       const eventData = await resEvent.json();
 
-      // Hilangkan ?userId= dan tambahkan header
       const resAttendees = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/attendees`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -120,7 +123,6 @@ export default function EventDashboard() {
     }
   };
 
-  // 🔥 UBAHAN KE-2: TARIK AGEN
   const fetchAgents = async () => {
     const token = localStorage.getItem('supabase_token');
     if (!token) return;
@@ -137,7 +139,6 @@ export default function EventDashboard() {
     }
   };
 
-  // 🔥 UBAHAN KE-3: TARIK LAPORAN
   const fetchReports = async () => {
     const token = localStorage.getItem('supabase_token');
     if (!token) return;
@@ -154,7 +155,6 @@ export default function EventDashboard() {
     }
   };
 
-  // 🔥 UBAHAN KE-4: TARIK DATA REKRUTMEN
   const fetchRecruitmentData = async () => {
     const token = localStorage.getItem('supabase_token');
     if (!token) return;
@@ -173,7 +173,6 @@ export default function EventDashboard() {
     }
   };
 
-  // 🔥 UBAHAN KE-5: TARIK DATA PAYOUT
   const fetchPayouts = async () => {
     const token = localStorage.getItem('supabase_token');
     if (!token) return;
@@ -187,7 +186,6 @@ export default function EventDashboard() {
     }
   };
 
-  // 🔥 UBAHAN KE-6: SELESAIKAN LAPORAN
   const handleResolveReport = async (reportId) => {
     const token = localStorage.getItem('supabase_token');
     const toastId = toast.loading("Memproses...");
@@ -207,7 +205,7 @@ export default function EventDashboard() {
     }
   };
 
-  // 🔥 UBAHAN KE-7: BIKIN LOWONGAN
+  // 🔥 BIKIN LOWONGAN
   const handleCreateJob = async (e) => {
     e.preventDefault();
     setIsCreatingJob(true);
@@ -254,7 +252,6 @@ export default function EventDashboard() {
     setConfirmDeleteJob({ show: true, jobId: jobId });
   };
 
-  // 🔥 UBAHAN KE-8: HAPUS LOWONGAN
   const executeDeleteJob = async () => {
     const jobId = confirmDeleteJob.jobId;
     setConfirmDeleteJob({ show: false, jobId: null });
@@ -279,7 +276,73 @@ export default function EventDashboard() {
     }
   };
 
-  // 🔥 UBAHAN KE-9: RESPOND PELAMAR
+  // 🔥 FUNGSI BARU: BUKA MODAL EDIT & ISI DATA OTOMATIS 🔥
+  const openEditJob = (job) => {
+    let extractedRole = job.role;
+    let extractedSession = 'Semua Sesi';
+
+    if (job.role.includes(' [')) {
+      const parts = job.role.split(' [');
+      extractedRole = parts[0];
+      extractedSession = parts[1].replace(']', '');
+    }
+
+    setEditJobData({
+      id: job.id,
+      role: extractedRole,
+      sessionName: extractedSession,
+      quota: job.quota,
+      fee: job.fee,
+      description: job.description
+    });
+    setShowEditJobModal(true);
+  };
+
+  // 🔥 FUNGSI BARU: UPDATE DATA LOWONGAN KE BACKEND 🔥
+  const handleUpdateJob = async (e) => {
+    e.preventDefault();
+    setIsUpdatingJob(true);
+    const token = localStorage.getItem('supabase_token');
+    const toastId = toast.loading('Menyimpan editan...');
+
+    const finalRole = editJobData.sessionName === 'Semua Sesi'
+      ? editJobData.role
+      : `${editJobData.role} [${editJobData.sessionName}]`;
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs/${editJobData.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        // Gue kirim 2 versi nama kolom biar cocok sama backend lu
+        body: JSON.stringify({
+          role: finalRole,
+          title: finalRole,
+          quota: parseInt(editJobData.quota),
+          fee: parseInt(editJobData.fee),
+          salary: parseInt(editJobData.fee),
+          description: editJobData.description,
+          requirements: editJobData.description
+        })
+      });
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success('Lowongan berhasil diupdate!', { id: toastId });
+        setShowEditJobModal(false);
+        fetchRecruitmentData();
+      } else {
+        toast.error(data.message || 'Gagal merubah lowongan.', { id: toastId });
+      }
+    } catch (err) {
+      toast.error('Terjadi kesalahan jaringan.', { id: toastId });
+    } finally {
+      setIsUpdatingJob(false);
+    }
+  };
+
   const executeRespondApplicant = async () => {
     const { appId, action } = confirmRespondApp;
     setConfirmRespondApp({ show: false, appId: null, action: null });
@@ -312,7 +375,6 @@ export default function EventDashboard() {
     }
   };
 
-  // 🔥 UBAHAN KE-10: MARK PAID (BAYAR AGEN)
   const executeMarkPaid = async () => {
     const amount = payoutAmountInput || 0;
     if (amount <= 0 || !proofFile) {
@@ -402,7 +464,6 @@ export default function EventDashboard() {
     setCurrentPage(1);
   }, [searchQuery, selectedSessionFilter, selectedStatusFilter]); 
 
-  // 🔥 UBAHAN KE-11: TAMBAH AGEN MANUAL
   const handleAddAgent = async (e) => {
     e.preventDefault();
     if (!agentEmailInput) return;
@@ -431,7 +492,6 @@ export default function EventDashboard() {
     }
   };
 
-  // 🔥 UBAHAN KE-12: HAPUS AGEN
   const executeRemoveAgent = async () => {
     const agentId = confirmRemoveAgent.agentId;
     setConfirmRemoveAgent({ show: false, agentId: null });
@@ -454,7 +514,6 @@ export default function EventDashboard() {
     }
   };
 
-  // 🔥 UBAHAN KE-13: EDIT TUGAS & RATING
   const submitEditRole = async () => {
     const token = localStorage.getItem('supabase_token');
     try {
@@ -482,7 +541,6 @@ export default function EventDashboard() {
   const toggleExpand = (orderId) => setExpandedRow(expandedRow === orderId ? null : orderId);
   const initiateManualCheckIn = (ticketId) => setConfirmDialog({ show: true, ticketId: ticketId }); 
 
-  // 🔥 UBAHAN KE-14: CHECK-IN MANUAL
   const confirmManualCheckIn = async () => {
     const ticketId = confirmDialog.ticketId;
     setConfirmDialog({ show: false, ticketId: null }); 
@@ -599,7 +657,7 @@ export default function EventDashboard() {
   return (
     <div className="bg-[#F8F9FA] min-h-screen font-sans pb-20 pt-4 md:pt-8 text-left relative">
       
-      {/* ======================= MODAL RECRUITMENT ======================= */}
+      {/* ======================= MODAL BIKIN LOWONGAN ======================= */}
       {showRecruitmentModal && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 animate-fadeIn">
           <div className="bg-white rounded-[24px] md:rounded-[32px] p-6 md:p-8 max-w-lg w-full shadow-2xl relative">
@@ -623,7 +681,6 @@ export default function EventDashboard() {
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all appearance-none"
                 >
                   <option value="Semua Sesi">Semua Sesi (Full Day)</option>
-                  {/* Looping data sesi yang udah ada di event ini */}
                   {event?.sessions?.map(s => (
                     <option key={s.id} value={s.name}>
                       {s.name} {s.start_time ? `(${s.start_time.slice(0,5)} - ${s.end_time.slice(0,5)})` : ''}
@@ -653,19 +710,71 @@ export default function EventDashboard() {
         </div>
       )}
 
+      {/* ======================= MODAL EDIT LOWONGAN ======================= */}
+      {showEditJobModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 animate-fadeIn">
+          <div className="bg-white rounded-[24px] md:rounded-[32px] p-6 md:p-8 max-w-lg w-full shadow-2xl relative">
+            <button onClick={() => setShowEditJobModal(false)} className="absolute top-6 right-6 text-gray-400 hover:text-gray-900 transition-colors">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+
+            <h3 className="text-xl font-black text-gray-900 mb-1">Edit Lowongan</h3>
+            <p className="text-xs font-bold text-gray-500 mb-6">Ubah detail data agen yang mau lu rekrut bro.</p>
+            
+            <form onSubmit={handleUpdateJob} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Tugas / Posisi</label>
+                <input type="text" value={editJobData.role} onChange={e => setEditJobData({...editJobData, role: e.target.value})} required className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Sesi Event</label>
+                <select 
+                  value={editJobData.sessionName} 
+                  onChange={e => setEditJobData({...editJobData, sessionName: e.target.value})} 
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all appearance-none"
+                >
+                  <option value="Semua Sesi">Semua Sesi (Full Day)</option>
+                  {event?.sessions?.map(s => (
+                    <option key={s.id} value={s.name}>
+                      {s.name} {s.start_time ? `(${s.start_time.slice(0,5)} - ${s.end_time.slice(0,5)})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Kuota Orang</label>
+                  <input type="number" min="1" value={editJobData.quota} onChange={e => setEditJobData({...editJobData, quota: e.target.value})} required className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Fee / Gaji (Rp)</label>
+                  <input type="number" min="0" value={editJobData.fee} onChange={e => setEditJobData({...editJobData, fee: e.target.value})} required className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all" />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block">Deskripsi / Syarat</label>
+                <textarea value={editJobData.description} onChange={e => setEditJobData({...editJobData, description: e.target.value})} required className="w-full h-24 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none transition-all"></textarea>
+              </div>
+              <button type="submit" disabled={isUpdatingJob} className="w-full bg-blue-600 text-white font-black py-3.5 rounded-xl hover:bg-blue-700 transition-colors uppercase tracking-widest text-[10px] md:text-xs shadow-lg shadow-blue-200 mt-2">
+                {isUpdatingJob ? 'Menyimpan...' : 'Simpan Perubahan'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ======================= MODAL PENGGAJIAN ======================= */}
       {showPayoutModal && selectedAgentPayout && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
           <div className="rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl relative bg-white">
             
-            {/* Tampil Pas Mode Input (Idle) */}
             {payoutProcessStatus === 'idle' && (
               <button 
                 onClick={() => { 
                   setShowPayoutModal(false); 
                   setSelectedAgentPayout(null); 
                   setPayoutAmountInput(''); 
-                  setProofFile(null); // Reset File saat modal ditutup
+                  setProofFile(null);
                 }} 
                 className="absolute top-5 right-5 rounded-full w-8 h-8 flex items-center justify-center transition-colors text-gray-400 bg-gray-100 hover:text-gray-900 z-10"
               >
@@ -682,7 +791,6 @@ export default function EventDashboard() {
                 <h3 className="text-xl font-black text-gray-900 mb-1 text-center">Transfer Gaji Agen</h3>
                 <p className="text-xs font-bold text-gray-500 mb-6 text-center">Tandai lunas untuk agen <span className="text-gray-900">{selectedAgentPayout.agent_name}</span></p>
 
-                {/* Info Bank Agen biar EO gampang transfer */}
                 <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-6 text-center relative overflow-hidden">
                    <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Tujuan Transfer ({selectedAgentPayout.bank_name || 'Bank Belum Diisi'})</p>
@@ -705,7 +813,6 @@ export default function EventDashboard() {
                   </div>
                 </div>
 
-                {/* 👇 BAGIAN INPUT FILE BUKTI TF 👇 */}
                 <div className="mb-8">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 block text-center">
                     Upload Bukti Transfer (JPG/PNG)
@@ -727,7 +834,6 @@ export default function EventDashboard() {
               </div>
             )}
 
-            {/* Tampil Pas Mode Processing / Success */}
             {payoutProcessStatus !== 'idle' && (
               <div className="p-12 text-center flex flex-col items-center justify-center min-h-[350px]">
                 {payoutProcessStatus === 'processing' ? (
@@ -1193,13 +1299,24 @@ export default function EventDashboard() {
                             <p className="text-[10px] text-gray-500 font-bold mb-3">Rp {new Intl.NumberFormat('id-ID').format(job.fee)} • Kuota: {job.quota} org</p>
                             <p className="text-xs text-gray-600 line-clamp-2">{job.description}</p>
                           </div>
-                          <button 
-                            onClick={() => initiateDeleteJob(job.id)}
-                            className="p-2 text-red-500 bg-red-50 hover:bg-red-600 hover:text-white rounded-lg transition-all"
-                            title="Hapus Lowongan"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                          </button>
+                          
+                          {/* 🔥 TOMBOL EDIT & HAPUS LOWONGAN 🔥 */}
+                          <div className="flex flex-col gap-2">
+                            <button 
+                              onClick={() => openEditJob(job)}
+                              className="p-2 text-blue-500 bg-blue-50 hover:bg-blue-600 hover:text-white rounded-lg transition-all"
+                              title="Edit Lowongan"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                            </button>
+                            <button 
+                              onClick={() => initiateDeleteJob(job.id)}
+                              className="p-2 text-red-500 bg-red-50 hover:bg-red-600 hover:text-white rounded-lg transition-all"
+                              title="Hapus Lowongan"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            </button>
+                          </div>
                         </div>
                       ))}
                     </div>
