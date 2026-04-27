@@ -12,7 +12,10 @@ export default function Profile() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState(''); 
   const [imagePreview, setImagePreview] = useState(null);
-  const [imageBase64, setImageBase64] = useState(null);
+  
+  // 🔥 STATE BARU BUAT NYIMPEN FILE FISIK (BLOB) BUKAN BASE64 LAGI 🔥
+  const [imageFile, setImageFile] = useState(null);
+  
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
   const [passData, setPassData] = useState({ oldPass: '', newPass: '', confirmPass: '' });
@@ -82,8 +85,10 @@ export default function Profile() {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
 
-          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-          setImageBase64(compressedBase64); 
+          // 🔥 UBAH GAMBAR JADI BLOB BIAR BISA DI UPLOAD KE SUPABASE 🔥
+          canvas.toBlob((blob) => {
+            setImageFile(blob);
+          }, 'image/jpeg', 0.8);
         };
         img.src = event.target.result;
       };
@@ -95,26 +100,51 @@ export default function Profile() {
     e.preventDefault();
     setIsLoadingProfile(true);
     
-    // 🔥 INI DIA: AMBIL TOKEN DARI BRANKAS 🔥
     const token = localStorage.getItem('supabase_token');
 
     try {
-      // 🚀 BONUS PRO: Update nama di Auth Supabase juga biar sinkron kalau relogin
       if (name !== user.name) {
         await supabase.auth.updateUser({ data: { full_name: name } });
       }
 
-      // 🔥 SELIPIN TOKEN DI HEADERS BUAT NEMBAK NESTJS 🔥
+      let finalImageUrl = user.picture;
+
+      // 🔥 ALUR BARU: UPLOAD FOTO KE BUCKET AVATARS DULU 🔥
+      if (imageFile) {
+        const fileName = `user-${user.id}-${Date.now()}.jpg`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(fileName, imageFile, {
+            contentType: 'image/jpeg',
+            upsert: true
+          });
+
+        if (uploadError) {
+          showPopup("Gagal mengupload foto ke Storage Supabase!", "error");
+          setIsLoadingProfile(false);
+          return;
+        }
+
+        // Ambil Link Public dari bucket
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(fileName);
+
+        finalImageUrl = publicUrl;
+      }
+
+      // 🔥 SELIPIN TOKEN DI HEADERS BUAT NEMBAK NESTJS (PAKAI URL ASLI SUPABASE) 🔥
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${user.id}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` // <--- POLA YANG HARUS LU COPAS KE FILE LAIN
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ 
           name, 
           phone, 
-          img: imageBase64,
+          img: finalImageUrl, // 🔥 Ini udah pake link public Supabase
           bank_name: bankData.bank_name,
           bank_account: bankData.bank_account,
           bank_account_name: bankData.bank_account_name
@@ -123,12 +153,11 @@ export default function Profile() {
       const data = await res.json();
       
       if (res.ok) {
-        const newPicture = data.picture || imagePreview; 
         const updatedUser = { 
           ...user, 
           name: data.name || name, 
           phone: data.phone || phone, 
-          picture: newPicture,
+          picture: finalImageUrl,
           bank_name: data.bank_name || bankData.bank_name,
           bank_account: data.bank_account || bankData.bank_account,
           bank_account_name: data.bank_account_name || bankData.bank_account_name
@@ -142,7 +171,7 @@ export default function Profile() {
         }
 
         setUser(updatedUser); 
-        setImageBase64(null); 
+        setImageFile(null); 
         
         showPopup("Profil & Data Bank berhasil diperbarui!", "success", () => window.location.reload());
       } else {
@@ -169,7 +198,6 @@ export default function Profile() {
 
     setIsLoadingPass(true);
     try {
-      // 🔥 UBAH PASSWORD SEKARANG PAKE SUPABASE LANGSUNG 🔥
       const { error } = await supabase.auth.updateUser({
         password: passData.newPass
       });
@@ -191,10 +219,8 @@ export default function Profile() {
   if (!user) return null;
   
   const isGoogleUser = !!user.googleId; 
-  // 👇 BACA ROLE UNTUK MENGUBAH TEMA 👇
   const isAgentMode = user.role === 'agent';
 
-  // 👇 STYLING DINAMIS BERDASARKAN MODE 👇
   const inputStyle = `w-full border rounded-xl px-5 py-4 text-sm font-bold focus:outline-none transition-all ${
     isAgentMode 
       ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-orange-500 focus:ring-1 focus:ring-orange-500' 
