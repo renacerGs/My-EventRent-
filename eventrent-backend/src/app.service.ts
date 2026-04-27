@@ -1469,4 +1469,39 @@ export class AppService implements OnModuleInit {
       throw new InternalServerErrorException('Gagal mengambil daftar pesanan');
     }
   }
+
+  // Ambil daftar peserta/tiket berdasarkan Event ID
+  async getEventTickets(eventId: number) {
+    try {
+      const res = await this.pool.query(
+        `SELECT id, ticket_code, attendee_name, attendee_email, pax, is_attending, custom_answers, created_at 
+         FROM tickets 
+         WHERE event_id = $1 
+         ORDER BY created_at DESC`,
+        [eventId]
+      );
+      return res.rows;
+    } catch (error) {
+      console.error('Error fetching tickets:', error);
+      throw new InternalServerErrorException('Gagal mengambil data peserta');
+    }
+  }
+
+  // Ambil daftar notifikasi milik user yang lagi login
+  async getMyNotifications(userId: number) {
+    try {
+      // Kita query ke tabel notifications berdasarkan ID user
+      const res = await this.pool.query(
+        `SELECT id, title, message, is_read, created_at 
+         FROM notifications 
+         WHERE user_id = $1 
+         ORDER BY created_at DESC`,
+        [userId]
+      );
+      return res.rows;
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      return []; 
+    }
+  }
 }
