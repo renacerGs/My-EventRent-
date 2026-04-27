@@ -132,7 +132,7 @@ export default function MyOrders() {
         
         {/* HEADER */}
         <div className="mb-8">
-          <button onClick={() => navigate(-1)} className="text-slate-500 hover:text-[#FF6B35] font-bold text-[10px] uppercase tracking-widest mb-4 flex items-center gap-1.5 transition-colors w-max">
+          <button onClick={() => navigate('/')} className="text-slate-500 hover:text-[#FF6B35] font-bold text-[10px] uppercase tracking-widest mb-4 flex items-center gap-1.5 transition-colors w-max">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7"></path></svg> 
             Kembali
           </button>
