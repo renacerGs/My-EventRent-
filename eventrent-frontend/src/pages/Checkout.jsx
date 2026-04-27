@@ -70,7 +70,6 @@ export default function Checkout() {
   const [formAnswers, setFormAnswers] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // State Modal (Dipakai cuma buat nampilin loading/sukses setelah Midtrans)
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('idle'); 
 
@@ -171,20 +170,17 @@ export default function Checkout() {
 
     const totalAmount = calculateTotal();
 
-    // 1. KALO TIKET GRATIS: Langsung eksekusi tanpa Midtrans
     if (totalAmount === 0) {
       setShowPaymentModal(true);
       executeRealPayment();
       return;
     }
 
-    // 2. KALO BAYAR: Siapin data customer & minta token Midtrans
     setIsSubmitting(true);
     try {
       let emailTamu = user?.email || ''; 
       let namaTamu = user?.name || 'Tamu EventRent'; 
       
-      // Ambil email/nama dari form pertama kalau blm login
       if (!emailTamu && cart.length > 0) {
         const firstCartItem = cart[0];
         emailTamu = formAnswers[`cart-${firstCartItem.id}-ticket-0-email`] || 'guest@email.com';
@@ -193,64 +189,73 @@ export default function Checkout() {
 
       const orderId = `TKT-${event.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-      // 🔥 LOGIKA FILTER METODE PEMBAYARAN (FIXED) 🔥
       let activePayments = event?.paymentMethods || { qris: true, va: true, transferBank: false };
       
-      // Kalau dari database PostgreSQL bentuknya string JSON, kita parse dulu
       if (typeof activePayments === 'string') {
-        try { 
-          activePayments = JSON.parse(activePayments); 
-        } catch(e) {
-          console.error("Gagal parse paymentMethods:", e);
-        }
+        try { activePayments = JSON.parse(activePayments); } catch(e) {}
       }
 
       let allowedInMidtrans = [];
-      
-      // Terjemahin ke kode Midtrans yang bener
-      if (activePayments.qris) {
-        allowedInMidtrans.push("gopay", "shopeepay", "other_qris");
+      if (activePayments.qris) allowedInMidtrans.push("gopay", "shopeepay", "other_qris");
+      if (activePayments.va || activePayments.transferBank) allowedInMidtrans.push("bca_va", "bni_va", "bri_va", "permata_va", "echannel", "other_va");
+      if (allowedInMidtrans.length === 0) allowedInMidtrans.push("other_qris");
+
+      // 🔥 LOGIKA BARU: PISAHIN GUEST SAMA USER LOGIN 🔥
+      let tokenMidtrans = null;
+      const isGuest = !user;
+
+      if (isGuest) {
+        // Kalo Guest, nggak masuk My Orders, hit API lama.
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/payment/test-midtrans`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: orderId, amount: totalAmount, name: namaTamu, email: emailTamu, enabledPayments: allowedInMidtrans 
+          })
+        });
+        const data = await res.json();
+        tokenMidtrans = data.token;
+      } else {
+        // Kalo Login, hit API My Orders!
+        const supabaseToken = localStorage.getItem('supabase_token');
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/checkout`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseToken}`
+          },
+          body: JSON.stringify({
+            eventId: event.id, cart: cart, formAnswers: formAnswers, enabledPayments: allowedInMidtrans
+          })
+        });
+        const data = await res.json();
+        tokenMidtrans = data.snapToken;
       }
-      if (activePayments.va || activePayments.transferBank) {
-        allowedInMidtrans.push("bca_va", "bni_va", "bri_va", "permata_va", "echannel", "other_va");
-      }
 
-      // Jaga-jaga kalau ternyata gak ada yang aktif, paksa nyalain QRIS
-      if (allowedInMidtrans.length === 0) {
-        allowedInMidtrans.push("other_qris");
-      }
-
-      // Nembak API backend yg kita bikin tadi
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/payment/test-midtrans`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId: orderId,
-          amount: totalAmount,
-          name: namaTamu,
-          email: emailTamu,
-          enabledPayments: allowedInMidtrans // 👈 INI PARAMETER PENTINGNYA
-        })
-      });
-
-      const data = await res.json();
-
-      if (data.token) {
-        // 🔥 PANGGIL POP-UP MIDTRANS 🔥
-        window.snap.pay(data.token, {
+      if (tokenMidtrans) {
+        window.snap.pay(tokenMidtrans, {
           onSuccess: function(result) {
-            console.log("Sukses dibayar:", result);
-            setShowPaymentModal(true); // Buka animasi loading temen lu
-            executeRealPayment(); // Simpan tiket ke database Supabase!
+            setShowPaymentModal(true); 
+            executeRealPayment(); // Tiket dicetak di sini
           },
           onPending: function(result) {
-            showPopup("Status Pending! Selesaikan pembayaran VA/Transfer kamu.", "info");
+            if (!isGuest) {
+               showPopup("Pembayaran tertunda. Kamu bisa lanjutin bayar di menu My Orders ya!", "info");
+               setTimeout(() => navigate('/my-orders'), 3000);
+            } else {
+               showPopup("Status Pending! Selesaikan pembayaran VA/Transfer kamu.", "info");
+            }
           },
           onError: function(result) {
             showPopup("Pembayaran gagal. Silakan coba lagi.", "error");
           },
           onClose: function() {
-            showPopup("Kamu menutup pop-up sebelum menyelesaikan pembayaran.", "error");
+            if (!isGuest) {
+               showPopup("Pop-up ditutup! Tenang, pesanan kamu tersimpan aman di menu My Orders.", "info");
+               setTimeout(() => navigate('/my-orders'), 3000);
+            } else {
+               showPopup("Kamu menutup pop-up sebelum menyelesaikan pembayaran.", "error");
+            }
           }
         });
       } else {
@@ -264,11 +269,9 @@ export default function Checkout() {
     }
   };
 
-  // 🔥 FUNGSI YANG DIUBAH: Fungsi simpan tiket ke DB (Bawa Token)
   const executeRealPayment = async () => {
     setPaymentStatus('processing');
     
-    // Ambil Token buat dikirim sebagai KTP
     const token = localStorage.getItem('supabase_token');
 
     try {
@@ -280,14 +283,13 @@ export default function Checkout() {
       }
       
       const payload = { 
-        userId: user ? user.id : null, // Backend udah disetting nerima null buat guest
+        userId: user ? user.id : null,
         guestEmail: emailTamu, 
         eventId: event.id, 
         cart: cart, 
         formAnswers: formAnswers 
       };
       
-      // Siapkan header (Kalau ada token, selipin. Kalau Guest, tetep jalan)
       const headers = { 'Content-Type': 'application/json' };
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
@@ -295,7 +297,7 @@ export default function Checkout() {
 
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tickets/buy`, {
         method: 'POST',
-        headers: headers, // 👈 Pake header yang udah dimodif
+        headers: headers,
         body: JSON.stringify(payload)
       });
       const data = await res.json();
@@ -366,7 +368,6 @@ export default function Checkout() {
               type="button" 
               onClick={() => navigate(-1)} 
               className={`w-12 h-12 flex items-center justify-center rounded-full border shadow-sm transition-all active:scale-95 bg-white border-gray-200 text-gray-500 hover:text-[#FF6B35] hover:border-[#FF6B35]`} 
-              title="Kembali"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
             </button>
@@ -374,7 +375,7 @@ export default function Checkout() {
               <h1 className={`text-3xl font-extrabold uppercase tracking-tight leading-none mb-1 text-gray-900`}>
                 Checkout Tiket
               </h1>
-              <p className={`text-xs font-bold uppercase tracking-widest text-gray-500`}>{event.title}</p>
+              <p className={`text-xs font-bold uppercase tracking-widest text-gray-500`}>{event?.title}</p>
             </div>
           </div>
 

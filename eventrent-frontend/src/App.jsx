@@ -19,6 +19,7 @@ import Scanner from './pages/Scanner';
 import TrackTicket from './pages/TrackTicket'; 
 import Notifications from './pages/Notifications';
 import AgentWallet from './components/AgentWallet';
+import MyOrders from './pages/MyOrders'; // Pastiin path foldernya bener ya
 
 // 👇 IMPORT HALAMAN JOB BOARD BARU 👇
 import JobBoard from './pages/JobBoard';
@@ -154,6 +155,7 @@ export default function App() {
           <Route path="/likes" element={<ProtectedRoute><Likes /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/my-tickets" element={<ProtectedRoute><MyTickets /></ProtectedRoute>} />
+          <Route path="/my-orders" element={<MyOrders />} />
           
           {/* 👇 ROUTE JOB BOARD (CARI KERJA) 👇 */}
           <Route path="/jobs" element={<ProtectedRoute><JobBoard /></ProtectedRoute>} />

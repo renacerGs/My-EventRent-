@@ -364,7 +364,8 @@ export class AppService implements OnModuleInit {
 
   // --- TICKETS, ATTENDEES, & SCANNER ---
   
-  async buyTicket(userId: number | null, eventId: number, cart: any[], formAnswers: any, guestEmail?: string) {
+  // 🔥 FIX: Tambahin orderId di belakang biar bisa nangkep lunas dari Localhost
+  async buyTicket(userId: number | null, eventId: number, cart: any[], formAnswers: any, guestEmail?: string, orderId?: string) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN'); 
@@ -395,6 +396,11 @@ export class AppService implements OnModuleInit {
           [eventId, dummySessionId, userId, 0, targetEmail || null, formAnswers.attendee_name || 'Tamu', formAnswers.email || targetEmail || '', '[]', 0, formAnswers.greeting, false, ticketCode]
         );
         
+        // 🔥 TAMBAHAN BUAT BYPASS LOCALHOST 🔥
+        if (orderId) {
+          await client.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [orderId]);
+        }
+
         await client.query('COMMIT');
         return { message: 'Terima kasih atas doa dan ucapan Anda', ticketIds: [] };
       }
@@ -446,6 +452,11 @@ export class AppService implements OnModuleInit {
           const newTicketCode = ticketRes.rows[0].ticket_code;
           boughtTickets.push(newTicketCode);
         }
+      }
+
+      // 🔥 TAMBAHAN BUAT BYPASS LOCALHOST 🔥
+      if (orderId) {
+        await client.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [orderId]);
       }
 
       await client.query('COMMIT');
@@ -1333,14 +1344,116 @@ export class AppService implements OnModuleInit {
 
     console.log(`💬 [WEBHOOK] Status Transaksi ${order_id}: ${transaction_status}`);
 
+    // 🔥 INI TAMBAHANNYA: UPDATE DATABASE SESUAI STATUS 🔥
     if (transaction_status === 'settlement' || transaction_status === 'capture') {
       console.log(`✅ [WEBHOOK SUCCESS] PESANAN ${order_id} TELAH DIBAYAR LUNAS SEBESAR Rp ${gross_amount}!`);
-    } else if (transaction_status === 'pending') {
+      await this.pool.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [order_id]);
+    } 
+    else if (transaction_status === 'pending') {
       console.log(`⏳ [WEBHOOK PENDING] Menunggu user mentransfer pembayaran untuk ${order_id}...`);
-    } else if (transaction_status === 'expire' || transaction_status === 'cancel' || transaction_status === 'deny') {
+    } 
+    else if (transaction_status === 'expire' || transaction_status === 'cancel' || transaction_status === 'deny') {
       console.log(`❌ [WEBHOOK FAILED] Transaksi ${order_id} gagal/kadaluarsa.`);
+      await this.pool.query(`UPDATE orders SET payment_status = 'FAILED' WHERE order_id = $1`, [order_id]);
     }
 
     return { status: 'OK' };
+  }
+
+  // ==========================================
+  // FITUR ORDERS (PESANAN SAYA)
+  // ==========================================
+
+  // 🔥 FIX HARGA & TIPE DATA USER_ID 🔥
+  async createCheckoutOrder(userId: number, data: any) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // 1. Generate Order ID
+      const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      let totalPrice = 0;
+      
+      // 2. 🔥 AMBIL HARGA ASLI DARI DATABASE BIAR AMAN 🔥
+      if (data.cart && data.cart.length > 0) {
+        for (const item of data.cart) {
+          const sessionRes = await client.query('SELECT price FROM event_sessions WHERE id = $1', [item.sessionId]);
+          const sessionPrice = sessionRes.rows.length > 0 ? Number(sessionRes.rows[0].price) : 0;
+          totalPrice += sessionPrice * Number(item.qty || item.quantity || 1);
+        }
+      }
+
+      // 3. Tembak Midtrans buat dapet Snap Token
+      let snapToken = null;
+      let redirectUrl = null;
+
+      if (totalPrice > 0) {
+        // Ambil data user buat email
+        const userRes = await client.query('SELECT name, email FROM users WHERE id = $1', [userId]);
+        const user = userRes.rows[0] || { name: 'Guest', email: 'guest@eventrent.com' };
+
+        const midtrans = await this.createMidtransTransaction(
+          orderId, 
+          totalPrice, 
+          { name: user.name, email: user.email },
+          data.enabledPayments
+        );
+        snapToken = midtrans.token;
+        redirectUrl = midtrans.redirect_url;
+      }
+
+      // 4. Simpan ke tabel orders
+      const query = `
+        INSERT INTO orders (order_id, user_id, event_id, total_price, snap_token, payment_status, ticket_details)
+        VALUES ($1, $2, $3, $4, $5, 'PENDING', $6)
+        RETURNING *
+      `;
+      const values = [
+        orderId, 
+        userId, 
+        data.eventId, 
+        totalPrice, 
+        snapToken, 
+        JSON.stringify({ cart: data.cart, formAnswers: data.formAnswers })
+      ];
+      
+      const res = await client.query(query, values);
+      
+      await client.query('COMMIT');
+      
+      return { 
+        message: 'Pesanan berhasil dibuat', 
+        order: res.rows[0],
+        snapToken: snapToken,
+        redirectUrl: redirectUrl
+      };
+
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error("Error Checkout Order:", err);
+      throw new InternalServerErrorException('Gagal membuat pesanan');
+    } finally {
+      client.release();
+    }
+  }
+
+  // 🔥 FIX TIPE DATA USER_ID & LOGIKA SORTING PENDING DI ATAS 🔥
+  async getMyOrders(userId: number) {
+    try {
+      const query = `
+        SELECT o.*, e.title as event_title, e.image_url as event_img, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date
+        FROM orders o
+        JOIN events e ON o.event_id = e.id
+        WHERE o.user_id = $1
+        ORDER BY 
+          CASE WHEN o.payment_status = 'PENDING' THEN 1 ELSE 2 END ASC,
+          o.created_at DESC
+      `;
+      const { rows } = await this.pool.query(query, [userId]);
+      return rows;
+    } catch (err) {
+      console.error("Error Get My Orders:", err);
+      throw new InternalServerErrorException('Gagal mengambil daftar pesanan');
+    }
   }
 }

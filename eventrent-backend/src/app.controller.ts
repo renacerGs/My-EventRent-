@@ -4,7 +4,6 @@ import { AppService } from './app.service';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { BuyTicketDto } from './dto/buy-ticket.dto';
 
-// 👇 IMPORT SATPAM KITA (Pastikan path-nya sesuai dengan lokasi file supabase.guard.ts lu ya!)
 import { SupabaseGuard } from './supabase.guard'; 
 
 @Controller('api')
@@ -18,12 +17,12 @@ export class AppController {
   @ApiOperation({ summary: 'Mendapatkan semua event' })
   @Get('events') 
   async getEvents() {
-    return await this.appService.getEvents(); // Public (Bebas akses)
+    return await this.appService.getEvents(); 
   }
 
   @ApiTags('Events')
   @ApiOperation({ summary: 'Mendapatkan event yang dibuat oleh user tertentu' })
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Get('events/my')
   async getMyEvents(@Req() req) {
     return await this.appService.getMyEvents(req.user.id);
@@ -33,21 +32,21 @@ export class AppController {
   @ApiOperation({ summary: 'Mendapatkan detail satu event beserta sesinya' })
   @Get('events/:id')
   async getEventById(@Param('id') id: number) {
-    return await this.appService.getEventById(id); // Public (Bebas akses)
+    return await this.appService.getEventById(id);
   }
 
   @ApiTags('Events')
   @ApiOperation({ summary: 'Membuat event baru' })
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Post('events')
   async createEvent(@Req() req, @Body() eventData: any) {
-    eventData.userId = req.user.id; // Otomatis pakai ID dari token
+    eventData.userId = req.user.id; 
     return await this.appService.createEvent(eventData);
   }
 
   @ApiTags('Events')
   @ApiOperation({ summary: 'Menghapus event' })
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Delete('events/:id')
   async deleteEvent(@Param('id') id: number, @Req() req) {
     return await this.appService.deleteEvent(id, req.user.id);
@@ -55,7 +54,7 @@ export class AppController {
 
   @ApiTags('Events')
   @ApiOperation({ summary: 'Mengubah data event' })
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Put('events/:id')
   async updateEvent(@Param('id') id: number, @Req() req, @Body() eventData: any) {
     return await this.appService.updateEvent(id, req.user.id, eventData);
@@ -65,12 +64,12 @@ export class AppController {
   @ApiOperation({ summary: 'Menambah jumlah tayangan (views) event' })
   @Post('events/:id/view')
   async incrementView(@Param('id') id: number) {
-    return await this.appService.incrementView(id); // Public
+    return await this.appService.incrementView(id);
   }
 
   @ApiTags('Events')
   @ApiOperation({ summary: 'Menyalakan/mematikan visibilitas event' })
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard) 
   @Patch('events/:id/visibility')
   async toggleVisibility(@Param('id') id: number, @Req() req) {
     return await this.appService.toggleEventVisibility(id, req.user.id);
@@ -80,26 +79,48 @@ export class AppController {
   // --- LIKES ---
   // ==========================================
   @ApiTags('Likes')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Post('likes/toggle')
   async toggleLike(@Req() req, @Body() data: { eventId: number }) {
     return await this.appService.toggleLike(req.user.id, data.eventId);
   }
 
   @ApiTags('Likes')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Get('likes/my')
   async getMyLikes(@Req() req) {
     return await this.appService.getMyLikes(req.user.id);
   }
 
   // ==========================================
+  // --- ORDERS (PESANAN SAYA) - FITUR BARU 🔥 ---
+  // ==========================================
+  @ApiTags('Orders')
+  @ApiOperation({ summary: 'Bikin pesanan baru & dapatkan Token Midtrans' })
+  @UseGuards(SupabaseGuard)
+  @Post('orders/checkout')
+  async checkoutOrder(@Req() req, @Body() data: any) {
+    // Panggil fungsi checkout di service
+    return await this.appService.createCheckoutOrder(req.user.id, data);
+  }
+
+  @ApiTags('Orders')
+  @ApiOperation({ summary: 'Ambil daftar riwayat pesanan (My Orders)' })
+  @UseGuards(SupabaseGuard)
+  @Get('orders/my')
+  async getMyOrders(@Req() req) {
+    return await this.appService.getMyOrders(req.user.id);
+  }
+
+  // ==========================================
   // --- TICKETS ---
   // ==========================================
+  
+  // 🔥 FIX: Nangkap orderId buat dikirim ke AppService
   @ApiTags('Tickets')
   @ApiOperation({ summary: 'Membeli tiket (Bebas Satpam biar Guest bisa beli)' })
   @Post('tickets/buy')
-  async buyTicket(@Body() data: BuyTicketDto) { 
+  async buyTicket(@Body() data: any) { 
     let finalCart = data.cart;
     let finalAnswers = data.formAnswers || {};
     let email = data.guestEmail || data.guest_email;
@@ -113,14 +134,14 @@ export class AppController {
       finalAnswers = { ...data.custom_answers, "attendee_name": data.attendee_name, "greeting": data.greeting };
     }
 
-    // 🔥 FIX ERROR 500 UUID: Kalau userId bentuknya string(UUID), kita null-kan biar database nggak crash.
-    const safeUserId = typeof data.userId === 'number' ? data.userId : null;
+    const safeUserId = typeof data.userId === 'number' || typeof data.userId === 'string' ? data.userId : null;
 
-    return await this.appService.buyTicket(safeUserId, data.eventId, finalCart || [], finalAnswers, email);
+    // 🔥 KITA LEMPAR data.orderId KE BELAKANG SINI:
+    return await this.appService.buyTicket(safeUserId, data.eventId, finalCart || [], finalAnswers, email, data.orderId);
   }
 
   @ApiTags('Tickets')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Get('tickets/my')
   async getMyTickets(@Req() req) {
     return await this.appService.getMyTickets(req.user.id);
@@ -129,18 +150,18 @@ export class AppController {
   @ApiTags('Tickets')
   @Post('tickets/track')
   async trackTicket(@Body() data: { ticketId: string; email: string }) { 
-    return await this.appService.trackTicket(data.ticketId, data.email); // Public
+    return await this.appService.trackTicket(data.ticketId, data.email);
   }
 
   @ApiTags('Tickets')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Get('events/:id/attendees')
   async getAttendees(@Param('id') id: number, @Req() req) {
     return await this.appService.getEventAttendees(id, req.user.id);
   }
 
   @ApiTags('Tickets')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Post('tickets/scan')
   async scanTicket(@Req() req, @Body() body: { ticketId: string, eventId: number }) {
     return this.appService.scanTicket(body.ticketId, body.eventId, req.user.id);
@@ -150,35 +171,35 @@ export class AppController {
   // --- AGENTS (KEPANITIAAN) ---
   // ==========================================
   @ApiTags('Agents')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Post('events/:id/agents')
   async addAgent(@Param('id') eventId: number, @Req() req, @Body() body: { email: string; role?: string }) {
     return await this.appService.addAgent(eventId, req.user.id, body.email, body.role);
   }
 
   @ApiTags('Agents')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Get('events/:id/agents')
   async getEventAgents(@Param('id') eventId: number, @Req() req) {
     return await this.appService.getEventAgents(eventId, req.user.id);
   }
 
   @ApiTags('Agents')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Put('events/:id/agents/:agentId')
   async updateAgent(@Param('id') eventId: number, @Param('agentId') agentId: number, @Req() req, @Body() body: { role?: string; rating_given?: number }) {
     return await this.appService.updateAgent(eventId, req.user.id, agentId, body);
   }
 
   @ApiTags('Agents')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Delete('events/:id/agents/:agentId')
   async removeAgent(@Param('id') eventId: number, @Param('agentId') agentId: number, @Req() req) {
     return await this.appService.removeAgent(eventId, req.user.id, agentId);
   }
 
   @ApiTags('Agents')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM (Dan Fix UUID di URL)
+  @UseGuards(SupabaseGuard)
   @Get('users/:id/assigned-events')
   async getAssignedEvents(@Req() req) {
     return await this.appService.getAssignedEvents(req.user.id);
@@ -188,13 +209,13 @@ export class AppController {
   // --- USERS & PROFILES ---
   // ==========================================
   @ApiTags('Users')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM (Fix UUID di URL)
+  @UseGuards(SupabaseGuard)
   @Put('users/:id')
   async updateProfile(@Req() req, @Body() data: any) {
     return await this.appService.updateProfile(req.user.id, data);
   }
 
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM (Fix UUID di URL)
+  @UseGuards(SupabaseGuard)
   @Get('users/:id/scan-history')
   async getScanHistory(@Req() req) {
     return this.appService.getAgentScanHistory(req.user.id);
@@ -204,7 +225,6 @@ export class AppController {
   @UseGuards(SupabaseGuard)
   @Get('auth/me')
   async getMe(@Req() req) {
-    // Karena Satpam udah ngebawa data lengkap, kita tinggal lempar balik ke Frontend
     return req.user;
   }
 
@@ -212,21 +232,21 @@ export class AppController {
   // --- NOTIFICATIONS ---
   // ==========================================
   @ApiTags('Notifications')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM (Fix UUID di URL)
+  @UseGuards(SupabaseGuard)
   @Get('users/:id/notifications')
   async getNotifications(@Req() req) {
     return await this.appService.getNotifications(req.user.id);
   }
 
   @ApiTags('Notifications')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Post('notifications/:id/respond')
   async respondInvitation(@Param('id') notifId: number, @Req() req, @Body() body: { action: 'accept' | 'reject' }) {
     return await this.appService.respondAgentInvitation(notifId, req.user.id, body.action);
   }
 
   @ApiTags('Notifications')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Patch('notifications/:id/read')
   async markNotifRead(@Param('id') notifId: number, @Req() req) {
     return await this.appService.markNotificationRead(notifId, req.user.id);
@@ -236,21 +256,21 @@ export class AppController {
   // --- REPORTS / KENDALA ---
   // ==========================================
   @ApiTags('Reports')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Post('events/:id/reports')
   async createReport(@Param('id') eventId: number, @Req() req, @Body() body: { message: string }) {
     return await this.appService.createEventReport(eventId, req.user.id, body.message);
   }
 
   @ApiTags('Reports')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Get('events/:id/reports')
   async getReports(@Param('id') eventId: number, @Req() req) {
     return await this.appService.getEventReports(eventId, req.user.id);
   }
 
   @ApiTags('Reports')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Patch('reports/:id/resolve')
   async resolveReport(@Param('id') reportId: number, @Req() req) {
     return await this.appService.resolveEventReport(reportId, req.user.id);
@@ -260,7 +280,7 @@ export class AppController {
   // --- RECRUITMENT (JOB BOARD) ---
   // ==========================================
   @ApiTags('Recruitment')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Post('jobs')
   async createJob(@Req() req, @Body() body: any) {
     body.eoId = req.user.id;
@@ -272,39 +292,39 @@ export class AppController {
   async getAllJobs(@Query('page') page?: string, @Query('limit') limit?: string) {
     const pageNum = page ? Number(page) : 1;
     const limitNum = limit ? Number(limit) : 10;
-    return await this.appService.getAllActiveJobs(pageNum, limitNum); // Public (biar gampang dicari)
+    return await this.appService.getAllActiveJobs(pageNum, limitNum);
   }
 
   @ApiTags('Recruitment')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Get('events/:id/jobs')
   async getEventJobs(@Param('id') eventId: string, @Req() req) {
     return await this.appService.getJobsByEvent(Number(eventId), req.user.id);
   }
 
   @ApiTags('Recruitment')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Post('jobs/apply')
   async applyJob(@Req() req, @Body() body: any) {
     return await this.appService.applyForJob(body.jobId, req.user.id);
   }
 
   @ApiTags('Recruitment')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Get('events/:id/applicants')
   async getEventApplicants(@Param('id') eventId: string, @Req() req) {
     return await this.appService.getApplicantsByEvent(Number(eventId), req.user.id);
   }
 
   @ApiTags('Recruitment')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Post('jobs/respond')
   async respondApplicant(@Req() req, @Body() body: any) {
     return await this.appService.respondToApplicant(body.applicationId, body.action, req.user.id);
   }
 
   @ApiTags('Recruitment')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Delete('jobs/:id')
   async deleteJob(@Param('id') jobId: string, @Req() req) {
     return await this.appService.deleteJobPosting(Number(jobId), req.user.id);
@@ -314,20 +334,20 @@ export class AppController {
   // --- PAYOUT / PENGGAJIAN AGEN ---
   // ==========================================
   @ApiTags('Payout')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Get('events/:id/payouts')
   async getPayouts(@Param('id') eventId: string, @Req() req) {
     return await this.appService.getEventPayouts(Number(eventId), req.user.id);
   }
 
   @ApiTags('Payout')
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM
+  @UseGuards(SupabaseGuard)
   @Post('events/:id/payouts/pay')
   async markPaid(@Param('id') eventId: string, @Req() req, @Body() body: { agentId: number, amount: number, proofUrl: string }) {
     return await this.appService.markAgentPaid(Number(eventId), body.agentId, req.user.id, body.amount, body.proofUrl);
   }
 
-  @UseGuards(SupabaseGuard) // 🔥 DIJAGA SATPAM (Fix UUID URL)
+  @UseGuards(SupabaseGuard)
   @Get('users/:id/payouts')
   async getAgentWalletPayouts(@Req() req) {
     return await this.appService.getAgentPayouts(req.user.id);
