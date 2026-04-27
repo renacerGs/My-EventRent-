@@ -364,11 +364,24 @@ export class AppService implements OnModuleInit {
 
   // --- TICKETS, ATTENDEES, & SCANNER ---
   
-  // 🔥 FIX: Tambahin orderId di belakang biar bisa nangkep lunas dari Localhost
+  // 🔥 FIX: Tambahin orderId di belakang & GEMBOK ANTI-DOUBLE TIKET
   async buyTicket(userId: number | null, eventId: number, cart: any[], formAnswers: any, guestEmail?: string, orderId?: string) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN'); 
+
+      // 🛑 GEMBOK ANTI-DOUBLE TIKET (MENCEGAH TAB KEMBAR) 🛑
+      if (orderId) {
+        // FOR UPDATE bikin database ngunci baris ini biar nggak ada yang bisa baca/tulis barengan
+        const checkOrder = await client.query('SELECT payment_status FROM orders WHERE order_id = $1 FOR UPDATE', [orderId]);
+        
+        // Kalau ternyata statusnya UDAH LUNAS (berarti tab sebelah udah nge-eksekusi ini duluan)
+        if (checkOrder.rows.length > 0 && checkOrder.rows[0].payment_status === 'SUCCESS') {
+          await client.query('ROLLBACK');
+          console.log(`[BLOKIR] Pesanan ${orderId} udah dicetak tiketnya. Cegah double print!`);
+          return { message: 'Tiket sudah dicetak sebelumnya.', ticketIds: [] };
+        }
+      }
 
       const boughtTickets: string[] = []; 
       let totalTransactionPrice = 0;
@@ -396,7 +409,7 @@ export class AppService implements OnModuleInit {
           [eventId, dummySessionId, userId, 0, targetEmail || null, formAnswers.attendee_name || 'Tamu', formAnswers.email || targetEmail || '', '[]', 0, formAnswers.greeting, false, ticketCode]
         );
         
-        // 🔥 TAMBAHAN BUAT BYPASS LOCALHOST 🔥
+        // 🔥 UBAH STATUS JADI LUNAS 🔥
         if (orderId) {
           await client.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [orderId]);
         }
@@ -454,7 +467,7 @@ export class AppService implements OnModuleInit {
         }
       }
 
-      // 🔥 TAMBAHAN BUAT BYPASS LOCALHOST 🔥
+      // 🔥 UBAH STATUS JADI LUNAS 🔥
       if (orderId) {
         await client.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [orderId]);
       }
