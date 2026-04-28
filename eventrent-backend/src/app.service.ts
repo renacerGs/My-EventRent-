@@ -1505,13 +1505,15 @@ export class AppService implements OnModuleInit {
     }
   }
 
+  // Ambil daftar peserta/tiket berdasarkan Event ID (REVISI KOLOM)
   async getEventTickets(eventId: number) {
     try {
       const res = await this.pool.query(
-        `SELECT id, ticket_code, attendee_name, attendee_email, pax, is_attending, custom_answers, created_at 
+        // 👇 Ganti created_at jadi purchase_date
+        `SELECT id, ticket_code, attendee_name, attendee_email, pax, is_attending, custom_answers, purchase_date 
          FROM tickets 
          WHERE event_id = $1 
-         ORDER BY created_at DESC`,
+         ORDER BY purchase_date DESC`,
         [eventId]
       );
       return res.rows;
