@@ -1,6 +1,7 @@
+// Versi 2: Pagination (Angka Halaman)
 import React, { useState, useEffect, useRef } from 'react'; 
 import { Link } from 'react-router-dom';
-import { motion, LayoutGroup } from 'framer-motion'; // 🔥 Tambahin LayoutGroup di sini
+import { motion, LayoutGroup } from 'framer-motion';
 
 const displayDate = (event) => {
   if (event.date_start && event.date_end && event.date_start !== event.date_end) {
@@ -49,8 +50,12 @@ const getEventLink = (event) => {
 
 export default function EventList({ events, searchQuery, onClearSearch }) {
   const [activeCategory, setActiveCategory] = useState('All');
-  const categories = ['All', 'Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports'];
   
+  // 🔥 STATE BARU BUAT PAGINATION 🔥
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 9; 
+  
+  const categories = ['All', 'Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports'];
   const isCategoryClicked = useRef(false);
 
   useEffect(() => {
@@ -61,6 +66,7 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
 
     if (!searchQuery || searchQuery.trim() === '') {
       setActiveCategory('All');
+      setCurrentPage(1); // Reset ke Hal 1
       return; 
     }
 
@@ -83,6 +89,7 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
         setActiveCategory('All');
       }
     }
+    setCurrentPage(1); // Reset ke Hal 1 tiap search
   }, [searchQuery, events]); 
 
   const handleCategoryClick = (cat) => {
@@ -90,6 +97,7 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
       isCategoryClicked.current = true; 
     }
     setActiveCategory(cat); 
+    setCurrentPage(1); // Reset ke Hal 1 tiap ganti tab
     if (onClearSearch) {
       onClearSearch(''); 
     }
@@ -108,6 +116,19 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
     return event.category === activeCategory;
   });
 
+  // 🔥 LOGIC MATH PAGINATION 🔥
+  const indexOfLastEvent = currentPage * itemsPerPage;
+  const indexOfFirstEvent = indexOfLastEvent - itemsPerPage;
+  const currentEvents = filteredEvents.slice(indexOfFirstEvent, indexOfLastEvent);
+  
+  const totalPages = Math.ceil(filteredEvents.length / itemsPerPage);
+
+  const paginate = (pageNumber) => {
+    setCurrentPage(pageNumber);
+    // Scroll mulus ke atas daftar event pas ganti halaman
+    window.scrollTo({ top: document.getElementById('event-grid').offsetTop - 100, behavior: 'smooth' });
+  };
+
   return (
     <main className="max-w-6xl mx-auto px-6 py-10 font-sans">
       
@@ -115,14 +136,13 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-xl font-bold text-gray-900">Browse by category</h2>
           <div className="sm:hidden flex items-center gap-1.5 text-[10px] font-black text-[#FF6B35] uppercase tracking-widest animate-pulse">
-            <span>Geser</span>
+            <span>Swipe</span>
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
             </svg>
           </div>
         </div>
         
-        {/* 🔥 BUNGKUS DENGAN LAYOUTGROUP BIAR SLIDINGNYA KONEK 🔥 */}
         <LayoutGroup>
           <div className="flex flex-nowrap sm:flex-wrap overflow-x-auto gap-2 pb-3 sm:pb-0 snap-x pr-8 sm:pr-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {categories.map(cat => (
@@ -139,7 +159,6 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
                   <motion.div
                     layoutId="activeCategoryPill"
                     className="absolute inset-0 bg-[#FF6B35] rounded-full shadow-md"
-                    // 🔥 ANIMASI DIBIKIN LEBIH LAMA & MANTUL DIKIT BIAR KELIHATAN SLIDINGNYA 🔥
                     transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                     style={{ zIndex: 0 }}
                   />
@@ -151,9 +170,9 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
         </LayoutGroup>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
-        {filteredEvents.length > 0 ? (
-          filteredEvents.map(event => (
+      <div id="event-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
+        {currentEvents.length > 0 ? (
+          currentEvents.map(event => (
             <Link 
               to={getEventLink(event)} 
               key={event.id} 
@@ -188,7 +207,7 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
                   </span>
                   
                   <span className={`text-[10px] font-bold uppercase tracking-widest ${Number(event.stock) > 0 ? 'text-[#FF6B35]' : 'text-gray-400'}`}>
-                     {Number(event.stock) > 0 ? 'Beli Tiket' : 'Sold Out'}
+                     {Number(event.stock) > 0 ? 'Buy Ticket' : 'Sold Out'}
                   </span>
                 </div>
               </div>
@@ -196,10 +215,41 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
           ))
         ) : (
           <div className="col-span-full text-center py-20 text-gray-400 font-bold bg-white rounded-3xl border border-gray-100">
-            Tidak ada event yang ditemukan.
+            No events found.
           </div>
         )}
       </div>
+
+      {/* 🔥 TOMBOL PAGINATION 🔥 */}
+      {totalPages > 1 && (
+        <div className="mt-12 flex justify-center items-center gap-2">
+          <button 
+            onClick={() => paginate(currentPage - 1)} 
+            disabled={currentPage === 1}
+            className={`w-10 h-10 flex items-center justify-center rounded-xl font-bold transition-colors ${currentPage === 1 ? 'text-gray-300 bg-gray-50 cursor-not-allowed' : 'text-gray-600 bg-white border border-gray-200 hover:border-[#FF6B35] hover:text-[#FF6B35]'}`}
+          >
+            ←
+          </button>
+          
+          {[...Array(totalPages)].map((_, i) => (
+            <button 
+              key={i} 
+              onClick={() => paginate(i + 1)}
+              className={`w-10 h-10 flex items-center justify-center rounded-xl font-black text-sm transition-colors ${currentPage === i + 1 ? 'bg-[#FF6B35] text-white shadow-md shadow-orange-200' : 'text-gray-600 bg-white border border-gray-200 hover:border-[#FF6B35] hover:text-[#FF6B35]'}`}
+            >
+              {i + 1}
+            </button>
+          ))}
+
+          <button 
+            onClick={() => paginate(currentPage + 1)} 
+            disabled={currentPage === totalPages}
+            className={`w-10 h-10 flex items-center justify-center rounded-xl font-bold transition-colors ${currentPage === totalPages ? 'text-gray-300 bg-gray-50 cursor-not-allowed' : 'text-gray-600 bg-white border border-gray-200 hover:border-[#FF6B35] hover:text-[#FF6B35]'}`}
+          >
+            →
+          </button>
+        </div>
+      )}
     </main>
   );
 }

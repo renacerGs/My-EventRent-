@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Cropper from 'react-easy-crop';
 import { supabase } from '../supabase';
 import toast from 'react-hot-toast';
-import { Landmark } from 'lucide-react'; // 🔥 Icon bank dari lucide-react
+import { Landmark } from 'lucide-react'; 
 
 // 🔥 IMPORT KOMPONEN DARI FOLDER SHARED
 import CustomDatePicker from './shared/CustomDatePicker';
@@ -47,7 +47,6 @@ export default function CreatePublicEvent() {
     title: '', description: '', eventStart: '', eventEnd: '', phone: '', category: '',
     isPrivate: false, 
     location: { namePlace: '', place: '', city: '', province: '', mapUrl: '' },
-    // 🔥 STATE BARU: Default QRIS & VA nyala, Transfer Bank mati
     paymentMethods: {
       qris: true,
       va: true,
@@ -104,11 +103,10 @@ export default function CreatePublicEvent() {
       setShowCropModal(false); 
     } catch (e) {
       console.error(e);
-      toast.error('Gagal memotong gambar!');
+      toast.error('Failed to crop image!');
     }
   };
 
-  // 🔥 FUNGSI BARU: Toggle metode pembayaran
   const togglePaymentMethod = (method) => {
     setFormData(prev => ({
       ...prev,
@@ -139,7 +137,7 @@ export default function CreatePublicEvent() {
   };
 
   const removeSession = (indexToRemove) => {
-    if (formData.sessions.length <= 1) return toast.error("Minimal harus ada 1 session untuk event ini!");
+    if (formData.sessions.length <= 1) return toast.error("There must be at least 1 session for this event!");
     const updatedSessions = formData.sessions.filter((_, index) => index !== indexToRemove);
     setFormData({ ...formData, sessions: updatedSessions });
   };
@@ -187,20 +185,18 @@ export default function CreatePublicEvent() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!imageBase64) return toast.error("Poster/Gambar wajib diupload!");
-    if (!formData.eventStart || !formData.eventEnd) return toast.error("Harap isi Tanggal Mulai dan Selesai Event!");
+    if (!imageBase64) return toast.error("Event Poster/Image is required!");
+    if (!formData.eventStart || !formData.eventEnd) return toast.error("Please fill in the Event Start and End Dates!");
     
-    // 🔥 VALIDASI: Kalau event-nya Paid, wajib pilih minimal 1 metode bayar
     const hasPaidSession = formData.sessions.some(s => s.typeEvent === 'Paid');
     const hasPaymentMethod = formData.paymentMethods.qris || formData.paymentMethods.va || formData.paymentMethods.transferBank;
     
     if (hasPaidSession && !hasPaymentMethod) {
-      return toast.error("Pilih minimal satu metode pembayaran untuk tiket berbayar!");
+      return toast.error("Please select at least one payment method for paid tickets!");
     }
     
     setIsLoading(true);
     try {
-      // 🔥 1. AMBIL TOKEN DARI LOKAL STORAGE
       const token = localStorage.getItem('supabase_token');
 
       const resBase64 = await fetch(imageBase64);
@@ -212,35 +208,33 @@ export default function CreatePublicEvent() {
         .from('event-posters')
         .upload(fileName, imageBlob, { contentType: 'image/webp', upsert: false });
 
-      if (uploadError) throw new Error("Gagal mengunggah gambar ke Supabase.");
+      if (uploadError) throw new Error("Failed to upload image to Supabase.");
 
       const { data: publicUrlData } = supabase.storage.from('event-posters').getPublicUrl(fileName);
       
-      // 🔥 2. HAPUS `userId` KARENA BACKEND UDAH UBAH PAKE TOKEN
       const payload = {
           ...formData,
           img: publicUrlData.publicUrl 
       };
 
-      // 🔥 3. TEMBAK API POST DENGAN TOKEN DI HEADER
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events`, {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}` // 👈 INI KTP-NYA!
+            'Authorization': `Bearer ${token}` 
           },
           body: JSON.stringify(payload)
       });
 
       if (response.ok) {
-          toast.success("Event berhasil dibuat!"); // Kasih notif biar seneng
+          toast.success("Event successfully created!"); 
           navigate('/manage'); 
       } else {
           const errorData = await response.json();
-          toast.error("Gagal membuat acara: " + (errorData.message || 'Server error'));
+          toast.error("Failed to create event: " + (errorData.message || 'Server error'));
       }
     } catch (error) {
-        toast.error(error.message || "Gagal terhubung ke server.");
+        toast.error(error.message || "Failed to connect to the server.");
     } finally {
         setIsLoading(false);
     }
@@ -256,8 +250,8 @@ export default function CreatePublicEvent() {
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-[24px] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col">
             <div className="p-5 border-b border-gray-100 flex justify-between items-center">
-              <h3 className="text-lg font-black uppercase tracking-widest text-gray-900">Sesuaikan Gambar</h3>
-              <button type="button" onClick={() => setShowCropModal(false)} className="text-gray-400 hover:text-red-500 font-bold">✕ Batal</button>
+              <h3 className="text-lg font-black uppercase tracking-widest text-gray-900">Adjust Image</h3>
+              <button type="button" onClick={() => setShowCropModal(false)} className="text-gray-400 hover:text-red-500 font-bold">✕ Cancel</button>
             </div>
             <div className="relative w-full h-[50vh] md:h-[60vh] bg-gray-900">
               <Cropper image={rawImageSrc} crop={crop} zoom={zoom} aspect={736 / 436} onCropChange={setCrop} onCropComplete={onCropComplete} onZoomChange={setZoom} />
@@ -268,7 +262,7 @@ export default function CreatePublicEvent() {
                 <input type="range" min={1} max={3} step={0.1} value={zoom} onChange={(e) => setZoom(e.target.value)} className="w-full accent-[#FF6B35]" />
               </div>
               <button type="button" onClick={handleSaveCrop} className="w-full sm:w-auto px-8 py-3 bg-[#FF6B35] text-white rounded-xl font-bold uppercase tracking-widest text-xs shadow-lg active:scale-95">
-                ✔ Potong & Simpan
+                ✔ Crop & Save
               </button>
             </div>
           </div>
@@ -277,14 +271,14 @@ export default function CreatePublicEvent() {
 
       <div className="pt-8 px-6 max-w-4xl mx-auto flex items-center gap-4">
         <button type="button" onClick={() => navigate(-1)} className="text-sm font-bold flex items-center gap-2 text-[#FF6B35] hover:opacity-80">
-            ← Kembali
+            ← Back
         </button>
       </div>
 
       <main className="max-w-4xl mx-auto px-6 py-6">
         <div className="text-center mb-10">
           <h1 className="text-4xl font-black uppercase tracking-tight text-gray-900">Create Public Event</h1>
-          <p className="text-gray-500 mt-2 font-medium">Isi detail acara publik Anda di bawah ini.</p>
+          <p className="text-gray-500 mt-2 font-medium">Fill in the details for your public event below.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
@@ -294,7 +288,7 @@ export default function CreatePublicEvent() {
             <h2 className="text-xl font-black mb-6 uppercase tracking-widest text-gray-900 border-b border-gray-100 pb-4">Event Details</h2>
             <div className="space-y-5 mt-6">
               <div>
-                <label className={labelStyle}>Event Poster <span className="normal-case ml-1 font-normal text-orange-500">(Rasio 736x436)</span></label>
+                <label className={labelStyle}>Event Poster <span className="normal-case ml-1 font-normal text-orange-500">(Ratio 736x436)</span></label>
                 <div className="relative group">
                   <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-xl cursor-pointer transition-all overflow-hidden border-gray-300 bg-gray-50 hover:bg-gray-100">
                     {imagePreview ? (
@@ -302,7 +296,7 @@ export default function CreatePublicEvent() {
                     ) : (
                       <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
                         <span className="text-3xl mb-2 opacity-50">+</span>
-                        <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Upload Gambar</p>
+                        <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Upload Image</p>
                       </div>
                     )}
                     <input type="file" className="hidden" accept="image/*" onChange={handleImageChange} required={!imagePreview} />
@@ -315,27 +309,27 @@ export default function CreatePublicEvent() {
                 <input type="text" name="title" value={formData.title} onChange={handleEventChange} className={inputStyle} required />
               </div>
               <div>
-                <label className={labelStyle}>Deskripsi</label>
+                <label className={labelStyle}>Description</label>
                 <textarea name="description" value={formData.description} onChange={handleEventChange} rows="4" className={inputStyle} required />
               </div>
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={labelStyle}>Event Start</label>
+                  <label className={labelStyle}>Event Start Date</label>
                   <CustomDatePicker 
                     theme="public"
                     value={formData.eventStart} 
                     onChange={(newDate) => handleEventChange({ target: { name: 'eventStart', value: newDate }})} 
-                    placeholder="Pilih Tanggal Mulai"
+                    placeholder="Select Start Date"
                   />
                 </div>
                 <div>
-                  <label className={labelStyle}>Event End</label>
+                  <label className={labelStyle}>Event End Date</label>
                   <CustomDatePicker 
                     theme="public"
                     value={formData.eventEnd} 
                     onChange={(newDate) => handleEventChange({ target: { name: 'eventEnd', value: newDate }})} 
-                    placeholder="Pilih Tanggal Selesai"
+                    placeholder="Select End Date"
                   />
                 </div>
               </div>
@@ -346,7 +340,7 @@ export default function CreatePublicEvent() {
                   <input type="text" name="phone" placeholder="Ex: 08123456789" value={formData.phone} onChange={handleEventChange} className={inputStyle} required />
                 </div>
                 <div>
-                  <label className={labelStyle}>Kategori</label>
+                  <label className={labelStyle}>Category</label>
                   <select name="category" value={formData.category} onChange={handleEventChange} className={inputStyle} required>
                     <option value="" disabled hidden>Select Category</option>
                     {categoriesList.filter(c => c !== 'Wedding').map(c => <option key={c} value={c}>{c}</option>)}
@@ -358,28 +352,28 @@ export default function CreatePublicEvent() {
 
           {/* BAGIAN 2: LOKASI GLOBAL */}
           <div className="bg-white border-gray-200 rounded-[24px] shadow-sm p-8 border">
-            <h2 className="text-xl font-black mb-6 uppercase tracking-widest text-gray-900 border-b border-gray-100 pb-4">Lokasi Acara</h2>
+            <h2 className="text-xl font-black mb-6 uppercase tracking-widest text-gray-900 border-b border-gray-100 pb-4">Event Location</h2>
             <div className="space-y-5 mt-6">
               <div>
-                <label className={labelStyle}>Nama Tempat</label>
+                <label className={labelStyle}>Venue Name</label>
                 <input type="text" name="namePlace" value={formData.location.namePlace} onChange={handleLocationChange} className={inputStyle} required />
               </div>
               <div>
-                <label className={labelStyle}>Full Alamat</label>
+                <label className={labelStyle}>Full Address</label>
                 <textarea name="place" value={formData.location.place} onChange={handleLocationChange} rows="2" className={inputStyle} required />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className={labelStyle}>Kota</label>
+                  <label className={labelStyle}>City</label>
                   <input type="text" name="city" value={formData.location.city} onChange={handleLocationChange} className={inputStyle} required />
                 </div>
                 <div>
-                  <label className={labelStyle}>Provinsi</label>
+                  <label className={labelStyle}>Province</label>
                   <input type="text" name="province" value={formData.location.province} onChange={handleLocationChange} className={inputStyle} required />
                 </div>
               </div>
               <div>
-                <label className={labelStyle}>URL Google Maps (Opsional)</label>
+                <label className={labelStyle}>Google Maps URL (Optional)</label>
                 <input type="url" name="mapUrl" value={formData.location.mapUrl} onChange={handleLocationChange} className={inputStyle} />
               </div>
             </div>
@@ -392,34 +386,34 @@ export default function CreatePublicEvent() {
                 <h2 className="text-lg font-black uppercase text-[#FF6B35]">Session {sIndex + 1}</h2>
                 {formData.sessions.length > 1 && (
                   <button type="button" onClick={() => removeSession(sIndex)} className="text-xs uppercase tracking-widest font-bold px-4 py-2 rounded-xl transition-all bg-red-50 text-red-500 hover:bg-red-100">
-                    Hapus
+                    Remove
                   </button>
                 )}
               </div>
               
               <div className="space-y-4">
                 <div>
-                  <label className={labelStyle}>Name Session / Jenis Tiket</label>
+                  <label className={labelStyle}>Session Name / Ticket Type</label>
                   <input type="text" value={session.name} onChange={(e) => handleSessionChange(sIndex, 'name', e.target.value)} className={inputStyle} required />
                 </div>
                 <div>
-                  <label className={labelStyle}>Deskripsi</label>
+                  <label className={labelStyle}>Description</label>
                   <textarea value={session.description} onChange={(e) => handleSessionChange(sIndex, 'description', e.target.value)} rows="3" className={inputStyle} />
                 </div>
                 
                 <div>
-                  <label className={labelStyle}>Tanggal</label>
+                  <label className={labelStyle}>Date</label>
                   <CustomDatePicker 
                     theme="public"
                     value={session.date} 
                     onChange={(newDate) => handleSessionChange(sIndex, 'date', newDate)} 
-                    placeholder="Pilih Tanggal Sesi"
+                    placeholder="Select Session Date"
                   />
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className={labelStyle}>Jam Mulai</label>
+                    <label className={labelStyle}>Start Time</label>
                     <CustomTimePicker 
                       theme="public"
                       value={session.startTime} 
@@ -428,7 +422,7 @@ export default function CreatePublicEvent() {
                     />
                   </div>
                   <div>
-                    <label className={labelStyle}>Jam Selesai</label>
+                    <label className={labelStyle}>End Time</label>
                     <CustomTimePicker 
                       theme="public"
                       value={session.endTime} 
@@ -440,7 +434,7 @@ export default function CreatePublicEvent() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className={labelStyle}>Type Event</label>
+                    <label className={labelStyle}>Event Type</label>
                     <select value={session.typeEvent} onChange={(e) => handleSessionChange(sIndex, 'typeEvent', e.target.value)} className={inputStyle}>
                       <option value="Paid">Paid</option>
                       <option value="Free">Free</option>
@@ -466,12 +460,12 @@ export default function CreatePublicEvent() {
                 </div>
                 
                 <div>
-                  <label className={labelStyle}>Contact Person Session</label>
+                  <label className={labelStyle}>Session Contact Person</label>
                   <input type="text" value={session.contactPerson} onChange={(e) => handleSessionChange(sIndex, 'contactPerson', e.target.value)} className={inputStyle} />
                 </div>
 
                 <div>
-                  <label className={labelStyle}>Stock / Kuota Tiket</label>
+                  <label className={labelStyle}>Ticket Stock / Quota</label>
                   <input type="text" value={session.stock} onChange={(e) => {
                         const val = e.target.value;
                         if (val === '' || /^\d+$/.test(val)) handleSessionChange(sIndex, 'stock', val);
@@ -479,7 +473,7 @@ export default function CreatePublicEvent() {
                 </div>
 
                 <div>
-                  <label className={labelStyle}>Syarat & Ketentuan</label>
+                  <label className={labelStyle}>Terms & Conditions</label>
                   <textarea value={session.ticketDesc} onChange={(e) => handleSessionChange(sIndex, 'ticketDesc', e.target.value)} rows="3" className={inputStyle} />
                 </div>
               </div>
@@ -495,13 +489,13 @@ export default function CreatePublicEvent() {
             {formData.sessions.map((session, sIndex) => (
               <div key={`formbuilder-${session.id}`} className="bg-white border-gray-200 rounded-[24px] shadow-sm p-8 border">
                 <div className="mb-6 border-b border-gray-100 pb-4">
-                   <p className="text-[10px] font-black uppercase tracking-widest mb-1 text-gray-400">Form Registrasi Tambahan Untuk:</p>
+                   <p className="text-[10px] font-black uppercase tracking-widest mb-1 text-gray-400">Additional Registration Form For:</p>
                    <h2 className="text-xl font-bold text-gray-900">{session.name || `Session ${sIndex + 1}`}</h2>
                 </div>
                 
                 <div className="space-y-4 mb-6 select-none opacity-50">
-                  <div><label className={labelStyle}>Nama Lengkap (Bawaan)</label><input type="text" disabled className={inputStyle} value="Akan diisi oleh peserta" readOnly/></div>
-                  <div><label className={labelStyle}>Email (Bawaan)</label><input type="text" disabled className={inputStyle} value="Akan diisi oleh peserta" readOnly/></div>
+                  <div><label className={labelStyle}>Full Name (Default)</label><input type="text" disabled className={inputStyle} value="Will be filled by the attendee" readOnly/></div>
+                  <div><label className={labelStyle}>Email (Default)</label><input type="text" disabled className={inputStyle} value="Will be filled by the attendee" readOnly/></div>
                 </div>
 
                 {session.questions.map((q, qIndex) => (
@@ -510,7 +504,7 @@ export default function CreatePublicEvent() {
                       <div className="flex-1 min-w-0">
                         <input 
                           type="text" 
-                          placeholder="Ketik pertanyaan custom di sini (Ex: Ukuran Kaos)" 
+                          placeholder="Type custom question here (Ex: T-Shirt Size)" 
                           value={q.text} 
                           onChange={(e) => handleQuestionChange(sIndex, qIndex, 'text', e.target.value)} 
                           className={`${inputStyle} w-full border-orange-200`} 
@@ -523,7 +517,7 @@ export default function CreatePublicEvent() {
                           onChange={(e) => handleQuestionChange(sIndex, qIndex, 'type', e.target.value)} 
                           className={`${inputStyle} w-full cursor-pointer font-semibold border-orange-200`}
                         >
-                          <option value="Text">Teks Singkat</option>
+                          <option value="Text">Short Text</option>
                           <option value="Dropdown">Dropdown</option>
                           <option value="Checkbox">Checkbox</option>
                         </select>
@@ -531,12 +525,12 @@ export default function CreatePublicEvent() {
                     </div>
 
                     {q.type === 'Text' && (
-                      <input type="text" placeholder="Kolom jawaban teks (diisi peserta nanti)" disabled className={`${inputStyle} opacity-60 bg-gray-50 border-gray-200`} />
+                      <input type="text" placeholder="Text answer field (filled by attendee later)" disabled className={`${inputStyle} opacity-60 bg-gray-50 border-gray-200`} />
                     )}
 
                     {(q.type === 'Dropdown' || q.type === 'Checkbox') && (
                       <div className="pl-4 border-l-2 mt-4 space-y-2 border-orange-200">
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Atur Pilihan Jawaban:</label>
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Set Answer Options:</label>
                         {q.options?.map((opt, optIndex) => (
                           <div key={optIndex} className="flex items-center gap-3">
                             <div className="text-gray-400 shrink-0">
@@ -550,7 +544,7 @@ export default function CreatePublicEvent() {
                             </div>
                             <input 
                               type="text" 
-                              placeholder={`Opsi ${optIndex + 1}`} 
+                              placeholder={`Option ${optIndex + 1}`} 
                               value={opt} 
                               onChange={(e) => updateQuestionOption(sIndex, qIndex, optIndex, e.target.value)} 
                               className={`${inputStyle} py-2 flex-1`} 
@@ -564,22 +558,22 @@ export default function CreatePublicEvent() {
                           </div>
                         ))}
                         <button type="button" onClick={() => addQuestionOption(sIndex, qIndex)} className="text-xs font-bold mt-2 px-3 py-1.5 rounded-lg transition-colors text-[#FF6B35] hover:text-orange-700 bg-orange-50">
-                          + Tambah Opsi
+                          + Add Option
                         </button>
                       </div>
                     )}
 
                     <div className="flex justify-end items-center gap-4 mt-6 pt-4 border-t border-orange-100">
-                      <button type="button" onClick={() => removeQuestion(sIndex, qIndex)} className="text-xs font-bold uppercase tracking-widest transition text-gray-400 hover:text-red-500">Hapus Form</button>
+                      <button type="button" onClick={() => removeQuestion(sIndex, qIndex)} className="text-xs font-bold uppercase tracking-widest transition text-gray-400 hover:text-red-500">Remove Form</button>
                       <label className="flex items-center gap-2 text-xs font-bold cursor-pointer uppercase tracking-widest select-none text-gray-700">
-                        Wajib Isi
+                        Required
                         <input type="checkbox" checked={q.isRequired} onChange={(e) => handleQuestionChange(sIndex, qIndex, 'isRequired', e.target.checked)} className="w-4 h-4 rounded focus:ring-2 text-orange-500 focus:ring-orange-500" />
                       </label>
                     </div>
                   </div>
                 ))}
                 <button type="button" onClick={() => addQuestion(sIndex)} className="text-sm font-bold flex items-center gap-2 mt-4 transition text-[#FF6B35] hover:text-orange-700">
-                  <span className="text-xl">⊕</span> Tambah Pertanyaan Baru
+                  <span className="text-xl">⊕</span> Add New Question
                 </button>
               </div>
             ))}
@@ -587,8 +581,8 @@ export default function CreatePublicEvent() {
 
           {/* 🔥 BAGIAN 5: SETTING METODE PEMBAYARAN 🔥 */}
           <div className="bg-white border-gray-200 rounded-[24px] shadow-sm p-8 border mt-8">
-            <h2 className="text-xl font-black mb-2 uppercase tracking-widest text-gray-900">Setting Metode Pembayaran Acara</h2>
-            <p className="text-sm text-gray-500 mb-6 font-medium">Pilih metode pembayaran yang Anda terima dari peserta.</p>
+            <h2 className="text-xl font-black mb-2 uppercase tracking-widest text-gray-900">Event Payment Method Settings</h2>
+            <p className="text-sm text-gray-500 mb-6 font-medium">Select the payment methods you accept from attendees.</p>
 
             <div className="space-y-4">
               {/* Opsi QRIS */}
@@ -601,7 +595,7 @@ export default function CreatePublicEvent() {
                 </div>
                 <div>
                   <p className="font-bold text-gray-900 md:text-lg">QR Code (QRIS)</p>
-                  <p className="text-xs text-gray-500 mt-0.5">GOPAY, OVO, DANA, DLL.</p>
+                  <p className="text-xs text-gray-500 mt-0.5">GOPAY, OVO, DANA, ETC.</p>
                 </div>
               </label>
 
@@ -615,7 +609,7 @@ export default function CreatePublicEvent() {
                 </div>
                 <div>
                   <p className="font-bold text-gray-900 md:text-lg">Virtual Account</p>
-                  <p className="text-xs text-gray-500 mt-0.5">BCA, MANDIRI, BNI, BRI, DLL.</p>
+                  <p className="text-xs text-gray-500 mt-0.5">BCA, MANDIRI, BNI, BRI, ETC.</p>
                 </div>
               </label>
 
@@ -628,8 +622,8 @@ export default function CreatePublicEvent() {
                   <Landmark className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="font-bold text-gray-900 md:text-lg">Transfer Bank</p>
-                  <p className="text-xs text-gray-500 mt-0.5">BCA, MANDIRI, PERMATA, DLL.</p>
+                  <p className="font-bold text-gray-900 md:text-lg">Bank Transfer</p>
+                  <p className="text-xs text-gray-500 mt-0.5">BCA, MANDIRI, PERMATA, ETC.</p>
                 </div>
               </label>
             </div>
@@ -637,7 +631,7 @@ export default function CreatePublicEvent() {
 
           <div className="flex justify-between items-center pt-6 border-t mt-10 border-gray-200">
             <button type="button" onClick={() => navigate(-1)} className="px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-xs transition text-gray-400 hover:text-gray-900">
-               Batal
+               Cancel
             </button>
             <button type="submit" disabled={isLoading} className="px-10 py-4 rounded-xl text-white font-bold uppercase tracking-widest text-xs shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed bg-[#FF6B35] hover:bg-[#E85526]">
               {isLoading ? 'Processing...' : 'Publish Event'}

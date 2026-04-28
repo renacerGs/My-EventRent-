@@ -3,15 +3,15 @@ import { useGoogleLogin } from '@react-oauth/google';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, CheckCircle2, RefreshCw, ArrowLeft, UserCircle2, Briefcase, KeyRound } from 'lucide-react'; 
 
-// 👇 IMPORT SUPABASE LU DI SINI (Sesuaikan path foldernya ya!)
+// 👇 IMPORT SUPABASE LU DI SINI
 import { supabase } from '../supabase'; 
 
-const AnimatedEyeToggle = ({ isVisible }) => {
+// 🔥 UBAHAN: Terima activeColor biar matanya bisa ganti warna Biru/Orange
+const AnimatedEyeToggle = ({ isVisible, activeColor = "#FF6B35" }) => {
   const strokeColor = "#9ca3af"; 
-  const activeColor = "#FF6B35"; 
 
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={isVisible ? activeColor : strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="transition-colors group-hover:stroke-[#FF6B35]">
+    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={isVisible ? activeColor : strokeColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="transition-colors hover:stroke-gray-600">
       <motion.path initial={false} animate={{ d: isVisible ? "M 2 12 C 8 4, 16 4, 22 12" : "M 3 13 C 8 16, 16 16, 21 13" }} transition={{ duration: 0.3 }} />
       <motion.path initial={false} animate={{ d: isVisible ? "M 2 12 C 8 20, 16 20, 22 12" : "M 3 13 C 8 16, 16 16, 21 13" }} transition={{ duration: 0.3 }} />
       <motion.circle cx="12" cy="12" r="3.5" stroke="none" fill={isVisible ? activeColor : strokeColor} initial={false} animate={ isVisible ? { x: [0, 4, -2, 0], y: [4, -1, 1, 0], scale: 1, opacity: 1 } : { x: 0, y: 4, scale: 0.5, opacity: 0 } } transition={{ duration: 0.6, times: [0, 0.4, 0.7, 1] }} />
@@ -26,22 +26,25 @@ const OtpVerification = ({ email, onVerified, onCancel, isAgentMode }) => {
   const [resendCooldown, setResendCooldown] = useState(0);
   const inputRefs = useRef([]);
 
+  const themeColor = isAgentMode ? 'text-blue-600' : 'text-[#FF6B35]';
+  const themeBg = isAgentMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-[#FF6B35] hover:bg-[#e85526]';
+  const themeRing = isAgentMode ? 'focus:ring-blue-500/30 focus:border-blue-500' : 'focus:ring-[#FF6B35]/30 focus:border-[#FF6B35]';
+  const themeIconBg = isAgentMode ? 'bg-blue-50 text-blue-600' : 'bg-[#FF6B35]/10 text-[#FF6B35]';
+
   const verifyOtpCode = async (codeToVerify) => {
     if (codeToVerify.length < 6 || isLoading) return;
     setIsLoading(true);
     setError('');
 
     try {
-      // 🚀 SUPABASE: Verifikasi OTP Register
       const { data, error: verifyError } = await supabase.auth.verifyOtp({
         email,
         token: codeToVerify,
-        type: 'signup' // Tipe OTP untuk akun baru
+        type: 'signup' 
       });
 
       if (verifyError) throw verifyError;
       
-      // Simpan token biar langsung login
       if (data.session) {
         localStorage.setItem('supabase_token', data.session.access_token);
       }
@@ -92,7 +95,6 @@ const OtpVerification = ({ email, onVerified, onCancel, isAgentMode }) => {
     setIsLoading(true);
     setError('');
     try {
-      // 🚀 SUPABASE: Kirim Ulang OTP
       const { error: resendError } = await supabase.auth.resend({
         type: 'signup',
         email: email
@@ -116,30 +118,30 @@ const OtpVerification = ({ email, onVerified, onCancel, isAgentMode }) => {
 
   return (
     <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full h-full flex flex-col justify-center items-center bg-white p-6 sm:p-8">
-      <div className="w-16 h-16 bg-[#FF6B35]/10 text-[#FF6B35] rounded-full flex items-center justify-center mb-6">
+      <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-6 ${themeIconBg}`}>
         <Mail className="w-8 h-8" />
       </div>
       <h2 className="text-2xl font-black text-center text-gray-900 mb-2 italic uppercase">Cek Email Lu!</h2>
       <p className="text-center text-gray-500 mb-8 text-xs font-medium px-4">
         Kita udah ngirim kode 6 digit ke <br/>
-        <span className="font-bold text-[#FF6B35]">{email}</span>
+        <span className={`font-bold ${themeColor}`}>{email}</span>
       </p>
 
       <form onSubmit={handleSubmit} className="w-full max-w-sm">
         <div className="flex justify-center gap-2 mb-6">
           {otp.map((digit, index) => (
-            <input key={index} ref={(el) => (inputRefs.current[index] = el)} type="text" maxLength="1" value={digit} onChange={(e) => handleChange(index, e.target.value)} onKeyDown={(e) => handleKeyDown(index, e)} onPaste={handlePaste} disabled={isLoading} className="w-11 h-14 text-center text-xl font-black text-gray-800 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-[#FF6B35] focus:ring-2 focus:ring-[#FF6B35]/30 outline-none transition-all disabled:opacity-70" />
+            <input key={index} ref={(el) => (inputRefs.current[index] = el)} type="text" maxLength="1" value={digit} onChange={(e) => handleChange(index, e.target.value)} onKeyDown={(e) => handleKeyDown(index, e)} onPaste={handlePaste} disabled={isLoading} className={`w-11 h-14 text-center text-xl font-black text-gray-800 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white outline-none transition-all disabled:opacity-70 ${themeRing}`} />
           ))}
         </div>
         {error && <p className="text-red-500 text-[10px] text-center font-bold bg-red-50 py-2.5 rounded-xl italic mb-4">{error}</p>}
-        <button type="submit" disabled={isLoading || otp.join('').length < 6} className="w-full py-4 bg-[#FF6B35] text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-[#e85526] hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50 flex justify-center items-center gap-2">
+        <button type="submit" disabled={isLoading || otp.join('').length < 6} className={`w-full py-4 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50 flex justify-center items-center gap-2 ${themeBg}`}>
           {isLoading ? 'Mengecek...' : 'Verifikasi Akun'} {!isLoading && <CheckCircle2 className="w-4 h-4" />}
         </button>
       </form>
 
       <div className="mt-8 flex flex-col items-center gap-4 text-xs font-medium">
-        <p className="text-gray-500"> Belum dapet emailnya?{' '} <button type="button" onClick={handleResend} disabled={resendCooldown > 0 || isLoading} className="text-[#FF6B35] font-black hover:underline disabled:text-gray-400 inline-flex items-center gap-1 uppercase tracking-widest"><RefreshCw className="w-3 h-3" /> {resendCooldown > 0 ? `Kirim ulang (${resendCooldown}s)` : 'Kirim Ulang'}</button></p>
-        <button onClick={onCancel} disabled={isLoading} className="text-gray-400 hover:text-gray-800 font-bold inline-flex items-center gap-1 uppercase tracking-widest mt-2 transition-colors disabled:opacity-50"><ArrowLeft className="w-3 h-3" /> Kembali Daftar</button>
+        <p className="text-gray-500"> Belum dapet emailnya?{' '} <button type="button" onClick={handleResend} disabled={resendCooldown > 0 || isLoading} className={`${themeColor} font-black hover:underline disabled:text-gray-400 inline-flex items-center gap-1 uppercase tracking-widest`}><RefreshCw className="w-3 h-3" /> {resendCooldown > 0 ? `Kirim ulang (${resendCooldown}s)` : 'Kirim Ulang'}</button></p>
+        <button onClick={onCancel} disabled={isLoading} className="text-gray-400 hover:text-gray-800 font-bold inline-flex items-center gap-1 uppercase tracking-widest mt-2 transition-colors disabled:opacity-50"><ArrowLeft className="w-3 h-3" /> Kembali</button>
       </div>
     </motion.div>
   );
@@ -162,11 +164,8 @@ const ForgotPasswordScreen = ({ onCancel, onPasswordResetSuccess }) => {
     setIsLoading(true);
     setErrorMsg('');
     try {
-      // 🚀 SUPABASE: Minta OTP Lupa Password
       const { error } = await supabase.auth.resetPasswordForEmail(email);
-      
       if (error) throw error;
-      
       setStep(2);
       setSuccessMsg('Kode OTP pemulihan telah dikirim ke email lu!');
     } catch (err) {
@@ -184,20 +183,16 @@ const ForgotPasswordScreen = ({ onCancel, onPasswordResetSuccess }) => {
     setErrorMsg('');
 
     try {
-      // 🚀 SUPABASE: 1. Verifikasi OTP Lupa Password
       const { error: verifyError } = await supabase.auth.verifyOtp({
         email,
         token: otpCode,
         type: 'recovery'
       });
-      
       if (verifyError) throw verifyError;
 
-      // 🚀 SUPABASE: 2. Ganti Password Baru
       const { error: updateError } = await supabase.auth.updateUser({
         password: newPassword
       });
-
       if (updateError) throw updateError;
       
       setSuccessMsg('Password berhasil direset! Silakan login.');
@@ -225,7 +220,8 @@ const ForgotPasswordScreen = ({ onCancel, onPasswordResetSuccess }) => {
 
   return (
     <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full h-full flex flex-col justify-center items-center bg-white p-6 sm:p-8">
-      <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center mb-6">
+      {/* 🔥 UBAHAN: Forgot Password jadi ORANGE FULL 🔥 */}
+      <div className="w-16 h-16 bg-[#FF6B35]/10 text-[#FF6B35] rounded-full flex items-center justify-center mb-6">
         <KeyRound className="w-8 h-8" />
       </div>
       
@@ -235,7 +231,7 @@ const ForgotPasswordScreen = ({ onCancel, onPasswordResetSuccess }) => {
       <p className="text-center text-gray-500 mb-8 text-xs font-medium px-4">
         {step === 1 
           ? "Kalem bro, masukin email lu ntar kita kirimin kode OTP buat reset." 
-          : <span>Masukin kode OTP yang udah dikirim ke <span className="font-bold text-blue-500">{email}</span> dan password baru lu.</span>
+          : <span>Masukin kode OTP yang udah dikirim ke <span className="font-bold text-[#FF6B35]">{email}</span> dan password baru lu.</span>
         }
       </p>
 
@@ -244,8 +240,8 @@ const ForgotPasswordScreen = ({ onCancel, onPasswordResetSuccess }) => {
 
       {step === 1 ? (
         <form onSubmit={handleSendOtp} className="w-full max-w-sm">
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email terdaftar" className="w-full px-5 py-3.5 mb-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/30 focus:bg-white border border-transparent focus:border-blue-100 transition-all text-sm" required />
-          <button type="submit" disabled={isLoading || !email} className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-black transition-all active:scale-95 disabled:opacity-50">
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email terdaftar" className="w-full px-5 py-3.5 mb-4 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:bg-white border border-transparent focus:border-orange-100 transition-all text-sm" required />
+          <button type="submit" disabled={isLoading || !email} className="w-full py-4 bg-[#FF6B35] text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-[#e85526] transition-all shadow-[0_8px_20px_-6px_rgba(255,107,53,0.5)] active:scale-95 disabled:opacity-50">
             {isLoading ? 'Mencari...' : 'Kirim Kode OTP'}
           </button>
         </form>
@@ -253,18 +249,18 @@ const ForgotPasswordScreen = ({ onCancel, onPasswordResetSuccess }) => {
         <form onSubmit={handleResetPassword} className="w-full max-w-sm">
           <div className="flex justify-center gap-2 mb-6">
             {otp.map((digit, index) => (
-              <input key={index} ref={(el) => (inputRefs.current[index] = el)} type="text" maxLength="1" value={digit} onChange={(e) => handleOtpChange(index, e.target.value)} onKeyDown={(e) => handleOtpKeyDown(index, e)} disabled={isLoading} className="w-11 h-14 text-center text-xl font-black text-gray-800 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none transition-all" />
+              <input key={index} ref={(el) => (inputRefs.current[index] = el)} type="text" maxLength="1" value={digit} onChange={(e) => handleOtpChange(index, e.target.value)} onKeyDown={(e) => handleOtpKeyDown(index, e)} disabled={isLoading} className="w-11 h-14 text-center text-xl font-black text-gray-800 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-[#FF6B35] focus:ring-2 focus:ring-[#FF6B35]/30 outline-none transition-all" />
             ))}
           </div>
 
           <div className="relative w-full group mb-6">
-            <input type={showPassword ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Password Baru" className="w-full pl-5 pr-12 py-3.5 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/30 focus:bg-white border border-transparent focus:border-blue-100 transition-all text-sm" required minLength="6" />
+            <input type={showPassword ? "text" : "password"} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Password Baru" className="w-full pl-5 pr-12 py-3.5 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:bg-white border border-transparent focus:border-orange-100 transition-all text-sm" required minLength="6" />
             <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 focus:outline-none flex items-center justify-center p-1.5 z-10">
-              <AnimatedEyeToggle isVisible={showPassword} />
+              <AnimatedEyeToggle isVisible={showPassword} activeColor="#FF6B35" />
             </button>
           </div>
 
-          <button type="submit" disabled={isLoading || otp.join('').length < 6 || !newPassword} className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50">
+          <button type="submit" disabled={isLoading || otp.join('').length < 6 || !newPassword} className="w-full py-4 bg-[#FF6B35] text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-[0_8px_20px_-6px_rgba(255,107,53,0.5)] hover:bg-[#e85526] transition-all active:scale-95 disabled:opacity-50">
             {isLoading ? 'Menyimpan...' : 'Simpan Password'}
           </button>
         </form>
@@ -312,7 +308,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // 🚀 SUPABASE: Login pake Google
   const handleGoogleLogin = async () => {
     try {
       setIsLoading(true);
@@ -321,7 +316,6 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
         provider: 'google',
       });
       if (error) throw error;
-      // Catatan: OAuth Google akan me-redirect halaman browser lu secara otomatis
     } catch (err) {
       setErrorMsg(err.message || 'Akses Google ditolak!');
     } finally {
@@ -337,25 +331,22 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
 
     try {
       if (isSignUp) {
-        // 🚀 SUPABASE: Register User Baru
         const { error } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
           options: {
             data: {
-              full_name: formData.name, // 👈 Ini bakal ngisi database berkat Trigger lu!
+              full_name: formData.name, 
             }
           }
         });
         
         if (error) throw error;
 
-        // Buka layar verifikasi OTP bawaan lu
         setRegisteredEmail(formData.email);
         setShowOtpScreen(true);
         
       } else {
-        // 🚀 SUPABASE: Login Normal
         const { data, error } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
@@ -363,11 +354,9 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
 
         if (error) throw error;
 
-        // 🔥 SIMPAN TOKEN UNTUK NEMBAK NESTJS NANTI 🔥
         const token = data.session.access_token;
         localStorage.setItem('supabase_token', token);
 
-        // Nyiapin data user buat frontend lu
         const loggedInUser = { 
           ...data.user, 
           name: data.user.user_metadata?.full_name || 'User',
@@ -411,7 +400,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
           </div>
         ) : (
           <>
-            <div className="md:hidden bg-[#FF6B35] relative w-full px-6 py-10 overflow-hidden flex flex-col items-center justify-center text-center shadow-sm">
+            {/* 🔥 UBAHAN: Header Mobile dinamis (Hitam kalau Agen) 🔥 */}
+            <div className={`md:hidden relative w-full px-6 py-10 overflow-hidden flex flex-col items-center justify-center text-center shadow-sm transition-colors duration-500 ${isAgentMode ? 'bg-gray-900' : 'bg-[#FF6B35]'}`}>
               <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
               <div className="absolute bottom-[-20%] left-[-10%] w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
               
@@ -437,6 +427,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                 </h2>
               </div>
 
+              {/* 🔥 UBAHAN: Toggle UI dinamis (Biru/Orange) 🔥 */}
               <div className="w-full bg-gray-100 p-1 rounded-xl flex items-center justify-between mb-6 shadow-inner relative">
                 <div 
                   className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-lg shadow-sm transition-all duration-300 ease-out z-0`}
@@ -445,14 +436,13 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                 <button type="button" onClick={() => setIsAgentMode(false)} className={`flex-1 py-2 text-[10px] sm:text-xs font-black uppercase tracking-widest z-10 transition-colors flex items-center justify-center gap-1.5 ${!isAgentMode ? 'text-[#FF6B35]' : 'text-gray-400 hover:text-gray-600'}`}>
                   <UserCircle2 className="w-3.5 h-3.5" /> Reguler
                 </button>
-                <button type="button" onClick={() => setIsAgentMode(true)} className={`flex-1 py-2 text-[10px] sm:text-xs font-black uppercase tracking-widest z-10 transition-colors flex items-center justify-center gap-1.5 ${isAgentMode ? 'text-[#FF6B35]' : 'text-gray-400 hover:text-gray-600'}`}>
+                <button type="button" onClick={() => setIsAgentMode(true)} className={`flex-1 py-2 text-[10px] sm:text-xs font-black uppercase tracking-widest z-10 transition-colors flex items-center justify-center gap-1.5 ${isAgentMode ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
                   <Briefcase className="w-3.5 h-3.5" /> Agen
                 </button>
               </div>
 
               <div className="text-center mb-5 mt-2 md:mt-0">
                 <div className="flex gap-4 justify-center">
-                  {/* 👇 TOMBOL GOOGLE SEKARANG PAKAI SUPABASE JUGA 👇 */}
                   <button type="button" onClick={handleGoogleLogin} className="w-12 h-12 md:w-10 md:h-10 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-all shadow-sm active:scale-90 bg-white">
                     <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 md:w-4 md:h-4" alt="Google" />
                   </button>
@@ -464,20 +454,21 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                 <motion.div key={isSignUp ? 'form-signup' : 'form-signin'} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
                   <form onSubmit={handleSubmit} className="space-y-3.5 md:space-y-4">
                     {isSignUp && (
-                      <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Full Name" className="w-full px-5 py-3.5 md:py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:bg-white border border-transparent focus:border-orange-100 transition-all text-sm" required />
+                      <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Full Name" className={`w-full px-5 py-3.5 md:py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:bg-white border border-transparent transition-all text-sm ${isAgentMode ? 'focus:ring-blue-500/30 focus:border-blue-100' : 'focus:ring-[#FF6B35]/30 focus:border-orange-100'}`} required />
                     )}
-                    <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Email" className="w-full px-5 py-3.5 md:py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:bg-white border border-transparent focus:border-orange-100 transition-all text-sm" required />
+                    <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Email" className={`w-full px-5 py-3.5 md:py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:bg-white border border-transparent transition-all text-sm ${isAgentMode ? 'focus:ring-blue-500/30 focus:border-blue-100' : 'focus:ring-[#FF6B35]/30 focus:border-orange-100'}`} required />
                     
                     <div className="relative w-full group">
-                      <input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} placeholder="Password" className="w-full pl-5 pr-12 py-3.5 md:py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:bg-white border border-transparent focus:border-orange-100 transition-all text-sm" required />
+                      <input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} placeholder="Password" className={`w-full pl-5 pr-12 py-3.5 md:py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:bg-white border border-transparent transition-all text-sm ${isAgentMode ? 'focus:ring-blue-500/30 focus:border-blue-100' : 'focus:ring-[#FF6B35]/30 focus:border-orange-100'}`} required />
                       <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 focus:outline-none flex items-center justify-center p-1.5 z-10">
-                        <AnimatedEyeToggle isVisible={showPassword} />
+                        {/* 🔥 UBAHAN: Mata dinamis warnanya 🔥 */}
+                        <AnimatedEyeToggle isVisible={showPassword} activeColor={isAgentMode ? "#2563eb" : "#FF6B35"} />
                       </button>
                     </div>
 
                     {!isSignUp && (
                       <div className="flex justify-end w-full">
-                        <button type="button" onClick={() => setShowForgotPassword(true)} className="text-[10px] font-bold text-gray-500 hover:text-blue-500 transition-colors uppercase tracking-widest cursor-pointer">
+                        <button type="button" onClick={() => setShowForgotPassword(true)} className={`text-[10px] font-bold text-gray-500 transition-colors uppercase tracking-widest cursor-pointer ${isAgentMode ? 'hover:text-blue-600' : 'hover:text-[#FF6B35]'}`}>
                           Lupa Password?
                         </button>
                       </div>
@@ -486,7 +477,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                     {errorMsg && <p className="text-red-500 text-[10px] text-center font-bold bg-red-50 py-2.5 rounded-xl italic">{errorMsg}</p>}
                     {successMsg && <p className="text-green-600 text-[10px] text-center font-bold bg-green-50 py-2.5 rounded-xl italic">{successMsg}</p>}
 
-                    <button type="submit" disabled={isLoading} className="w-full py-4 bg-[#FF6B35] text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-[0_8px_20px_-6px_rgba(255,107,53,0.5)] hover:bg-[#e85526] hover:shadow-lg hover:-translate-y-0.5 transition-all active:scale-95 disabled:opacity-50 italic mt-2">
+                    {/* 🔥 UBAHAN: Tombol dinamis warnanya (Biru/Orange) 🔥 */}
+                    <button type="submit" disabled={isLoading} className={`w-full py-4 text-white rounded-2xl font-black uppercase text-xs tracking-widest transition-all active:scale-95 disabled:opacity-50 italic mt-2 ${isAgentMode ? 'bg-blue-600 hover:bg-blue-700 shadow-[0_8px_20px_-6px_rgba(37,99,235,0.5)]' : 'bg-[#FF6B35] hover:bg-[#e85526] shadow-[0_8px_20px_-6px_rgba(255,107,53,0.5)]'}`}>
                       {isLoading ? 'Processing...' : (isSignUp ? 'Sign Up' : (isAgentMode ? 'Masuk Portal Agen' : 'Sign In'))}
                     </button>
                   </form>
@@ -495,14 +487,15 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
 
               <div className="md:hidden mt-8 pt-6 border-t border-gray-100 text-center">
                  <p className="text-[11px] text-gray-500 font-medium">{isSignUp ? "Already have an account?" : "Don't have an account?"}</p>
-                 <button type="button" onClick={() => { setIsSignUp(!isSignUp); setErrorMsg(''); setSuccessMsg(''); setShowPassword(false); }} className="mt-2 text-[#FF6B35] font-black text-xs uppercase tracking-widest active:scale-95 transition-transform">
+                 <button type="button" onClick={() => { setIsSignUp(!isSignUp); setErrorMsg(''); setSuccessMsg(''); setShowPassword(false); }} className={`mt-2 font-black text-xs uppercase tracking-widest active:scale-95 transition-transform ${isAgentMode ? 'text-blue-600' : 'text-[#FF6B35]'}`}>
                    {isSignUp ? "Sign In Here" : "Create Account"}
                  </button>
               </div>
             </div>
 
+            {/* 🔥 UBAHAN: Background Kanan Desktop dinamis (Hitam kalau Agen) 🔥 */}
             <div className={`hidden md:flex absolute top-0 left-0 w-1/2 h-full transition-transform duration-700 ease-in-out z-100 ${isSignUp ? '-translate-x-0' : 'translate-x-full'}`}>
-              <div className="bg-[#FF6B35] h-full w-full flex flex-col items-center justify-center text-white p-12 text-center relative overflow-hidden">
+              <div className={`h-full w-full flex flex-col items-center justify-center text-white p-12 text-center relative overflow-hidden transition-colors duration-500 ${isAgentMode ? 'bg-gray-900' : 'bg-[#FF6B35]'}`}>
                 <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
                 <div className="absolute bottom-[-10%] left-[-10%] w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
 
@@ -514,7 +507,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                     <p className="text-sm font-medium mb-10 opacity-90 leading-relaxed">
                       {isSignUp ? "Enter your personal details to stay connected with the best events." : "Sign up if you still don't have an account and join the party!"}
                     </p>
-                    <button type="button" onClick={() => { setIsSignUp(!isSignUp); setErrorMsg(''); setSuccessMsg(''); setShowPassword(false); }} className="px-12 py-3 border-2 border-white rounded-2xl font-black uppercase text-[10px] tracking-[2px] hover:bg-white hover:text-[#FF6B35] transition-all active:scale-90">
+                    <button type="button" onClick={() => { setIsSignUp(!isSignUp); setErrorMsg(''); setSuccessMsg(''); setShowPassword(false); }} className={`px-12 py-3 border-2 border-white rounded-2xl font-black uppercase text-[10px] tracking-[2px] transition-all active:scale-90 hover:bg-white ${isAgentMode ? 'hover:text-gray-900' : 'hover:text-[#FF6B35]'}`}>
                       {isSignUp ? 'Sign In' : 'Sign Up'}
                     </button>
                   </motion.div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
-// Import Semua Tema di Sini
+// Import All Themes Here
 import ThemeElegantGold from 
 '../components/Templates/ThemeElegantGold';
 import ThemeFloralWhite from 
@@ -14,17 +14,17 @@ import ThemeDarkRomantic from
 export default function WeddingInvitation() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
-  const guestName = searchParams.get('to') || 'Tamu Undangan Spesial'; 
+  const guestName = searchParams.get('to') || 'Special Guest'; 
 
   const [event, setEvent] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isOpen, setIsOpen] = useState(false); // State biar buka tutup undangan konsisten
+  const [isOpen, setIsOpen] = useState(false); // State to keep invitation open/close consistent
 
   useEffect(() => {
     const fetchEvent = async () => {
       try {
         const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`);
-        if (!res.ok) throw new Error('Undangan tidak ditemukan');
+        if (!res.ok) throw new Error('Invitation not found');
         const data = await res.json();
         setEvent(data);
       } catch (err) {
@@ -45,9 +45,9 @@ export default function WeddingInvitation() {
     );
   }
 
-  if (!event) return <div className="text-center mt-20 text-slate-800 font-serif">Undangan tidak valid.</div>;
+  if (!event) return <div className="text-center mt-20 text-slate-800 font-serif">Invalid invitation.</div>;
 
-  // Baca template yang dipilih dari database, default ke elegant-gold
+  // Read selected template from database, default to elegant-gold
   const selectedTheme = event.event_details?.templateId || 'elegant-gold';
 
   // --- RENDER CONTROLLER ---

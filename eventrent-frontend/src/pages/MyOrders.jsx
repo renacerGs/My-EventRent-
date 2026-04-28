@@ -10,7 +10,7 @@ export default function MyOrders() {
 
   useEffect(() => {
     if (!user) {
-      toast.error('Login dulu bro buat liat pesanan!');
+      toast.error('Please login first to view your orders!');
       navigate('/');
       return;
     }
@@ -30,7 +30,6 @@ export default function MyOrders() {
     try {
       if (!isBackground) setLoading(true); 
       
-      // 🔥 Trik jitu: Cari otomatis kunci yang belakangnya '-auth-token'
       const authKey = Object.keys(localStorage).find(key => key.endsWith('-auth-token'));
       const sessionStr = authKey ? localStorage.getItem(authKey) : null;
       let token = '';
@@ -51,11 +50,11 @@ export default function MyOrders() {
         const data = await res.json();
         setOrders(data);
       } else {
-        if (!isBackground) toast.error('Gagal menarik riwayat pesanan');
+        if (!isBackground) toast.error('Failed to fetch order history');
       }
     } catch (err) {
       console.error(err);
-      if (!isBackground) toast.error('Terjadi kesalahan jaringan');
+      if (!isBackground) toast.error('Network error occurred');
     } finally {
       if (!isBackground) setLoading(false);
     }
@@ -63,15 +62,14 @@ export default function MyOrders() {
 
   const handlePayNow = (order) => {
     if (!window.snap) {
-      toast.error('Sistem pembayaran belum siap, tunggu sebentar bro.');
+      toast.error('Payment system is not ready yet, please wait.');
       return;
     }
 
     window.snap.pay(order.snap_token, {
       onSuccess: async function (result) {
-        toast.loading('Mencetak tiket kamu...', { id: 'process-ticket' });
+        toast.loading('Generating your ticket...', { id: 'process-ticket' });
         try {
-          // 🔥 Trik jitu token otomatis di sini juga!
           const authKey = Object.keys(localStorage).find(key => key.endsWith('-auth-token'));
           const sessionStr = authKey ? localStorage.getItem(authKey) : null;
           let token = '';
@@ -86,32 +84,31 @@ export default function MyOrders() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify({
-              userId: order.user_id, // 🔥 Pake ID Angka
+              userId: order.user_id, 
               eventId: order.event_id, 
               cart: details.cart, 
               formAnswers: details.formAnswers,
-              orderId: order.order_id // 🔥 JALUR TIKUS BYPASS LOCALHOST/MIDTRANS REDIRECT
+              orderId: order.order_id 
             })
           });
           
-          toast.success('Pembayaran Berhasil! Tiket udah terbit.', { id: 'process-ticket' });
+          toast.success('Payment Successful! Ticket generated.', { id: 'process-ticket' });
           
-          // Refresh data diam-diam
           setTimeout(() => fetchOrders(true), 2000); 
         } catch (err) {
-          toast.error('Gagal mencetak tiket. Hubungi admin.', { id: 'process-ticket' });
+          toast.error('Failed to generate ticket. Please contact admin.', { id: 'process-ticket' });
         }
       },
       onPending: function (result) {
-        toast.success('Menunggu kamu menyelesaikan pembayaran...');
+        toast.success('Waiting for you to complete the payment...');
         fetchOrders(true); 
       },
       onError: function (result) {
-        toast.error('Pembayaran gagal atau kadaluarsa.');
+        toast.error('Payment failed or expired.');
         fetchOrders(true); 
       },
       onClose: function () {
-        toast.error('Pop-up ditutup sebelum pembayaran diselesaikan.');
+        toast.error('Pop-up closed before payment was completed.');
         fetchOrders(true); 
       }
     });
@@ -120,7 +117,7 @@ export default function MyOrders() {
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
       <div className="w-12 h-12 border-4 border-slate-200 border-t-[#FF6B35] rounded-full animate-spin mb-4"></div>
-      <p className="uppercase tracking-widest text-xs font-bold text-slate-400">Memuat Pesanan...</p>
+      <p className="uppercase tracking-widest text-xs font-bold text-slate-400">Loading Orders...</p>
     </div>
   );
 
@@ -134,15 +131,15 @@ export default function MyOrders() {
         <div className="mb-8">
           <button onClick={() => navigate('/')} className="text-slate-500 hover:text-[#FF6B35] font-bold text-[10px] uppercase tracking-widest mb-4 flex items-center gap-1.5 transition-colors w-max">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7"></path></svg> 
-            Kembali
+            Back
           </button>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 md:w-12 md:h-12 bg-orange-100 text-[#FF6B35] rounded-2xl flex items-center justify-center border border-orange-200 shrink-0">
               <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
             </div>
             <div>
-              <h1 className="text-xl md:text-3xl font-black text-slate-900 uppercase tracking-tight">Pesanan Saya</h1>
-              <p className="text-[10px] md:text-sm font-medium text-slate-500 mt-1">Riwayat transaksi dan tagihan tiket lu bro.</p>
+              <h1 className="text-xl md:text-3xl font-black text-slate-900 uppercase tracking-tight">My Orders</h1>
+              <p className="text-[10px] md:text-sm font-medium text-slate-500 mt-1">Your transaction history and ticket bills, bro.</p>
             </div>
           </div>
         </div>
@@ -153,9 +150,9 @@ export default function MyOrders() {
              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
                <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
              </div>
-             <p className="font-black text-slate-900 text-lg tracking-tight mb-1">Belum Ada Pesanan</p>
-             <p className="text-xs font-medium text-slate-500">Lu belum pernah checkout tiket apapun.</p>
-             <button onClick={() => navigate('/')} className="mt-6 px-6 py-2.5 bg-[#FF6B35] text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20">Cari Event Sekarang</button>
+             <p className="font-black text-slate-900 text-lg tracking-tight mb-1">No Orders Yet</p>
+             <p className="text-xs font-medium text-slate-500">You haven't made any orders yet.</p>
+             <button onClick={() => navigate('/')} className="mt-6 px-6 py-2.5 bg-[#FF6B35] text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/20">SEARCH FOR EVENTS NOW</button>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-5">
@@ -177,7 +174,7 @@ export default function MyOrders() {
                 {/* STATUS & HARGA */}
                 <div className="flex flex-row md:flex-col items-center md:items-end justify-between border-t border-slate-100 md:border-none pt-4 md:pt-0 gap-3">
                   <div className="text-left md:text-right">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Total Tagihan</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Total Amount</p>
                     <p className="font-black text-slate-900 text-lg">Rp {Number(order.total_price).toLocaleString('id-ID')}</p>
                   </div>
 
@@ -186,15 +183,15 @@ export default function MyOrders() {
                       onClick={() => handlePayNow(order)}
                       className="bg-[#FF6B35] hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20 whitespace-nowrap active:scale-95 border border-orange-400 animate-pulse"
                     >
-                      Lanjut Bayar
+                      Pay Now
                     </button>
                   ) : order.payment_status === 'SUCCESS' ? (
                     <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-emerald-200 whitespace-nowrap">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg> Lunas
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg> Paid
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1.5 bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-red-200 whitespace-nowrap">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg> Batal / Kadaluarsa
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg> Cancelled / Expired
                     </span>
                   )}
                 </div>

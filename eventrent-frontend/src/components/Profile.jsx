@@ -13,7 +13,6 @@ export default function Profile() {
   const [phone, setPhone] = useState(''); 
   const [imagePreview, setImagePreview] = useState(null);
   
-  // 🔥 STATE BARU BUAT NYIMPEN FILE FISIK (BLOB) BUKAN BASE64 LAGI 🔥
   const [imageFile, setImageFile] = useState(null);
   
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
@@ -85,7 +84,6 @@ export default function Profile() {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
 
-          // 🔥 UBAH GAMBAR JADI BLOB BIAR BISA DI UPLOAD KE SUPABASE 🔥
           canvas.toBlob((blob) => {
             setImageFile(blob);
           }, 'image/jpeg', 0.8);
@@ -105,7 +103,6 @@ export default function Profile() {
     try {
       let finalImageUrl = user.picture;
 
-      // 🔥 ALUR BARU: UPLOAD FOTO KE BUCKET AVATARS DULU 🔥
       if (imageFile) {
         const fileName = `user-${user.id}-${Date.now()}.jpg`;
         
@@ -117,12 +114,11 @@ export default function Profile() {
           });
 
         if (uploadError) {
-          showPopup("Gagal mengupload foto ke Storage Supabase!", "error");
+          showPopup("Failed to upload photo to Supabase Storage!", "error");
           setIsLoadingProfile(false);
           return;
         }
 
-        // Ambil Link Public dari bucket
         const { data: { publicUrl } } = supabase.storage
           .from('avatars')
           .getPublicUrl(fileName);
@@ -130,8 +126,6 @@ export default function Profile() {
         finalImageUrl = publicUrl;
       }
 
-      // 🔥 LAPOR KE POS SATPAM (SUPABASE AUTH METADATA) 🔥
-      // Biar sinkron sama cara kerja Mobile App (Lapis 1)
       const authMetadata = {};
       if (name !== user.name) authMetadata.full_name = name;
       if (imageFile) authMetadata.avatar_url = finalImageUrl;
@@ -140,7 +134,6 @@ export default function Profile() {
         await supabase.auth.updateUser({ data: authMetadata });
       }
 
-      // 🔥 SELIPIN TOKEN DI HEADERS BUAT NEMBAK NESTJS (PAKAI URL ASLI SUPABASE) 🔥
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/${user.id}`, {
         method: 'PUT',
         headers: { 
@@ -150,7 +143,7 @@ export default function Profile() {
         body: JSON.stringify({ 
           name, 
           phone, 
-          img: finalImageUrl, // 🔥 Ini udah pake link public Supabase
+          img: finalImageUrl,
           bank_name: bankData.bank_name,
           bank_account: bankData.bank_account,
           bank_account_name: bankData.bank_account_name
@@ -179,13 +172,13 @@ export default function Profile() {
         setUser(updatedUser); 
         setImageFile(null); 
         
-        showPopup("Profil & Data Bank berhasil diperbarui!", "success", () => window.location.reload());
+        showPopup("Profile & Bank Data successfully updated!", "success", () => window.location.reload());
       } else {
-        showPopup(data.message || "Gagal memperbarui profil", "error");
+        showPopup(data.message || "Failed to update profile", "error");
       }
     } catch (err) {
       console.error(err);
-      showPopup("Terjadi kesalahan sistem", "error");
+      showPopup("System error occurred", "error");
     } finally {
       setIsLoadingProfile(false);
     }
@@ -194,11 +187,11 @@ export default function Profile() {
   const handleChangePassword = async (e) => {
     e.preventDefault();
     if (passData.newPass !== passData.confirmPass) {
-      showPopup("Password baru dan konfirmasi tidak cocok!", "error");
+      showPopup("New password and confirmation do not match!", "error");
       return;
     }
     if (passData.newPass.length < 6) {
-      showPopup("Password minimal terdiri dari 6 karakter!", "error");
+      showPopup("Password must be at least 6 characters!", "error");
       return;
     }
 
@@ -209,14 +202,14 @@ export default function Profile() {
       });
 
       if (!error) {
-        showPopup("Password berhasil diubah!", "success");
+        showPopup("Password changed successfully!", "success");
         setPassData({ oldPass: '', newPass: '', confirmPass: '' });
       } else {
-        showPopup(error.message || "Gagal mengubah password", "error");
+        showPopup(error.message || "Failed to change password", "error");
       }
     } catch (err) {
       console.error(err);
-      showPopup("Terjadi kesalahan sistem", "error");
+      showPopup("System error occurred", "error");
     } finally {
       setIsLoadingPass(false);
     }
@@ -242,7 +235,6 @@ export default function Profile() {
   return (
     <div className={`min-h-screen pt-10 pb-20 font-sans relative ${isAgentMode ? 'bg-[#0f172a]' : 'bg-[#F8F9FA]'}`}>
       
-      {/* ORNAMEN BACKGROUND KHUSUS MODE AGEN */}
       {isAgentMode && (
         <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-orange-500/10 to-transparent pointer-events-none"></div>
       )}
@@ -268,7 +260,7 @@ export default function Profile() {
               </div>
               
               <h2 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">
-                {popup.type === 'error' ? 'Ups, Gagal!' : popup.type === 'success' ? 'Berhasil!' : 'Info'}
+                {popup.type === 'error' ? 'Oops, Failed!' : popup.type === 'success' ? 'Success!' : 'Info'}
               </h2>
               <p className="text-white/90 font-medium mb-8 text-sm">{popup.message}</p>
               
@@ -276,7 +268,7 @@ export default function Profile() {
                 onClick={closePopup} 
                 className={`w-full bg-white py-4 rounded-xl font-bold uppercase tracking-widest shadow-lg transition-all active:scale-95 text-xs ${popup.type === 'error' ? 'text-[#E24A29] hover:bg-red-50' : popup.type === 'success' ? 'text-[#27AE60] hover:bg-green-50' : 'text-gray-900 hover:bg-gray-50'}`}
               >
-                Tutup
+                Close
               </button>
             </motion.div>
           </div>
@@ -294,7 +286,6 @@ export default function Profile() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* BAGIAN KIRI: PROFIL UTAMA & BANK */}
           <div className="lg:col-span-7">
             <div className={`p-8 rounded-[32px] shadow-sm border ${isAgentMode ? 'bg-slate-800/50 border-slate-700/50 backdrop-blur-sm' : 'bg-white border-gray-100'}`}>
               <h2 className={`text-xl font-black mb-6 uppercase tracking-wide border-b pb-4 ${isAgentMode ? 'text-white border-slate-700' : 'text-gray-900 border-gray-100'}`}>Personal & Bank Info</h2>
@@ -317,7 +308,7 @@ export default function Profile() {
                     <h3 className={`text-lg font-black ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>{user.name}</h3>
                     <p className={`text-sm font-semibold mb-2 ${isAgentMode ? 'text-slate-400' : 'text-gray-500'}`}>{user.email}</p>
                     <label className={`cursor-pointer inline-block px-4 py-1.5 border rounded-lg text-xs font-bold uppercase tracking-widest transition-colors shadow-sm ${isAgentMode ? 'bg-slate-700 text-slate-300 border-slate-600 hover:bg-slate-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'}`}>
-                      Ganti Foto
+                      CHANGE PHOTO
                       <input type="file" className="hidden" onChange={handleImageChange} accept="image/*" />
                     </label>
                   </div>
@@ -338,27 +329,27 @@ export default function Profile() {
                   <div>
                     <label className={labelStyle}>Email Address</label>
                     <input type="email" value={user.email} disabled className={`w-full rounded-xl px-5 py-4 text-sm font-bold cursor-not-allowed ${isAgentMode ? 'bg-slate-800 border border-slate-700 text-slate-500' : 'bg-gray-100 border border-gray-200 text-gray-400'}`} />
-                    <p className="text-[10px] text-red-400 font-bold mt-2 ml-1 uppercase tracking-widest">*Email tidak dapat diubah</p>
+                    <p className="text-[10px] text-red-400 font-bold mt-2 ml-1 uppercase tracking-widest">*EMAIL CANNOT BE CHANGED</p>
                   </div>
 
                   <div className={`pt-4 mt-6 border-t ${isAgentMode ? 'border-slate-700' : 'border-gray-100'}`}>
-                    <h3 className={`text-[10px] font-black mb-4 uppercase tracking-widest w-max px-3 py-1.5 rounded-lg border ${isAgentMode ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-orange-50 text-[#FF6B35] border-orange-100'}`}>🏦 Data Rekening (Untuk Agen)</h3>
+                    <h3 className={`text-[10px] font-black mb-4 uppercase tracking-widest w-max px-3 py-1.5 rounded-lg border ${isAgentMode ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-orange-50 text-[#FF6B35] border-orange-100'}`}>🏦 ACCOUNT DATA (FOR AGENTS)</h3>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
-                        <label className={labelStyle}>Nama Bank</label>
+                        <label className={labelStyle}>BANK NAME</label>
                         <input type="text" value={bankData.bank_name} onChange={e => setBankData({...bankData, bank_name: e.target.value})} className={inputStyle} placeholder="BCA / Mandiri" />
                       </div>
                       <div>
-                        <label className={labelStyle}>Nomor Rekening</label>
+                        <label className={labelStyle}>ACCOUNT NUMBER</label>
                         <input type="text" value={bankData.bank_account} onChange={e => setBankData({...bankData, bank_account: e.target.value})} className={inputStyle} placeholder="1234567890" />
                       </div>
                       <div>
-                        <label className={labelStyle}>A.N (Pemilik)</label>
+                        <label className={labelStyle}>A/N (OWNER)</label>
                         <input type="text" value={bankData.bank_account_name} onChange={e => setBankData({...bankData, bank_account_name: e.target.value})} className={inputStyle} placeholder="Budi Santoso" />
                       </div>
                     </div>
-                    <p className={`text-[10px] font-bold mt-2 ml-1 ${isAgentMode ? 'text-slate-400' : 'text-gray-400'}`}>*Lengkapi data ini agar EO mudah mentransfer upah Anda.</p>
+                    <p className={`text-[10px] font-bold mt-2 ml-1 ${isAgentMode ? 'text-slate-400' : 'text-gray-400'}`}>*Complete this data so that the Event Organizer can easily transfer your wages.</p>
                   </div>
 
                   <div className="pt-6">
@@ -367,7 +358,7 @@ export default function Profile() {
                       disabled={isLoadingProfile}
                       className={`w-full sm:w-auto bg-[#FF6B35] text-white px-10 py-4 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-[#E85526] transition-all active:scale-95 disabled:opacity-50 shadow-xl ${isAgentMode ? 'shadow-orange-500/20' : 'shadow-orange-100/50'}`}
                     >
-                      {isLoadingProfile ? 'Menyimpan...' : 'Simpan Perubahan'}
+                      {isLoadingProfile ? 'SAVING...' : 'SAVE CHANGES'}
                     </button>
                   </div>
                 </div>
@@ -375,10 +366,9 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* BAGIAN KANAN: SECURITY */}
           <div className="lg:col-span-5 flex flex-col gap-8">
             <div className={`p-8 rounded-[32px] shadow-sm border ${isAgentMode ? 'bg-slate-800/50 border-slate-700/50 backdrop-blur-sm' : 'bg-white border-gray-100'}`}>
-              <h2 className={`text-xl font-black mb-6 uppercase tracking-wide border-b pb-4 ${isAgentMode ? 'text-white border-slate-700' : 'text-gray-900 border-gray-100'}`}>Keamanan</h2>
+              <h2 className={`text-xl font-black mb-6 uppercase tracking-wide border-b pb-4 ${isAgentMode ? 'text-white border-slate-700' : 'text-gray-900 border-gray-100'}`}>SECURITY</h2>
               
               {isGoogleUser ? (
                 <div className={`text-center py-10 px-4 rounded-2xl border ${isAgentMode ? 'bg-blue-900/10 border-blue-800/50' : 'bg-blue-50/50 border-blue-100'}`}>
@@ -387,26 +377,26 @@ export default function Profile() {
                   </div>
                   <h3 className={`text-sm font-black mb-1 uppercase tracking-wide ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>Login via Google</h3>
                   <p className={`text-[10px] font-bold leading-relaxed px-4 ${isAgentMode ? 'text-slate-400' : 'text-gray-500'}`}>
-                    Akun kamu terhubung secara aman dengan Google. Tidak perlu mengingat password.
+                    Your account is securely connected with Google. No need to remember a password.
                   </p>
                 </div>
               ) : (
                 <form onSubmit={handleChangePassword} className="space-y-5">
                   <div>
-                    <label className={labelStyle}>Password Lama</label>
+                    <label className={labelStyle}>OLD PASSWORD</label>
                     <input type="password" value={passData.oldPass} onChange={e => setPassData({...passData, oldPass: e.target.value})} className={inputStyle} placeholder="••••••••" required />
                   </div>
                   <div>
-                    <label className={labelStyle}>Password Baru</label>
+                    <label className={labelStyle}>NEW PASSWORD</label>
                     <input type="password" value={passData.newPass} onChange={e => setPassData({...passData, newPass: e.target.value})} className={inputStyle} placeholder="••••••••" required />
                   </div>
                   <div>
-                    <label className={labelStyle}>Konfirmasi Password Baru</label>
+                    <label className={labelStyle}>CONFIRM NEW PASSWORD</label>
                     <input type="password" value={passData.confirmPass} onChange={e => setPassData({...passData, confirmPass: e.target.value})} className={inputStyle} placeholder="••••••••" required />
                   </div>
                   <div className="pt-2">
                      <button type="submit" disabled={isLoadingPass} className={`w-full text-white py-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 ${isAgentMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-900 hover:bg-black'}`}>
-                      {isLoadingPass ? 'Memproses...' : 'Ubah Password'}
+                      {isLoadingPass ? 'PROCESSING...' : 'CHANGE PASSWORD'}
                     </button>
                   </div>
                 </form>

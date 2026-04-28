@@ -101,6 +101,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
   const notifRef = useRef(null);
   const profileRef = useRef(null);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const isAgentMode = user?.role === 'agent';
 
@@ -151,14 +152,12 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // 1. 🔥 FIX: AMBIL NOTIF & FILTER WEBSOCKET 🔥
   useEffect(() => {
     if (!user?.id) return; 
 
     fetchNotifications();
 
     const notifChannel = supabase
-      // 👇 BIKIN NAMA CHANNEL UNIK PER USER BIAR GAK NYASAR/TABRAKAN 👇
       .channel(`navbar-notif-${user.id}`)
       .on(
         'postgres_changes',
@@ -189,7 +188,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     };
   }, [user?.id]); 
 
-  // 2. FETCH NOTIF PAKE TOKEN
   const fetchNotifications = async () => {
     try {
       const token = localStorage.getItem('supabase_token');
@@ -207,7 +205,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     }
   };
 
-  // 3. RESPOND NOTIF PAKE TOKEN
   const handleRespondNotif = async (notifId, action) => {
     try {
       const token = localStorage.getItem('supabase_token');
@@ -227,11 +224,10 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
         toast.error(data.message);
       }
     } catch (err) {
-      toast.error('Kesalahan jaringan, coba lagi bro.');
+      toast.error('Network error, please try again.');
     }
   };
 
-  // 4. READ NOTIF PAKE TOKEN
   const markAsRead = async (notifId) => {
     try {
       const token = localStorage.getItem('supabase_token');
@@ -305,7 +301,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
            ) : (
              <div className="bg-slate-800/50 px-6 py-2 rounded-full border border-slate-700/50 flex items-center gap-2">
                <svg className="w-4 h-4 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-               <span className="text-white text-[10px] sm:text-xs font-black uppercase tracking-widest">Portal Agen</span>
+               <span className="text-white text-[10px] sm:text-xs font-black uppercase tracking-widest">Agent Portal</span>
              </div>
            )}
         </div>
@@ -317,7 +313,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                 <svg className="w-[16px] h-[16px] md:w-[18px] md:h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path>
                 </svg>
-                <span className="hidden md:inline">Cek Tiket</span>
+                <span className="hidden md:inline">Check Ticket</span>
               </Link>
               <Link to="/create" className="flex items-center justify-center gap-1.5 bg-[#FF6B35] text-white w-9 h-9 md:w-auto md:px-5 md:py-2.5 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-orange-600 transition shadow-md shadow-orange-100 shrink-0">
                 <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -347,8 +343,8 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                 <div className={`absolute right-0 top-full mt-3 w-[280px] md:w-[350px] bg-white rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 transform origin-top-right transition-all duration-300 z-[60] flex flex-col overflow-hidden ${showNotifDropdown ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
                   
                   <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
-                    <h3 className="font-black text-gray-900 text-xs uppercase tracking-widest">Notifikasi</h3>
-                    {unreadCount > 0 && <span className="bg-[#FF6B35] text-white px-2 py-0.5 rounded-md text-[9px] font-bold">{unreadCount} Baru</span>}
+                    <h3 className="font-black text-gray-900 text-xs uppercase tracking-widest">Notifications</h3>
+                    {unreadCount > 0 && <span className="bg-[#FF6B35] text-white px-2 py-0.5 rounded-md text-[9px] font-bold">{unreadCount} New</span>}
                   </div>
                   
                   <div className="max-h-[300px] overflow-y-auto overscroll-contain">
@@ -376,15 +372,15 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                             
                             {notif.type === 'INVITATION_AGENT' && !notif.is_read && (
                               <div className="flex gap-2 mt-3">
-                                <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'reject'); }} className="flex-1 bg-red-50 text-red-500 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-colors">Tolak</button>
-                                <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'accept'); }} className="flex-1 bg-[#FF6B35] text-white py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-colors shadow-md">Terima</button>
+                                <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'reject'); }} className="flex-1 bg-red-50 text-red-500 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-colors">Decline</button>
+                                <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'accept'); }} className="flex-1 bg-[#FF6B35] text-white py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-colors shadow-md">Accept</button>
                               </div>
                             )}
                           </div>
                         </div>
                       ))
                     ) : (
-                      <div className="p-6 text-center text-gray-400 text-xs font-bold">Belum ada notifikasi bro.</div>
+                      <div className="p-6 text-center text-gray-400 text-xs font-bold">No new notifications.</div>
                     )}
                   </div>
                   
@@ -396,7 +392,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                       }} 
                       className="block w-full text-center py-2.5 text-[10px] md:text-xs font-black text-[#FF6B35] hover:text-orange-600 uppercase tracking-widest transition-colors rounded-xl hover:bg-orange-50"
                     >
-                      Lihat Semua Notifikasi
+                      View All Notifications
                     </button>
                   </div>
 
@@ -420,52 +416,52 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                     
                     {!isAgentMode ? (
                       <>
-                        <button onClick={() => { navigate('/'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35] rounded-xl transition-all group">
-                          <svg className="w-4 h-4 text-gray-400 group-hover:text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                        <button onClick={() => { navigate('/'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname === '/' ? 'bg-orange-50 text-[#FF6B35]' : 'text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35]'}`}>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
                           HOME
                         </button>
-                        <button onClick={() => { navigate('/profile'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35] rounded-xl transition-all group">
-                          <svg className="w-4 h-4 text-gray-400 group-hover:text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                        <button onClick={() => { navigate('/profile'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/profile') ? 'bg-orange-50 text-[#FF6B35]' : 'text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35]'}`}>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                           MY PROFILE
                         </button>
-                        <button onClick={() => { navigate('/manage'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35] rounded-xl transition-all group">
-                          <svg className="w-4 h-4 text-gray-400 group-hover:text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        <button onClick={() => { navigate('/manage'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/manage') ? 'bg-orange-50 text-[#FF6B35]' : 'text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35]'}`}>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                           MANAGE EVENTS
                         </button>
-                        <button onClick={() => { navigate('/my-orders'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35] rounded-xl transition-all group">
-                          <svg className="w-4 h-4 text-gray-400 group-hover:text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                        <button onClick={() => { navigate('/my-orders'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/my-orders') ? 'bg-orange-50 text-[#FF6B35]' : 'text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35]'}`}>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
                           MY ORDERS
                         </button>
-                        <button onClick={() => { navigate('/my-tickets'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35] rounded-xl transition-all group">
-                          <svg className="w-4 h-4 text-gray-400 group-hover:text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        <button onClick={() => { navigate('/my-tickets'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/my-tickets') ? 'bg-orange-50 text-[#FF6B35]' : 'text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35]'}`}>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                           MY TICKETS
                         </button>
                       </>
                     ) : (
                       <>
-                        <button onClick={() => { navigate('/agent'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-blue-500 rounded-xl transition-all group">
-                          <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
-                          DAFTAR TUGAS
+                        <button onClick={() => { navigate('/agent'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname === '/agent' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-blue-500'}`}>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                          MY TASKS
                         </button>
                         
-                        <button onClick={() => { navigate('/profile'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-blue-500 rounded-xl transition-all group">
-                          <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
-                          PROFIL & REKENING
+                        <button onClick={() => { navigate('/profile'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/profile') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-blue-500'}`}>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                          PROFILE & BANK
                         </button>
 
-                        <button onClick={() => { navigate('/agent/wallet'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-emerald-500 rounded-xl transition-all group">
-                          <svg className="w-4 h-4 text-gray-400 group-hover:text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
-                          DOMPET PENDAPATAN
+                        <button onClick={() => { navigate('/agent/wallet'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/wallet') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-blue-500'}`}>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                          EARNINGS WALLET
                         </button>
 
-                        <button onClick={() => { navigate('/agent/history'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-blue-500 rounded-xl transition-all group">
-                          <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                          RIWAYAT SCAN
+                        <button onClick={() => { navigate('/agent/history'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/history') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-blue-500'}`}>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                          SCAN HISTORY
                         </button>
 
-                        <button onClick={() => { navigate('/jobs'); setIsDropdownOpen(false); }} className="flex items-center gap-3 px-4 py-3 text-[11px] font-bold text-gray-600 hover:bg-gray-50 hover:text-blue-500 rounded-xl transition-all group">
-                          <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                          CARI JOB (FREELANCE)
+                        <button onClick={() => { navigate('/jobs'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/jobs') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-blue-500'}`}>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                          FIND JOBS (FREELANCE)
                         </button>
                       </>
                     )}
@@ -474,7 +470,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                     
                     <button onClick={toggleRole} className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 text-gray-900 rounded-xl hover:bg-gray-100 transition-all group">
                       <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 group-hover:text-gray-900 transition-colors">
-                        {isAgentMode ? 'Mode Pembeli' : 'Mode Agen'}
+                        {isAgentMode ? 'User Mode' : 'Agent Mode'}
                       </span>
                       <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
                     </button>
@@ -508,21 +504,21 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
               </svg>
             </div>
             
-            <h3 className="text-xl font-black text-gray-900 mb-2 uppercase tracking-tight italic">Keluar Akun?</h3>
-            <p className="text-xs text-gray-500 mb-8 font-medium">Yakin nih mau logout dari EventRent sekarang?</p>
+            <h3 className="text-xl font-black text-gray-900 mb-2 uppercase tracking-tight italic">Log Out?</h3>
+            <p className="text-xs text-gray-500 mb-8 font-medium">Are you sure you want to log out from EventRent?</p>
             
             <div className="flex gap-3">
               <button 
                 onClick={() => setShowLogoutModal(false)} 
                 className="flex-1 py-3.5 bg-gray-100 text-gray-600 rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-widest hover:bg-gray-200 transition-colors"
               >
-                Batal
+                Cancel
               </button>
               <button 
                 onClick={handleActualLogout} 
                 className="flex-1 py-3.5 bg-red-500 text-white rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-widest hover:bg-red-600 shadow-md shadow-red-200 transition-all active:scale-95"
               >
-                Yakin, Keluar
+                Yes, Log Out
               </button>
             </div>
           </div>

@@ -87,7 +87,7 @@ export default function Checkout() {
     const fetchEvent = async () => {
       try {
         const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`);
-        if (!res.ok) throw new Error("Gagal load");
+        if (!res.ok) throw new Error("Failed to load");
         const data = await res.json();
         setEvent(data);
         
@@ -100,7 +100,7 @@ export default function Checkout() {
               }));
               setCart(allCartItems);
             } else {
-              showPopup("Maaf, semua tiket sudah habis!", "error");
+              showPopup("Sorry, all tickets are sold out!", "error");
               setTimeout(() => { navigate(`/event/${id}`); }, 2000);
             }
           } else if (preferredSessionId) {
@@ -119,7 +119,7 @@ export default function Checkout() {
         }
       } catch (err) {
         console.error(err);
-        showPopup("Gagal memuat data", "error");
+        showPopup("Failed to load data", "error");
         setTimeout(() => { navigate('/'); }, 2000);
       } finally {
         setLoading(false);
@@ -131,7 +131,7 @@ export default function Checkout() {
   const handleAddCartItem = () => {
     const availableSession = event.sessions.find(s => s.stock > 0 && !cart.some(item => String(item.sessionId) === String(s.id)));
     if (!availableSession) {
-      showPopup("Semua kategori tiket sudah kamu pilih!", "error");
+      showPopup("You have selected all available ticket categories!", "error");
       return;
     }
     const newCartId = crypto.randomUUID();
@@ -140,7 +140,7 @@ export default function Checkout() {
 
   const handleRemoveCartItem = (cartId) => {
     if (cart.length === 1) {
-      showPopup("Minimal pilih 1 kategori tiket!", "error");
+      showPopup("You must select at least 1 ticket category!", "error");
       return;
     }
     setCart(cart.filter(item => item.id !== cartId));
@@ -165,8 +165,8 @@ export default function Checkout() {
   const handlePayWithMidtrans = async (e) => {
     e.preventDefault(); 
 
-    if (cart.length === 0) return showPopup("Keranjang tiket kosong!", "error");
-    if (cart.find(item => item.qty < 1)) return showPopup("Jumlah tiket minimal 1 per kategori!", "error");
+    if (cart.length === 0) return showPopup("Cart is empty!", "error");
+    if (cart.find(item => item.qty < 1)) return showPopup("Minimum ticket quantity is 1 per category!", "error");
 
     const totalAmount = calculateTotal();
 
@@ -179,12 +179,12 @@ export default function Checkout() {
     setIsSubmitting(true);
     try {
       let emailTamu = user?.email || ''; 
-      let namaTamu = user?.name || 'Tamu EventRent'; 
+      let namaTamu = user?.name || 'EventRent Guest'; 
       
       if (!emailTamu && cart.length > 0) {
         const firstCartItem = cart[0];
         emailTamu = formAnswers[`cart-${firstCartItem.id}-ticket-0-email`] || 'guest@email.com';
-        namaTamu = formAnswers[`cart-${firstCartItem.id}-ticket-0-nama`] || 'Tamu';
+        namaTamu = formAnswers[`cart-${firstCartItem.id}-ticket-0-nama`] || 'Guest';
       }
 
       const orderId = `TKT-${event.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -237,30 +237,30 @@ export default function Checkout() {
           },
           onPending: function(result) {
             if (!isGuest) {
-               showPopup("Pembayaran tertunda. Kamu bisa lanjutin bayar di menu My Orders ya!", "info");
+               showPopup("Payment pending. You can complete the payment in the My Orders menu!", "info");
                setTimeout(() => navigate('/my-orders'), 3000);
             } else {
-               showPopup("Status Pending! Selesaikan pembayaran VA/Transfer kamu.", "info");
+               showPopup("Pending status! Please complete your VA/Transfer payment.", "info");
             }
           },
           onError: function(result) {
-            showPopup("Pembayaran gagal. Silakan coba lagi.", "error");
+            showPopup("Payment failed. Please try again.", "error");
           },
           onClose: function() {
             if (!isGuest) {
-               showPopup("Pop-up ditutup! Tenang, pesanan kamu tersimpan aman di menu My Orders.", "info");
+               showPopup("Pop-up closed! Don't worry, your order is safely saved in the My Orders menu.", "info");
                setTimeout(() => navigate('/my-orders'), 3000);
             } else {
-               showPopup("Kamu menutup pop-up sebelum menyelesaikan pembayaran.", "error");
+               showPopup("You closed the pop-up before completing the payment.", "error");
             }
           }
         });
       } else {
-        showPopup("Gagal mendapatkan token pembayaran dari server.", "error");
+        showPopup("Failed to retrieve payment token from the server.", "error");
       }
     } catch (err) {
       console.error(err);
-      showPopup("Terjadi kesalahan jaringan.", "error");
+      showPopup("Network error occurred.", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -305,12 +305,12 @@ export default function Checkout() {
           navigate(`/event/${id}`); 
         }, 2000);
       } else {
-        showPopup("Gagal memproses tiket: " + (data.message || 'Error server'), "error");
+        showPopup("Failed to process ticket: " + (data.message || 'Server error'), "error");
         setShowPaymentModal(false);
       }
     } catch (err) {
       console.error(err);
-      showPopup("Terjadi kesalahan sistem saat mencetak tiket.", "error");
+      showPopup("System error occurred while generating the ticket.", "error");
       setShowPaymentModal(false);
     }
   };
@@ -343,14 +343,14 @@ export default function Checkout() {
                 )}
               </div>
               <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight">
-                {popup.type === 'error' ? 'Ups!' : popup.type === 'success' ? 'Berhasil!' : 'Info'}
+                {popup.type === 'error' ? 'Oops!' : popup.type === 'success' ? 'Success!' : 'Info'}
               </h2>
               <p className="text-white/90 font-medium mb-8">{popup.message}</p>
               <button 
                 onClick={closePopup} 
                 className={`w-full bg-white py-4 rounded-xl font-bold uppercase tracking-widest shadow-lg transition-all active:scale-95 ${popup.type === 'error' ? 'text-[#E24A29] hover:bg-red-50' : popup.type === 'success' ? 'text-[#27AE60] hover:bg-green-50' : 'text-gray-900 hover:bg-gray-50'}`}
               >
-                Tutup
+                Close
               </button>
             </motion.div>
           </div>
@@ -361,7 +361,6 @@ export default function Checkout() {
         
         <div className="max-w-7xl mx-auto px-4 md:px-8">
           <div className="flex items-center gap-4 mb-8">
-            {/* 🔥 INI YANG KITA UBAH! LANGSUNG TEMBAK BALIK KE HALAMAN EVENT 🔥 */}
             <button 
               type="button" 
               onClick={() => navigate(`/event/${id}`)} 
@@ -371,7 +370,7 @@ export default function Checkout() {
             </button>
             <div>
               <h1 className={`text-3xl font-extrabold uppercase tracking-tight leading-none mb-1 text-gray-900`}>
-                Checkout Tiket
+                Checkout Ticket
               </h1>
               <p className={`text-xs font-bold uppercase tracking-widest text-gray-500`}>{event?.title}</p>
             </div>
@@ -388,10 +387,10 @@ export default function Checkout() {
                   <div key={item.id} className={`bg-white border-gray-200 p-5 rounded-2xl shadow-sm border`}>
                     <div className="flex justify-between items-center mb-3">
                       <span className={`text-xs font-bold uppercase tracking-widest text-[#FF6B35]`}>
-                        Kategori Tiket {index + 1}
+                        Ticket Category {index + 1}
                       </span>
                       {cart.length > 1 && (
-                        <button type="button" onClick={() => handleRemoveCartItem(item.id)} className="text-gray-400 hover:text-red-500 font-bold text-sm">✕ Hapus</button>
+                        <button type="button" onClick={() => handleRemoveCartItem(item.id)} className="text-gray-400 hover:text-red-500 font-bold text-sm">✕ Remove</button>
                       )}
                     </div>
                     <select 
@@ -404,15 +403,15 @@ export default function Checkout() {
                         const isOutOfStock = s.stock < 1;
                         return (
                           <option key={s.id} value={s.id} disabled={isOutOfStock || isAlreadySelectedByOtherCartItem}>
-                            {s.name} - {Number(s.price) === 0 ? 'FREE' : `Rp ${parseInt(s.price).toLocaleString('id-ID')}`} {isOutOfStock ? ' (Habis)' : isAlreadySelectedByOtherCartItem ? ' (Sudah Dipilih)' : ''}
+                            {s.name} - {Number(s.price) === 0 ? 'FREE' : `Rp ${parseInt(s.price).toLocaleString('id-ID')}`} {isOutOfStock ? ' (Sold Out)' : isAlreadySelectedByOtherCartItem ? ' (Selected)' : ''}
                           </option>
                         );
                       })}
                     </select>
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className={`text-[10px] font-bold uppercase mb-1 text-gray-400`}>Sisa Stok</p>
-                        <p className={`text-sm font-bold text-gray-900`}>{availableStock} Tiket</p>
+                        <p className={`text-[10px] font-bold uppercase mb-1 text-gray-400`}>Remaining Stock</p>
+                        <p className={`text-sm font-bold text-gray-900`}>{availableStock} Tickets</p>
                       </div>
                       <div className={`flex items-center rounded-xl p-1 bg-gray-100`}>
                         <button type="button" onClick={() => item.qty > 1 && updateCartItem(item.id, 'qty', item.qty - 1)} className={`w-8 h-8 flex items-center justify-center rounded-lg font-bold shadow-sm bg-white text-gray-600 hover:bg-gray-200`}>-</button>
@@ -425,14 +424,14 @@ export default function Checkout() {
               })}
               {canAddNewSession && (
                 <button type="button" onClick={handleAddCartItem} className={`w-full py-4 border-2 border-dashed font-bold rounded-2xl transition-colors uppercase text-xs tracking-widest border-green-500 text-green-600 hover:bg-green-50`}>
-                  + Tambah Kategori Tiket
+                  + Add Ticket Category
                 </button>
               )}
             </div>
 
             <div className={`lg:col-span-8 bg-white border-gray-200 rounded-[32px] p-8 md:p-10 shadow-sm border`}>
               <h2 className={`text-2xl font-bold mb-6 border-b pb-4 text-gray-900 border-gray-100`}>
-                Data Pemegang Tiket
+                Ticket Holder Data
               </h2>
               
               <div className="space-y-4">
@@ -446,17 +445,17 @@ export default function Checkout() {
                     return (
                       <div key={formKeyPrefix} className="mb-10 last:mb-0">
                         <div className={`px-4 py-2 rounded-lg font-bold text-sm mb-5 inline-block border bg-orange-50 text-[#FF6B35] border-orange-100`}>
-                          Tiket {qtyIndex + 1} - <span className="uppercase">{session.name}</span>
+                          Ticket {qtyIndex + 1} - <span className="uppercase">{session.name}</span>
                         </div>
                         
                         <div className={`space-y-5 pl-2 md:pl-4 border-l-2 border-gray-100`}>
                           <div>
-                            <label className={labelStyle}>Nama Lengkap <span className="text-red-500">*</span></label>
-                            <input type="text" required value={formAnswers[`${formKeyPrefix}-nama`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-nama`]: e.target.value}))} className={inputStyle} placeholder="Masukkan nama sesuai KTP" />
+                            <label className={labelStyle}>Full Name <span className="text-red-500">*</span></label>
+                            <input type="text" required value={formAnswers[`${formKeyPrefix}-nama`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-nama`]: e.target.value}))} className={inputStyle} placeholder="Enter your full name" />
                           </div>
                           <div>
                             <label className={labelStyle}>Email <span className="text-red-500">*</span></label>
-                            <input type="email" required value={formAnswers[`${formKeyPrefix}-email`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-email`]: e.target.value}))} className={inputStyle} placeholder="Masukkan email aktif untuk tiket" />
+                            <input type="email" required value={formAnswers[`${formKeyPrefix}-email`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-email`]: e.target.value}))} className={inputStyle} placeholder="Enter an active email" />
                           </div>
                           
                           {/* --- RENDER CUSTOM QUESTIONS --- */}
@@ -475,7 +474,7 @@ export default function Checkout() {
                                     value={formAnswers[formKey] || ''} 
                                     onChange={(e) => setFormAnswers(prev => ({...prev, [formKey]: e.target.value}))} 
                                     className={inputStyle} 
-                                    placeholder="Ketik jawaban..." 
+                                    placeholder="Type your answer..." 
                                   />
                                 )}
 
@@ -485,7 +484,7 @@ export default function Checkout() {
                                     options={q.options} 
                                     value={formAnswers[formKey] || ''} 
                                     onChange={(val) => setFormAnswers(prev => ({...prev, [formKey]: val}))} 
-                                    placeholder="Pilih jawaban..." 
+                                    placeholder="Select Answer..." 
                                     required={q.is_required}
                                   />
                                 )}
@@ -543,7 +542,7 @@ export default function Checkout() {
         <div className={`fixed bottom-0 left-0 right-0 border-t shadow-[0_-10px_30px_rgba(0,0,0,0.05)] p-5 z-50 bg-white border-gray-200`}>
           <div className="max-w-7xl mx-auto flex items-center justify-between px-4">
             <div>
-              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-1">Total Pembayaran</p>
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-1">Total Payment</p>
               <p className={`text-2xl font-black text-[#FF6B35]`}>Rp {calculateTotal().toLocaleString('id-ID')}</p>
             </div>
             
@@ -552,7 +551,7 @@ export default function Checkout() {
               disabled={isSubmitting || cart.length === 0}
               className={`px-8 py-4 font-bold rounded-xl uppercase tracking-widest text-sm shadow-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed bg-gray-900 hover:bg-black text-white`}
             >
-              {isSubmitting ? 'Memproses...' : (calculateTotal() === 0 ? 'Klaim Tiket Gratis' : 'Bayar Sekarang')}
+              {isSubmitting ? 'Processing...' : (calculateTotal() === 0 ? 'Claim Free Tickets' : 'Pay Now')}
             </button>
           </div>
         </div>
@@ -570,8 +569,8 @@ export default function Checkout() {
               {paymentStatus === 'processing' ? (
                 <>
                   <div className={`w-16 h-16 border-4 rounded-full animate-spin mb-6 border-gray-100 border-t-[#FF6B35]`}></div>
-                  <h3 className={`text-lg font-black uppercase tracking-wide text-gray-900`}>Memproses Tiket...</h3>
-                  <p className={`text-xs mt-2 font-medium text-gray-500`}>Sedang menyimpan dan mengirim email tiket kamu.</p>
+                  <h3 className={`text-lg font-black uppercase tracking-wide text-gray-900`}>Processing Tickets...</h3>
+                  <p className={`text-xs mt-2 font-medium text-gray-500`}>Saving data and emailing your tickets.</p>
                 </>
               ) : (
                 <>
@@ -579,10 +578,10 @@ export default function Checkout() {
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                   </div>
                   <h3 className={`text-2xl font-black uppercase tracking-tight text-gray-900`}>
-                    Tiket Berhasil Dicetak!
+                    Tickets Generated!
                   </h3>
                   <p className={`text-sm mt-2 font-medium text-gray-500`}>
-                     Cek email kamu untuk melihat barcode tiket.
+                     Check your email to view your ticket barcodes.
                   </p>
                 </>
               )}

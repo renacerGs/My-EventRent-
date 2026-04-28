@@ -9,8 +9,8 @@ export default function ChooseEventType() {
       <div className="max-w-6xl w-full">
         
         <div className="text-center mb-16">
-          <h1 className="text-4xl font-black text-gray-900 uppercase tracking-tight mb-4">Pilih Platform Acara</h1>
-          <p className="text-gray-500 font-medium text-lg">Sesuaikan sistem EventRent dengan kebutuhan momen spesial Anda.</p>
+          <h1 className="text-4xl font-black text-gray-900 uppercase tracking-tight mb-4">Choose Event Platform</h1>
+          <p className="text-gray-500 font-medium text-lg">Customize the EventRent system for your special moments.</p>
         </div>
         
         {/* GRID DIBUAT JADI 3 KOLOM */}
@@ -26,12 +26,12 @@ export default function ChooseEventType() {
             </div>
             <h2 className="text-2xl font-black text-gray-900 mb-3 uppercase tracking-tight">Public Event</h2>
             <p className="text-gray-500 text-sm leading-relaxed mb-8 flex-grow">
-              Sistem penjualan tiket terbuka. Cocok untuk Konser, Pameran, Seminar, atau Turnamen Olahraga.
+              Open ticket sales system. Perfect for Concerts, Exhibitions, Seminars, or Sports Tournaments.
             </p>
             <ul className="space-y-3 text-xs font-bold text-gray-700 uppercase tracking-wide">
-              <li className="flex items-center gap-3"><span className="text-[#FF6B35] text-lg">✔</span> Payment Gateway Integrasi</li>
-              <li className="flex items-center gap-3"><span className="text-[#FF6B35] text-lg">✔</span> Manajemen Kuota & Stok</li>
-              <li className="flex items-center gap-3"><span className="text-[#FF6B35] text-lg">✔</span> Tampil di Katalog Publik</li>
+              <li className="flex items-center gap-3"><span className="text-[#FF6B35] text-lg">✔</span> Payment Gateway Integration</li>
+              <li className="flex items-center gap-3"><span className="text-[#FF6B35] text-lg">✔</span> Quota & Stock Management</li>
+              <li className="flex items-center gap-3"><span className="text-[#FF6B35] text-lg">✔</span> Listed in Public Catalog</li>
             </ul>
           </div>
 
@@ -46,12 +46,12 @@ export default function ChooseEventType() {
             </div>
             <h2 className="text-2xl font-black text-white mb-3 uppercase tracking-tight relative z-10">Wedding</h2>
             <p className="text-gray-400 text-sm leading-relaxed mb-8 flex-grow relative z-10">
-              Undangan digital super elegan untuk Pernikahan. Lengkap dengan data kedua mempelai dan ucapan doa.
+              Super elegant digital invitations for Weddings. Complete with couple's details and wishes.
             </p>
             <ul className="space-y-3 text-xs font-bold text-gray-300 uppercase tracking-wide relative z-10">
-              <li className="flex items-center gap-3"><span className="text-[#D4AF37] text-lg">✦</span> Tema Elegan & Eksklusif</li>
-              <li className="flex items-center gap-3"><span className="text-[#D4AF37] text-lg">✦</span> Amplop Digital (Gifts)</li>
-              <li className="flex items-center gap-3"><span className="text-[#D4AF37] text-lg">✦</span> Buku Tamu & RSVP</li>
+              <li className="flex items-center gap-3"><span className="text-[#D4AF37] text-lg">✦</span> Elegant & Exclusive Themes</li>
+              <li className="flex items-center gap-3"><span className="text-[#D4AF37] text-lg">✦</span> Digital Envelope (Gifts)</li>
+              <li className="flex items-center gap-3"><span className="text-[#D4AF37] text-lg">✦</span> Guestbook & RSVP</li>
             </ul>
           </div>
 
@@ -63,14 +63,14 @@ export default function ChooseEventType() {
             <div className="w-20 h-20 bg-purple-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
               <span className="text-4xl">🥳</span>
             </div>
-            <h2 className="text-2xl font-black text-gray-900 mb-3 uppercase tracking-tight">Acara Pribadi</h2>
+            <h2 className="text-2xl font-black text-gray-900 mb-3 uppercase tracking-tight">Personal Event</h2>
             <p className="text-gray-500 text-sm leading-relaxed mb-8 flex-grow">
-              Sistem RSVP Private untuk Pesta Ulang Tahun, Reuni Akbar, Syukuran, atau Private Party.
+              Private RSVP system for Birthday Parties, Grand Reunions, Thanksgivings, or Private Parties.
             </p>
             <ul className="space-y-3 text-xs font-bold text-gray-700 uppercase tracking-wide">
-              <li className="flex items-center gap-3"><span className="text-[#8B5CF6] text-lg">✔</span> 1 Profil Tuan Rumah (Host)</li>
-              <li className="flex items-center gap-3"><span className="text-[#8B5CF6] text-lg">✔</span> Konfirmasi Kehadiran Cepat</li>
-              <li className="flex items-center gap-3"><span className="text-[#8B5CF6] text-lg">✔</span> Link Undangan Rahasia</li>
+              <li className="flex items-center gap-3"><span className="text-[#8B5CF6] text-lg">✔</span> 1 Host Profile</li>
+              <li className="flex items-center gap-3"><span className="text-[#8B5CF6] text-lg">✔</span> Quick Attendance Confirmation</li>
+              <li className="flex items-center gap-3"><span className="text-[#8B5CF6] text-lg">✔</span> Secret Invitation Link</li>
             </ul>
           </div>
 

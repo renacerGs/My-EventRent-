@@ -42,7 +42,7 @@ export default function Notifications() {
         }
       } catch (err) {
         console.error(err);
-        toast.error('Gagal memuat notifikasi.');
+        toast.error('Failed to load notifications.');
       } finally {
         setLoading(false);
       }
@@ -102,7 +102,7 @@ export default function Notifications() {
         toast.error(data.message);
       }
     } catch (err) {
-      toast.error('Kesalahan jaringan bro.');
+      toast.error('Network error, bro.');
     }
   };
 
@@ -127,7 +127,7 @@ export default function Notifications() {
     if (unreadNotifs.length === 0) return;
     
     const token = localStorage.getItem('supabase_token');
-    const toastId = toast.loading('Menandai semua dibaca...');
+    const toastId = toast.loading('Marking all as read...');
     
     try {
       await Promise.all(unreadNotifs.map(n => 
@@ -136,10 +136,10 @@ export default function Notifications() {
           headers: { 'Authorization': `Bearer ${token}` } 
         })
       ));
-      toast.success('Semua telah dibaca', { id: toastId });
+      toast.success('All marked as read', { id: toastId });
       setNotifications(prev => prev.map(n => n.type !== 'INVITATION_AGENT' ? { ...n, is_read: true } : n));
     } catch (err) {
-      toast.error('Gagal memperbarui data', { id: toastId });
+      toast.error('Failed to update data', { id: toastId });
     }
   };
 
@@ -184,13 +184,13 @@ export default function Notifications() {
           <div>
             <button type="button" onClick={() => navigate(-1)} className="text-gray-400 hover:text-[#FF6B35] font-bold text-[10px] uppercase tracking-widest mb-3 flex items-center gap-1.5 transition-colors w-max">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7"></path></svg> 
-              Kembali
+              Back
             </button>
-            <h1 className="text-2xl md:text-3xl font-black text-gray-900 uppercase tracking-tight">Pusat Notifikasi</h1>
+            <h1 className="text-2xl md:text-3xl font-black text-gray-900 uppercase tracking-tight">Notification Center</h1>
           </div>
           {notifications.length > 0 && notifications.some(n => !n.is_read) && (
             <button type="button" onClick={markAllAsRead} className="text-[10px] md:text-xs font-bold text-[#FF6B35] hover:text-orange-600 bg-orange-50 px-4 py-2.5 rounded-lg transition-colors w-max shadow-sm">
-              Tandai semua dibaca
+              Mark all as read
             </button>
           )}
         </div>
@@ -204,8 +204,8 @@ export default function Notifications() {
           ) : notifications.length === 0 ? (
             <div className="py-20 text-center">
               <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-              <h3 className="text-lg font-bold text-gray-900">Belum ada notifikasi</h3>
-              <p className="text-xs text-gray-500 mt-1 font-medium">Nanti kalau ada info atau undangan, munculnya di sini bro.</p>
+              <h3 className="text-lg font-bold text-gray-900">No notifications yet</h3>
+              <p className="text-xs text-gray-500 mt-1 font-medium">If there's any info or invitations, they will appear here.</p>
             </div>
           ) : (
             <div className="flex flex-col relative">
@@ -236,13 +236,13 @@ export default function Notifications() {
                           {notif.message}
                         </p>
                         <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                          {new Date(notif.created_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}
+                          {new Date(notif.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
                         </p>
 
                         {notif.type === 'INVITATION_AGENT' && !notif.is_read && (
                           <div className="flex gap-3 mt-4">
-                            <button type="button" onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'reject'); }} className="px-5 py-2.5 bg-red-50 text-red-500 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest hover:bg-red-100 transition-colors">Tolak</button>
-                            <button type="button" onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'accept'); }} className="px-5 py-2.5 bg-[#FF6B35] text-white rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest hover:bg-orange-600 shadow-md transition-colors">Terima Undangan</button>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'reject'); }} className="px-5 py-2.5 bg-red-50 text-red-500 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest hover:bg-red-100 transition-colors">Decline</button>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'accept'); }} className="px-5 py-2.5 bg-[#FF6B35] text-white rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest hover:bg-orange-600 shadow-md transition-colors">Accept Invitation</button>
                           </div>
                         )}
                       </div>
@@ -260,7 +260,7 @@ export default function Notifications() {
                             }}
                             className="w-full md:w-auto px-8 py-3 bg-white border border-gray-200 text-gray-500 rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest hover:bg-gray-100 hover:text-gray-700 transition-all active:scale-95 shadow-sm"
                           >
-                            ↑ Lihat Lebih Sedikit
+                            ↑ Show Less
                           </button>
                         ) : (
                           <button 
@@ -268,7 +268,7 @@ export default function Notifications() {
                             onClick={() => setVisibleCount(notifications.length)} 
                             className="w-full md:w-auto px-8 py-3 bg-white border-2 border-dashed border-orange-200 text-[#FF6B35] rounded-xl text-[10px] sm:text-xs font-black uppercase tracking-widest hover:bg-orange-50 transition-all active:scale-95 shadow-sm"
                           >
-                            Lihat Semua Notifikasi ↓
+                            View All Notifications ↓
                           </button>
                         )}
                       </div>

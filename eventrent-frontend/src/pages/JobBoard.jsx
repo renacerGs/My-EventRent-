@@ -20,7 +20,7 @@ export default function JobBoard() {
   // 🔥 FIX 1: Ganti dependency dari [user] jadi [user?.id] biar GAK KEDIP-KEDIP!
   useEffect(() => {
     if (!user || !user.id) {
-      toast.error('Lo harus login dulu bro buat nyari job!');
+      toast.error('You must login first to find a job!');
       navigate('/');
       return;
     }
@@ -47,15 +47,15 @@ export default function JobBoard() {
         const data = await res.json();
         setJobs(data);
       } else {
-        console.warn("API /api/jobs belum siap, nampilin data dummy sementara.");
+        console.warn("API /api/jobs not ready, showing dummy data temporarily.");
         setJobs([
-          { id: 1, event_title: "Konser We The Fest 2026", event_date: "10 Mei 2026", role: "Penjaga Pintu A", fee: 150000, quota: 5, description: "Standby jam 15.00 - 22.00. Membantu scan tiket pengunjung VIP." },
-          { id: 2, event_title: "Seminar Nasional Tech", event_date: "15 Juni 2026", role: "Registrasi VIP", fee: 250000, quota: 2, description: "Handle tamu VIP. Wajib rapi, dresscode kemeja hitam." }
+          { id: 1, event_title: "We The Fest 2026 Concert", event_date: "May 10, 2026", role: "Gate Keeper A", fee: 150000, quota: 5, description: "Standby from 15:00 - 22:00. Assist in scanning VIP tickets." },
+          { id: 2, event_title: "National Tech Seminar", event_date: "June 15, 2026", role: "VIP Registration", fee: 250000, quota: 2, description: "Handle VIP guests. Must look neat, black shirt dresscode." }
         ]);
       }
     } catch (err) {
-      console.error("Gagal menarik data lowongan:", err);
-      toast.error("Gagal terhubung ke server.");
+      console.error("Failed to fetch job data:", err);
+      toast.error("Failed to connect to the server.");
     } finally {
       setLoading(false);
     }
@@ -73,7 +73,7 @@ export default function JobBoard() {
 
     try {
       setApplyingId(jobId);
-      const toastId = toast.loading('Mengirim lamaran...');
+      const toastId = toast.loading('Submitting application...');
       const token = localStorage.getItem('supabase_token');
 
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs/apply`, {
@@ -89,22 +89,22 @@ export default function JobBoard() {
       const data = await res.json();
 
       if (res.ok) {
-        toast.success("Lamaran berhasil dikirim! Pantengin terus notifikasi lu bro.", { id: toastId });
+        toast.success("Application sent successfully! Keep an eye on your notifications.", { id: toastId });
         
         const newAppliedList = [...appliedJobs, jobId];
         setAppliedJobs(newAppliedList);
         localStorage.setItem(`applied_jobs_${user.id}`, JSON.stringify(newAppliedList));
         
       } else {
-        toast.error(data.message || "Gagal ngirim lamaran. Mungkin lu udah pernah apply?", { id: toastId });
-        if(data.message && data.message.includes('pernah ngelamar')){
+        toast.error(data.message || "Failed to send application. Maybe you've already applied?", { id: toastId });
+        if(data.message && (data.message.includes('pernah ngelamar') || data.message.includes('already applied'))){
             const newAppliedList = [...appliedJobs, jobId];
             setAppliedJobs(newAppliedList);
             localStorage.setItem(`applied_jobs_${user.id}`, JSON.stringify(newAppliedList));
         }
       }
     } catch (err) {
-      toast.error("Terjadi kesalahan jaringan.", { id: toastId });
+      toast.error("Network error occurred.", { id: toastId });
     } finally {
       setApplyingId(null);
     }
@@ -123,7 +123,7 @@ export default function JobBoard() {
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#0f172a]">
       <div className="w-12 h-12 border-4 border-slate-700 border-t-[#FF6B35] rounded-full animate-spin mb-4"></div>
-      <p className="uppercase tracking-widest text-xs font-bold text-slate-500">Mencari Peluang...</p>
+      <p className="uppercase tracking-widest text-xs font-bold text-slate-500">Looking for Opportunities...</p>
     </div>
   );
 
@@ -148,21 +148,21 @@ export default function JobBoard() {
                 </svg>
               </div>
               
-              <h3 className="text-xl font-black text-white mb-2 uppercase tracking-tight">Kirim Lamaran?</h3>
-              <p className="text-xs text-slate-400 mb-8 font-medium leading-relaxed">Yakin mau ngelamar posisi ini? Pastikan jadwal kosong dan jangan sampai telat ya bro!</p>
+              <h3 className="text-xl font-black text-white mb-2 uppercase tracking-tight">Submit Application?</h3>
+              <p className="text-xs text-slate-400 mb-8 font-medium leading-relaxed">Are you sure you want to apply for this position? Make sure your schedule is clear and don't be late!</p>
               
               <div className="flex gap-3">
                 <button 
                   onClick={() => setConfirmApply({ show: false, jobId: null })} 
                   className="flex-1 py-3.5 bg-slate-700 text-white rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-widest hover:bg-slate-600 transition-colors"
                 >
-                  Batal
+                  Cancel
                 </button>
                 <button 
                   onClick={executeApply} 
                   className="flex-1 py-3.5 bg-[#FF6B35] text-white rounded-xl font-black text-[10px] sm:text-xs uppercase tracking-widest hover:bg-[#e85a2a] shadow-lg shadow-orange-500/20 transition-all active:scale-95 border border-orange-400"
                 >
-                  Yakin, Lamar
+                  Yes, Apply
                 </button>
               </div>
             </motion.div>
@@ -180,17 +180,17 @@ export default function JobBoard() {
               Freelance Board
             </div>
             <h1 className="text-3xl md:text-4xl font-black text-white leading-tight tracking-tight mb-2">
-              Cari Job Event <span className="text-[#FF6B35]">Sekarang.</span>
+              Find Event Jobs <span className="text-[#FF6B35]">Now.</span>
             </h1>
             <p className="text-xs md:text-sm font-medium text-slate-400 leading-relaxed">
-              Jadilah bagian dari event-event keren di kotamu dan dapatkan penghasilan tambahan sebagai agen profesional EventRent.
+              Be part of cool events in your city and earn extra income as a professional EventRent agent.
             </p>
           </div>
           
           <div className="w-full lg:w-96 shrink-0 relative">
             <input 
               type="text" 
-              placeholder="Cari nama event atau peran..." 
+              placeholder="Search event name or role..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-slate-900 border border-slate-700 text-white rounded-2xl pl-12 pr-5 py-4 text-sm font-bold focus:outline-none focus:border-[#FF6B35] focus:ring-1 focus:ring-[#FF6B35] transition-all"
@@ -203,7 +203,7 @@ export default function JobBoard() {
         <div className="mb-6 flex items-center justify-between px-2">
           <div className="flex items-center gap-3">
              <span className="w-2 h-6 md:h-8 bg-orange-500 rounded-full inline-block"></span>
-             <h2 className="text-lg md:text-xl font-black text-white uppercase tracking-wide">Lowongan Tersedia <span className="text-slate-500 text-sm ml-1">({filteredJobs.length})</span></h2>
+             <h2 className="text-lg md:text-xl font-black text-white uppercase tracking-wide">Available Jobs <span className="text-slate-500 text-sm ml-1">({filteredJobs.length})</span></h2>
           </div>
         </div>
 
@@ -224,13 +224,13 @@ export default function JobBoard() {
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
                       {job.role}
                     </span>
-                    <span className="text-[10px] font-bold text-slate-500 bg-slate-900 px-2 py-1 rounded-md border border-slate-700">Sisa Kuota: <span className="text-white">{job.quota}</span></span>
+                    <span className="text-[10px] font-bold text-slate-500 bg-slate-900 px-2 py-1 rounded-md border border-slate-700">Quota Left: <span className="text-white">{job.quota}</span></span>
                   </div>
 
                   <h3 className="text-xl font-black text-white mb-2 leading-tight line-clamp-2 relative z-10">{job.event_title}</h3>
                   <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 mb-5 relative z-10">
                     <svg className="w-4 h-4 text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                    {job.event_date || "Tanggal Menyusul"}
+                    {job.event_date || "Date TBA"}
                   </div>
 
                   <div className="bg-slate-900/80 rounded-xl p-4 mb-6 flex-grow border border-slate-700/50 relative z-10">
@@ -241,7 +241,7 @@ export default function JobBoard() {
 
                   <div className="mt-auto pt-2 flex items-center justify-between gap-4 relative z-10">
                     <div>
-                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Fee / Upah</p>
+                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-0.5">Fee / Salary</p>
                       <p className="text-lg font-black text-[#FF6B35]">
                         {new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(job.fee)}
                       </p>
@@ -253,8 +253,8 @@ export default function JobBoard() {
                         className="flex items-center gap-1.5 bg-slate-700/50 text-slate-500 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-700 cursor-not-allowed"
                       >
                         <svg className="w-4 h-4 animate-spin text-slate-500" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span className="hidden sm:inline">Menunggu ACC</span>
-                        <span className="sm:hidden">ACC...</span>
+                        <span className="hidden sm:inline">Pending ACC</span>
+                        <span className="sm:hidden">Pending...</span>
                       </button>
                     ) : (
                       <button 
@@ -262,7 +262,7 @@ export default function JobBoard() {
                         disabled={applyingId === job.id}
                         className="bg-[#FF6B35] hover:bg-[#e85a2a] text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-md shadow-orange-500/20 hover:shadow-orange-500/40 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed border border-orange-400"
                       >
-                        {applyingId === job.id ? 'Loading...' : 'Lamar Job'}
+                        {applyingId === job.id ? 'Loading...' : 'Apply Job'}
                       </button>
                     )}
                   </div>
@@ -276,16 +276,16 @@ export default function JobBoard() {
             <div className="w-24 h-24 bg-slate-900 rounded-full flex items-center justify-center mb-6 border border-slate-700 shadow-inner">
               <svg className="w-12 h-12 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
             </div>
-            <h3 className="text-2xl font-black text-white mb-2 tracking-tight">Belum Ada Lowongan</h3>
+            <h3 className="text-2xl font-black text-white mb-2 tracking-tight">No Jobs Available</h3>
             <p className="text-slate-400 text-sm font-medium max-w-md mx-auto leading-relaxed">
-              Saat ini belum ada Event Organizer yang buka lowongan freelance. Jangan sedih, coba cek lagi nanti atau cari dengan kata kunci lain ya bro!
+              Currently there are no freelance job openings from Event Organizers. Don't worry, check back later or search with different keywords!
             </p>
             {searchQuery && (
               <button 
                 onClick={() => setSearchQuery('')}
                 className="mt-6 px-6 py-2.5 bg-slate-700 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-600 transition-colors border border-slate-600"
               >
-                Reset Pencarian
+                Reset Search
               </button>
             )}
           </div>

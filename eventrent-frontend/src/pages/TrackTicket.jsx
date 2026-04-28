@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import QRCode from 'react-qr-code';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom'; // 👈 IMPORT INI BUAT TOMBOL BACK
+import { useNavigate } from 'react-router-dom'; 
 import { Search, Ticket, Mail, MapPin, Clock, Calendar, User, AlertCircle, CheckCircle2, QrCode } from 'lucide-react';
 
 export default function TrackTicket() {
-  const navigate = useNavigate(); // 👈 INISIALISASI NAVIGATE
+  const navigate = useNavigate(); 
   const [formData, setFormData] = useState({ ticketId: '', email: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -15,7 +15,7 @@ export default function TrackTicket() {
     e.preventDefault(); 
 
     if (!formData.ticketId.trim() || !formData.email.trim()) {
-      setError("Order ID dan Email wajib diisi bro!");
+      setError("Order ID and Email are required, bro!");
       return;
     }
 
@@ -35,7 +35,7 @@ export default function TrackTicket() {
 
       if (!res.ok) {
         const errData = await res.json();
-        throw new Error(errData.message || "Tiket tidak ditemukan. Pastikan datanya benar!");
+        throw new Error(errData.message || "Ticket not found. Make sure the data is correct!");
       }
 
       const data = await res.json();
@@ -69,8 +69,8 @@ export default function TrackTicket() {
         <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center mx-auto mb-6">
           <Search className="w-8 h-8 text-[#FF6B35]" />
         </div>
-        <h1 className="text-4xl md:text-5xl font-black text-gray-900 uppercase tracking-tight mb-4">Lacak Tiket</h1>
-        <p className="text-gray-500 font-medium text-sm md:text-base px-4">Masukkan Order ID dan Email dari bukti pembelian untuk menampilkan E-Ticket Anda.</p>
+        <h1 className="text-4xl md:text-5xl font-black text-gray-900 uppercase tracking-tight mb-4">Track Ticket</h1>
+        <p className="text-gray-500 font-medium text-sm md:text-base px-4">Enter the Order ID and Email from your purchase receipt to view your E-Ticket.</p>
       </motion.div>
 
       {/* --- FORM PENCARIAN --- */}
@@ -98,14 +98,14 @@ export default function TrackTicket() {
           </div>
 
           <div>
-            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Email Pembeli</label>
+            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1">Buyer Email</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <Mail className="w-5 h-5 text-gray-400" />
               </div>
               <input 
                 type="email" 
-                placeholder="email@contoh.com" 
+                placeholder="email@example.com" 
                 value={formData.email} 
                 onChange={(e) => setFormData({...formData, email: e.target.value})} 
                 className="w-full bg-gray-50 border border-gray-200 text-gray-900 text-sm font-bold rounded-2xl pl-12 pr-5 py-4 outline-none focus:bg-white focus:ring-2 focus:ring-[#FF6B35]/20 focus:border-[#FF6B35] transition-all" 
@@ -121,9 +121,9 @@ export default function TrackTicket() {
             {loading ? (
               <>
                 <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                Mencari Tiket...
+                Searching Ticket...
               </>
-            ) : "Cari E-Ticket"}
+            ) : "Find E-Ticket"}
           </button>
         </form>
 
@@ -153,7 +153,7 @@ export default function TrackTicket() {
             className="flex items-center justify-center gap-3 mb-2"
           >
             <div className="h-px w-12 bg-gray-300"></div>
-            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Ditemukan {ticketData.length} Tiket</span>
+            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Found {ticketData.length} Tickets</span>
             <div className="h-px w-12 bg-gray-300"></div>
           </motion.div>
 
@@ -167,7 +167,7 @@ export default function TrackTicket() {
             >
               {/* LABEL STATUS TIKET */}
               <div className={`absolute top-6 -right-12 text-white text-[9px] font-black uppercase tracking-widest px-14 py-2 rotate-45 z-20 shadow-md ${ticket.is_scanned ? 'bg-red-500' : 'bg-[#27AE60]'}`}>
-                {ticket.is_scanned ? 'Telah Dipakai' : 'Tiket Valid'}
+                {ticket.is_scanned ? 'Already Used' : 'Valid Ticket'}
               </div>
 
               {/* BAGIAN KIRI: GAMBAR EVENT */}
@@ -194,7 +194,7 @@ export default function TrackTicket() {
                 <div className="flex-1 w-full space-y-6">
                   <div>
                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                      <Ticket className="w-3 h-3" /> Session / Kategori
+                      <Ticket className="w-3 h-3" /> Session / Category
                     </p>
                     <p className="text-lg font-black text-gray-900">{ticket.session_name}</p>
                   </div>
@@ -202,13 +202,13 @@ export default function TrackTicket() {
                   <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
                     <div>
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                        <Clock className="w-3 h-3" /> Jam Mulai
+                        <Clock className="w-3 h-3" /> Start Time
                       </p>
                       <p className="text-sm font-bold text-gray-900">{ticket.start_time.slice(0, 5)} WIB</p>
                     </div>
                     <div>
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                        <MapPin className="w-3 h-3" /> Lokasi
+                        <MapPin className="w-3 h-3" /> Location
                       </p>
                       <p className="text-sm font-bold text-gray-900 line-clamp-1" title={ticket.location}>{ticket.location}</p>
                     </div>
@@ -216,10 +216,10 @@ export default function TrackTicket() {
 
                   <div className="pt-4 border-t border-dashed border-gray-200">
                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                      <User className="w-3 h-3" /> Nama Pemegang Tiket
+                      <User className="w-3 h-3" /> Ticket Holder Name
                     </p>
                     <div className="flex justify-between items-center bg-orange-50 px-4 py-3 rounded-xl border border-orange-100">
-                      <span className="text-sm font-black text-[#FF6B35] uppercase">{ticket.attendee_name || 'Peserta'}</span>
+                      <span className="text-sm font-black text-[#FF6B35] uppercase">{ticket.attendee_name || 'Attendee'}</span>
                       {ticket.is_scanned && <CheckCircle2 className="w-5 h-5 text-red-500" />}
                     </div>
                   </div>

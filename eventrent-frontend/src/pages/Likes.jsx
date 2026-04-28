@@ -23,13 +23,8 @@ export default function Likes() {
   const [likedEvents, setLikedEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // STATE UNTUK KONTROL POP-UP KONFIRMASI
   const [eventToUnlike, setEventToUnlike] = useState(null); 
-  
-  // STATE UNTUK POP-UP SHARE MODERN
   const [shareEvent, setShareEvent] = useState(null);
-
-  // STATE UNTUK POP-UP MODERN (Pengganti Alert)
   const [popup, setPopup] = useState({ isOpen: false, message: '', type: 'info' });
 
   const navigate = useNavigate();
@@ -50,7 +45,6 @@ export default function Likes() {
         return;
       }
 
-      // 🔥 AMBIL TOKEN
       const token = localStorage.getItem('supabase_token');
       if (!token) {
         setLoading(false);
@@ -59,7 +53,6 @@ export default function Likes() {
 
       try {
         setLoading(true);
-        // 🔥 HAPUS ?userId DAN TAMBAH HEADER TOKEN
         const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/likes/my`, {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -72,14 +65,14 @@ export default function Likes() {
           localStorage.setItem('likedEvents', JSON.stringify(validData));
         }
       } catch (error) {
-        console.error("Gagal mengambil data likes:", error);
-        showPopup("Gagal mengambil data wishlist dari server.", "error");
+        console.error("Failed to fetch likes data:", error);
+        showPopup("Failed to fetch wishlist data from the server.", "error");
       } finally {
         setLoading(false);
       }
     };
     fetchLikedEvents();
-  }, [user?.id]); // 👈 Kuncinya udah bener, aman dari infinite loop
+  }, [user?.id]); 
 
   const triggerUnlikeConfirmation = (e, eventId) => {
     e.preventDefault(); 
@@ -90,18 +83,15 @@ export default function Likes() {
   const confirmUnlike = async () => {
     if (!eventToUnlike) return;
     
-    // Optimistic UI Update (Ubah di layar duluan)
     const updatedLikes = likedEvents.filter(event => event.id !== eventToUnlike);
     setLikedEvents(updatedLikes);
     localStorage.setItem('likedEvents', JSON.stringify(updatedLikes)); 
     const currentEventId = eventToUnlike;
     setEventToUnlike(null);
     
-    // 🔥 AMBIL TOKEN
     const token = localStorage.getItem('supabase_token');
 
     try {
-      // 🔥 HAPUS userId DARI BODY DAN TAMBAH HEADER TOKEN
       await axios.post(`${import.meta.env.VITE_API_URL}/api/likes/toggle`, 
       {
         eventId: currentEventId
@@ -112,13 +102,11 @@ export default function Likes() {
         }
       });
     } catch (error) {
-      console.error("Gagal unlike event:", error);
-      showPopup("Gagal menghapus event dari wishlist.", "error");
-      // Rollback jika gagal (opsional)
+      console.error("Failed to unlike event:", error);
+      showPopup("Failed to remove event from wishlist.", "error");
     }
   };
 
-  // --- LOGIC SHARE MENU BARU ---
   const triggerShareMenu = (e, event) => {
     e.preventDefault(); 
     e.stopPropagation();
@@ -129,7 +117,7 @@ export default function Likes() {
     if (!shareEvent) return;
     
     const url = `${window.location.origin}/event/${shareEvent.id}`;
-    const text = `Cek event keren ini: ${shareEvent.title}`;
+    const text = `Check out this awesome event: ${shareEvent.title}`;
     const encodedUrl = encodeURIComponent(url);
     const encodedText = encodeURIComponent(text + '\n\n');
 
@@ -142,13 +130,13 @@ export default function Likes() {
         window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`, '_blank');
       } else if (platform === 'copy') {
         await navigator.clipboard.writeText(url);
-        showPopup("Link berhasil disalin!", "success");
+        showPopup("Link successfully copied!", "success");
       } else if (platform === 'native' && navigator.share) {
         await navigator.share({ title: shareEvent.title, text: text, url: url });
       }
     } catch (err) {
-      console.error("Gagal membagikan:", err);
-      showPopup("Gagal membagikan event.", "error");
+      console.error("Failed to share:", err);
+      showPopup("Failed to share the event.", "error");
     } finally {
       setShareEvent(null);
     }
@@ -165,7 +153,7 @@ export default function Likes() {
   return (
     <div className="min-h-screen bg-[#F8F9FA] py-10 px-4 md:px-8 font-sans text-left relative">
       
-      {/* --- UI POP UP MODERN ANIMATED (Pesan Notifikasi) --- */}
+      {/* POPUP INFO */}
       <AnimatePresence>
         {popup.isOpen && (
           <div className="fixed inset-0 z-[120] flex flex-col items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
@@ -187,7 +175,7 @@ export default function Likes() {
               </div>
               
               <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight">
-                {popup.type === 'error' ? 'Ups!' : popup.type === 'success' ? 'Berhasil!' : 'Info'}
+                {popup.type === 'error' ? 'Oops!' : popup.type === 'success' ? 'Success!' : 'Info'}
               </h2>
               <p className="text-white/90 font-medium mb-8">{popup.message}</p>
               
@@ -195,7 +183,7 @@ export default function Likes() {
                 onClick={closePopup} 
                 className={`w-full bg-white py-4 rounded-xl font-bold uppercase tracking-widest shadow-lg transition-all active:scale-95 ${popup.type === 'error' ? 'text-[#E24A29] hover:bg-red-50' : popup.type === 'success' ? 'text-[#27AE60] hover:bg-green-50' : 'text-gray-900 hover:bg-gray-50'}`}
               >
-                Tutup
+                Close
               </button>
             </motion.div>
           </div>
@@ -228,10 +216,10 @@ export default function Likes() {
             <div className="w-24 h-24 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
                <span className="text-4xl">💔</span>
             </div>
-            <h3 className="text-xl font-black text-gray-900 mb-2 uppercase tracking-wide">Wishlist Kosong</h3>
-            <p className="text-gray-500 font-medium mb-8">Kamu belum menambahkan event apapun ke daftar favorit.</p>
+            <h3 className="text-xl font-black text-gray-900 mb-2 uppercase tracking-wide">Empty Wishlist</h3>
+            <p className="text-gray-500 font-medium mb-8">You haven't added any events to your favorites yet.</p>
             <Link to="/" className="bg-[#FF6B35] text-white px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-xs shadow-xl shadow-orange-100 hover:bg-[#E85526] transition-all active:scale-95">
-              Cari Event Sekarang
+              Search Events Now
             </Link>
           </div>
         ) : (
@@ -248,11 +236,9 @@ export default function Likes() {
                   className="group bg-white rounded-[32px] overflow-hidden shadow-sm border border-gray-100 hover:shadow-xl hover:border-orange-100 transition-all duration-300 flex flex-col cursor-pointer"
                   onClick={() => navigate(`/event/${event.id}`)}
                 >
-                  {/* Image Section */}
                   <div className="relative aspect-[4/3] w-full overflow-hidden bg-gray-100">
                     <img src={event.img} alt={event.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
                     
-                    {/* Floating Badges */}
                     <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm">
                       <svg className="w-3.5 h-3.5 text-[#FF6B35]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                       <span className="text-[10px] font-black text-gray-900 uppercase">{event.category}</span>
@@ -268,7 +254,6 @@ export default function Likes() {
                     </button>
                   </div>
 
-                  {/* Content Section */}
                   <div className="p-6 flex flex-col flex-1">
                     <div className="flex items-start justify-between gap-4 mb-3">
                       <h3 className="font-black text-xl text-gray-900 leading-tight line-clamp-2 group-hover:text-[#FF6B35] transition-colors">{event.title}</h3>
@@ -287,16 +272,16 @@ export default function Likes() {
 
                     <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-auto">
                       <div>
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Tiket & Info</p>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Tickets & Info</p>
                         <p className="font-bold text-sm text-[#FF6B35] leading-none flex items-center gap-1">
-                          Cek Detail
+                          View Details
                           <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
                         </p>
                       </div>
                       <button 
                         onClick={(e) => triggerShareMenu(e, event)}
                         className="bg-gray-50 hover:bg-orange-50 text-gray-400 hover:text-[#FF6B35] p-2.5 rounded-xl transition-colors"
-                        title="Bagikan Event"
+                        title="Share Event"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
                       </button>
@@ -323,7 +308,7 @@ export default function Likes() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex justify-between items-center mb-6">
-                <h3 className="font-black text-gray-900 uppercase tracking-widest text-sm">Bagikan Event</h3>
+                <h3 className="font-black text-gray-900 uppercase tracking-widest text-sm">Share Event</h3>
                 <button onClick={() => setShareEvent(null)} className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-full text-gray-500 transition-colors">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
@@ -363,13 +348,13 @@ export default function Likes() {
                   <div className="w-14 h-14 bg-orange-50 text-[#FF6B35] rounded-full flex items-center justify-center group-hover:scale-110 group-hover:bg-[#FF6B35] group-hover:text-white transition-all shadow-sm">
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
                   </div>
-                  <span className="text-[10px] font-bold text-gray-600">Salin Link</span>
+                  <span className="text-[10px] font-bold text-gray-600">Copy Link</span>
                 </button>
               </div>
 
               {navigator.share && (
                 <button onClick={() => executeShare('native')} className="w-full mt-6 py-4 bg-gray-50 text-gray-600 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-gray-100 transition-colors">
-                  Opsi Lainnya...
+                  More Options...
                 </button>
               )}
 
@@ -395,9 +380,9 @@ export default function Likes() {
                     <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
                   </svg>
                 </div>
-                <h3 className="text-xl font-black text-gray-900 mb-2 uppercase tracking-tight">Hapus dari Wishlist?</h3>
+                <h3 className="text-xl font-black text-gray-900 mb-2 uppercase tracking-tight">Remove from Wishlist?</h3>
                 <p className="text-gray-500 text-sm mb-8 font-medium">
-                  Yakin mau hapus event ini dari daftar favoritmu? Kamu bisa mencarinya lagi nanti di halaman utama.
+                  Are you sure you want to remove this event from your favorites? You can always find it again on the main page.
                 </p>
                 
                 <div className="flex w-full gap-4">
@@ -405,13 +390,13 @@ export default function Likes() {
                     onClick={() => setEventToUnlike(null)} 
                     className="flex-1 py-4 bg-gray-100 text-gray-600 rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-gray-200 transition-colors"
                   >
-                    Batal
+                    Cancel
                   </button>
                   <button 
                     onClick={confirmUnlike} 
                     className="flex-1 py-4 bg-red-500 text-white rounded-xl font-bold uppercase text-xs tracking-widest hover:bg-red-600 shadow-xl shadow-red-100 transition-all active:scale-95"
                   >
-                    Ya, Hapus
+                    Yes, Remove
                   </button>
                 </div>
               </div>

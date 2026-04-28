@@ -349,14 +349,14 @@ export default function EventDetail() {
             <div className={`w-full rounded-[24px] md:rounded-[32px] p-6 md:p-8 shadow-sm border text-center flex flex-col items-center justify-center relative overflow-hidden mt-2 md:mt-0 ${isWed ? 'bg-[#FCFAEE] border-[#D4AF37]/30' : 'bg-[#FFF5F0] border-orange-100'}`}>
               <div className={`absolute top-0 left-0 w-full h-1 ${isWed ? 'bg-[#D4AF37]' : 'bg-[#FF6B35]'}`}></div>
               <h3 className={`text-xs md:text-sm font-black mb-4 md:mb-6 uppercase tracking-widest ${isWed ? 'text-[#D4AF37]' : 'text-[#FF6B35]'}`}>
-                {isWed ? 'Konfirmasi Kehadiran' : 'Dapatkan Tiketmu'}
+                {isWed ? 'Konfirmasi Kehadiran' : 'GET YOUR TICKETS'}
               </h3>
               
               <button 
                 onClick={() => handleGoToCheckout('all')} 
                 className={`w-full py-3.5 md:py-4 text-white rounded-xl font-bold uppercase tracking-widest text-[11px] md:text-xs shadow-xl transition-all active:scale-95 ${isWed ? 'bg-[#D4AF37] hover:bg-[#B5952F]' : 'bg-gray-900 hover:bg-black'}`}
               >
-                {isWed ? 'RSVP Semua Acara' : 'Beli Semua Sesi'}
+                {isWed ? 'RSVP ALL EVENTS' : 'BUY ALL SESSIONS'}
               </button>
             </div>
           </div>
@@ -446,7 +446,7 @@ export default function EventDetail() {
                         {/* HARGA TIKET DIHILANGKAN JIKA WEDDING */}
                         {!isWed ? (
                           <div className="text-left md:text-right">
-                            <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">Harga Tiket</p>
+                            <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">TICKET PRICE</p>
                             <p className="font-black text-xl md:text-3xl text-gray-900 mb-0 md:mb-4">
                               {Number(session.price) === 0 ? <span className="text-[#27AE60]">FREE</span> : `Rp ${parseInt(session.price).toLocaleString('id-ID')}`}
                             </p>
@@ -464,7 +464,7 @@ export default function EventDetail() {
                           disabled={isSoldOut}
                           className={`w-auto md:w-full px-5 py-2.5 md:px-8 md:py-3 rounded-xl font-bold text-[10px] md:text-xs uppercase tracking-widest transition-all ${isSoldOut ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : (isWed ? 'bg-[#D4AF37] text-white hover:bg-[#B5952F] active:scale-95' : 'bg-[#FF6B35] text-white hover:bg-[#E85526] shadow-md shadow-orange-100 active:scale-95')}`}
                         >
-                          {isSoldOut ? 'Penuh' : (isWed ? 'Kirim RSVP' : 'Pilih Tiket')}
+                          {isSoldOut ? 'FULL' : (isWed ? 'SEND RSVP' : 'CHOOSE TICKET')}
                         </button>
                       </div>
 

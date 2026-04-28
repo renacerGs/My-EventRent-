@@ -27,7 +27,7 @@ export default function PersonalRSVP() {
     const fetchEvent = async () => {
       try {
         const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`);
-        if (!res.ok) throw new Error("Event tidak ditemukan");
+        if (!res.ok) throw new Error("Event not found");
         const data = await res.json();
         setEvent(data);
         
@@ -47,7 +47,6 @@ export default function PersonalRSVP() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // 👇 FUNGSI BARU: Nangkep Jawaban Custom (Teks, Dropdown, Checkbox)
   const handleCustomChange = (qId, value, type, isChecked = false) => {
     if (type === 'Checkbox') {
       setFormData(prev => {
@@ -68,7 +67,6 @@ export default function PersonalRSVP() {
     );
   };
 
-  // 👇 FUNGSI BARU: Ambil pertanyaan custom berdasarkan sesi yang dicentang
   const activeQuestions = [];
   const seenQIds = new Set();
   if (event && event.sessions) {
@@ -86,15 +84,14 @@ export default function PersonalRSVP() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (formData.isAttending === null) return toast.error("Pilih konfirmasi kehadiran Anda!");
+    if (formData.isAttending === null) return toast.error("Please confirm your attendance!");
     if (formData.isAttending === true && selectedSessions.length === 0) {
-      return toast.error("Pilih minimal 1 sesi acara yang akan dihadiri!");
+      return toast.error("Please select at least 1 session to attend!");
     }
     
-    // Validasi Custom Checkbox (Wajib Isi)
     for (const q of activeQuestions) {
       if (q.is_required && q.answer_type === 'Checkbox' && (!formData[q.id] || formData[q.id].length === 0)) {
-        return toast.error(`Pertanyaan "${q.question_text}" wajib diisi!`);
+        return toast.error(`The question "${q.question_text}" is required!`);
       }
     }
 
@@ -114,7 +111,7 @@ export default function PersonalRSVP() {
         guestEmail: formData.email,
         cart: cartPayload,
         formAnswers: {
-          ...formData, // 👈 Masukin semua Custom Answers biar ditangkep Backend
+          ...formData, 
           attendee_name: formData.name,
           greeting: formData.greeting,
           isAttending: formData.isAttending 
@@ -133,7 +130,7 @@ export default function PersonalRSVP() {
 
       if (!response.ok) {
         const errData = await response.json();
-        throw new Error(errData.message || "Gagal mengirim RSVP");
+        throw new Error(errData.message || "Failed to send RSVP");
       }
 
       setIsSuccess(true);
@@ -150,7 +147,7 @@ export default function PersonalRSVP() {
   };
 
   if (isLoading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="animate-spin w-10 h-10 border-4 border-purple-200 border-t-purple-600 rounded-full"></div></div>;
-  if (!event) return <div className="text-center mt-20 text-gray-500 font-bold">Event tidak ditemukan.</div>;
+  if (!event) return <div className="text-center mt-20 text-gray-500 font-bold">Event not found.</div>;
 
   const inputStyle = `w-full bg-white text-gray-900 border border-gray-200 rounded-xl px-5 py-4 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition text-sm placeholder:text-gray-400`;
 
@@ -162,7 +159,7 @@ export default function PersonalRSVP() {
           <ChevronLeft className="w-5 h-5" />
         </button>
         <h1 className="flex-1 text-center font-black text-gray-900 uppercase tracking-widest text-sm mr-9">
-          Konfirmasi Kehadiran
+          Confirm Attendance
         </h1>
       </div>
 
@@ -174,14 +171,14 @@ export default function PersonalRSVP() {
           {isSuccess ? (
             <div className="text-center py-12 relative z-10">
               <CheckCircle2 className="w-24 h-24 text-purple-500 mx-auto mb-6" />
-              <h2 className="text-3xl font-black text-gray-900 mb-4 uppercase tracking-tight">RSVP Berhasil! 🎉</h2>
+              <h2 className="text-3xl font-black text-gray-900 mb-4 uppercase tracking-tight">RSVP Successful! 🎉</h2>
               <p className="text-gray-500 font-medium text-sm leading-relaxed mb-8">
                 {formData.isAttending 
-                  ? "Asyik! Terima kasih konfirmasinya. E-Ticket QR kamu udah dikirim ke email ya." 
-                  : "Sayang banget nggak bisa datang. Tenang, doa dan ucapan kamu udah tersampaikan kok!"}
+                  ? "Awesome! Thanks for confirming. Your E-Ticket QR has been sent to your email." 
+                  : "Too bad you can't make it. Don't worry, your greetings have been delivered!"}
               </p>
               <p className="text-purple-600 text-xs uppercase tracking-widest font-bold animate-pulse">
-                Balik ke halaman pesta...
+                Returning to the party page...
               </p>
             </div>
           ) : (
@@ -189,31 +186,31 @@ export default function PersonalRSVP() {
               
               <div className="space-y-5">
                 <div>
-                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2">Nama Lengkap <span className="text-red-500">*</span></label>
-                  <input type="text" name="name" value={formData.name} onChange={handleChange} required placeholder="Ketik nama kamu di sini..." className={inputStyle} />
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2">Full Name <span className="text-red-500">*</span></label>
+                  <input type="text" name="name" value={formData.name} onChange={handleChange} required placeholder="Type your name here..." className={inputStyle} />
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2">Email <span className="text-red-500">*</span></label>
-                  <input type="email" name="email" value={formData.email} onChange={handleChange} required placeholder="Penting buat ngirim E-Ticket (QR Code)" className={inputStyle} />
+                  <input type="email" name="email" value={formData.email} onChange={handleChange} required placeholder="Required for sending E-Ticket (QR Code)" className={inputStyle} />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-3">Bisa Datang Nggak? <span className="text-red-500">*</span></label>
+                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-3">Will you be attending? <span className="text-red-500">*</span></label>
                 <div className="grid grid-cols-2 gap-4">
                   <button 
                     type="button"
                     onClick={() => setFormData({...formData, isAttending: true})}
                     className={`py-4 rounded-xl text-sm font-bold transition-all border-2 ${formData.isAttending === true ? 'border-purple-500 bg-purple-50 text-purple-700 shadow-sm' : 'border-gray-200 bg-gray-50 text-gray-400 hover:border-purple-200 hover:bg-white'}`}
                   >
-                    Gas, Gue Hadir!
+                    Yes, I'm In!
                   </button>
                   <button 
                     type="button"
                     onClick={() => setFormData({...formData, isAttending: false})}
                     className={`py-4 rounded-xl text-sm font-bold transition-all border-2 ${formData.isAttending === false ? 'border-red-500 bg-red-50 text-red-600 shadow-sm' : 'border-gray-200 bg-gray-50 text-gray-400 hover:border-red-200 hover:bg-white'}`}
                   >
-                    Maaf, Skip Dulu
+                    Sorry, Can't Make It
                   </button>
                 </div>
               </div>
@@ -222,7 +219,7 @@ export default function PersonalRSVP() {
                 <div className="space-y-8 p-6 bg-purple-50/50 border border-purple-100 rounded-2xl">
                   
                   <div>
-                    <label className="block text-[11px] font-bold text-purple-600 uppercase tracking-widest mb-3">Ikut Acara Yang Mana? <span className="text-red-500">*</span></label>
+                    <label className="block text-[11px] font-bold text-purple-600 uppercase tracking-widest mb-3">Which Sessions Will You Attend? <span className="text-red-500">*</span></label>
                     <div className="space-y-3">
                       {event.sessions?.map(s => (
                         <label 
@@ -243,7 +240,7 @@ export default function PersonalRSVP() {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-purple-600 uppercase tracking-widest mb-3">Bawa Berapa Orang? (Pax) <span className="text-red-500">*</span></label>
+                    <label className="block text-[11px] font-bold text-purple-600 uppercase tracking-widest mb-3">How Many People? (Pax) <span className="text-red-500">*</span></label>
                     <div className="grid grid-cols-2 gap-4">
                       <button 
                         type="button"
@@ -251,7 +248,7 @@ export default function PersonalRSVP() {
                         className={`py-5 flex flex-col items-center justify-center gap-2 rounded-xl transition-all border-2 bg-white ${formData.pax === 1 ? 'border-purple-500 text-purple-700 shadow-md' : 'border-gray-100 text-gray-400 hover:border-purple-200'}`}
                       >
                         <User className="w-6 h-6" />
-                        <span className="text-xs font-bold uppercase tracking-widest">Sendirian Aja</span>
+                        <span className="text-xs font-bold uppercase tracking-widest">Just Me</span>
                       </button>
                       <button 
                         type="button"
@@ -259,15 +256,14 @@ export default function PersonalRSVP() {
                         className={`py-5 flex flex-col items-center justify-center gap-2 rounded-xl transition-all border-2 bg-white ${formData.pax === 2 ? 'border-purple-500 text-purple-700 shadow-md' : 'border-gray-100 text-gray-400 hover:border-purple-200'}`}
                       >
                         <Users className="w-6 h-6" />
-                        <span className="text-xs font-bold uppercase tracking-widest">+1 (Bawa Partner)</span>
+                        <span className="text-xs font-bold uppercase tracking-widest">+1 (Plus One)</span>
                       </button>
                     </div>
                   </div>
 
-                  {/* 👇 BAGIAN RENDER CUSTOM QUESTIONS 👇 */}
                   {activeQuestions.length > 0 && (
                     <div className="pt-6 border-t border-purple-100 space-y-6">
-                      <h3 className="text-[11px] font-black text-purple-600 uppercase tracking-widest bg-purple-100/50 inline-block px-3 py-1 rounded-md">Pertanyaan Tambahan</h3>
+                      <h3 className="text-[11px] font-black text-purple-600 uppercase tracking-widest bg-purple-100/50 inline-block px-3 py-1 rounded-md">Additional Questions</h3>
                       {activeQuestions.map(q => (
                         <div key={q.id}>
                           <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-widest mb-2">
@@ -275,12 +271,12 @@ export default function PersonalRSVP() {
                           </label>
                           
                           {q.answer_type === 'Text' && (
-                            <input type="text" onChange={e => handleCustomChange(q.id, e.target.value, 'Text')} required={q.is_required} className={inputStyle} placeholder="Ketik jawabanmu di sini..." />
+                            <input type="text" onChange={e => handleCustomChange(q.id, e.target.value, 'Text')} required={q.is_required} className={inputStyle} placeholder="Type your answer here..." />
                           )}
                           
                           {q.answer_type === 'Dropdown' && (
                             <select onChange={e => handleCustomChange(q.id, e.target.value, 'Dropdown')} required={q.is_required} className={`${inputStyle} cursor-pointer`}>
-                              <option value="">-- Pilih Jawaban --</option>
+                              <option value="">-- Select Answer --</option>
                               {q.options?.map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
                             </select>
                           )}
@@ -299,19 +295,18 @@ export default function PersonalRSVP() {
                       ))}
                     </div>
                   )}
-                  {/* 👆 AKHIR RENDER CUSTOM QUESTIONS 👆 */}
 
                 </div>
               )}
 
               <div>
-                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2">Ucapan & Doa <span className="text-red-500">*</span></label>
+                <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-widest mb-2">Greetings & Wishes <span className="text-red-500">*</span></label>
                 <textarea 
                   name="greeting" 
                   value={formData.greeting} 
                   onChange={handleChange}
                   required 
-                  placeholder={formData.isAttending === false ? "Tulis alasan atau titip salam di sini..." : "Happy birthday / Happy party! Semoga..."}
+                  placeholder={formData.isAttending === false ? "Write your reason or send regards here..." : "Happy birthday / Happy party! Wishing you..."}
                   rows="4" 
                   className={`${inputStyle} resize-none`} 
                 />
@@ -323,7 +318,7 @@ export default function PersonalRSVP() {
                   disabled={isSubmitting || formData.isAttending === null}
                   className="w-full py-4 bg-purple-600 text-white font-black uppercase tracking-widest rounded-xl hover:bg-purple-700 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-purple-200 text-sm"
                 >
-                  {isSubmitting ? 'Memproses...' : 'Kirim RSVP'}
+                  {isSubmitting ? 'Processing...' : 'Send RSVP'}
                 </button>
               </div>
 

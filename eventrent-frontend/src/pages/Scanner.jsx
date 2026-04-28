@@ -19,32 +19,27 @@ export default function Scanner() {
     }
   }, [user, navigate]);
 
-  // 🔥 FUNGSI YANG DIUBAH: Tambah Token & Buang userId di payload
   const processTicket = async (ticketIdStr) => {
     setScanResult('processing');
     
-    // 👇 FIX 1: GAK PAKAI parseInt LAGI! Langsung ambil string-nya
     const ticketId = ticketIdStr;
     
-    // 👇 FIX 2: Validasi cuma ngecek kosong atau nggak
     if (!ticketId) {
       setScanResult('error');
-      setMessage("QR Code Tidak Valid! Format kosong.");
+      setMessage("Invalid QR Code! Empty format.");
       return;
     }
 
     try {
-      // AMBIL TOKEN DARI LOKAL STORAGE
       const token = localStorage.getItem('supabase_token');
 
-      // TEMBAK API DENGAN TOKEN
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tickets/scan`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` // 👈 INI KTP-NYA!
+          'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify({ ticketId, eventId }) // 👈 userId DIHAPUS DARI SINI
+        body: JSON.stringify({ ticketId, eventId }) 
       });
       
       const data = await res.json();
@@ -55,12 +50,12 @@ export default function Scanner() {
         setTicketData(data.data);
       } else {
         setScanResult('error');
-        setMessage(data.message || 'Akses Ditolak!');
+        setMessage(data.message || 'Access Denied!');
         setTicketData(data.data || null);
       }
     } catch (error) {
       setScanResult('error');
-      setMessage("Gagal terhubung ke server. Cek internet!");
+      setMessage("Failed to connect to the server. Check your internet!");
     }
   };
 
@@ -100,8 +95,8 @@ export default function Scanner() {
   };
 
   const getAttendeeName = () => {
-    if (!ticketData) return 'Peserta';
-    return ticketData.attendee_name || ticketData.buyer_name || 'Guest/Tamu';
+    if (!ticketData) return 'Attendee';
+    return ticketData.attendee_name || ticketData.buyer_name || 'Guest';
   };
 
   return (
@@ -109,7 +104,7 @@ export default function Scanner() {
       <div className="p-6 flex items-center justify-between bg-gray-900/80 backdrop-blur-md z-30 relative">
         <button onClick={handleCloseScanner} className="text-gray-400 hover:text-white flex items-center gap-2 font-bold text-sm uppercase tracking-widest transition-colors">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-          Tutup Scanner
+          Close Scanner
         </button>
         {!scanResult && (
           <span className="bg-red-500 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse">Live</span>
@@ -118,7 +113,7 @@ export default function Scanner() {
 
       <div className="flex-1 relative flex flex-col items-center justify-center p-4">
         <div className={`w-full max-w-sm relative transition-all duration-300 ${scanResult ? 'opacity-40 blur-sm scale-95 pointer-events-none' : 'opacity-100 scale-100'}`}>
-          <h2 className="text-center text-gray-300 font-bold mb-4 uppercase tracking-widest text-xs">Arahkan kamera ke QR Code Tiket</h2>
+          <h2 className="text-center text-gray-300 font-bold mb-4 uppercase tracking-widest text-xs">Point camera at Ticket QR Code</h2>
           <div className="w-full rounded-3xl overflow-hidden border-4 border-[#FF6B35] shadow-[0_0_30px_rgba(255,107,53,0.3)] bg-black aspect-square">
              <QrScanner onScan={handleScan} onError={() => {}} formats={['qr_code']} />
           </div>
@@ -129,7 +124,7 @@ export default function Scanner() {
             {scanResult === 'processing' && (
               <div className="flex flex-col items-center justify-center animate-in zoom-in-95 duration-300">
                 <div className="w-16 h-16 border-4 border-gray-700 border-t-[#FF6B35] rounded-full animate-spin mb-6"></div>
-                <h2 className="text-xl font-bold uppercase tracking-widest text-white animate-pulse">Memverifikasi...</h2>
+                <h2 className="text-xl font-bold uppercase tracking-widest text-white animate-pulse">Verifying...</h2>
               </div>
             )}
 
@@ -138,15 +133,15 @@ export default function Scanner() {
                 <div className="w-24 h-24 bg-white text-[#27AE60] rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
                   <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                 </div>
-                <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight">TIKET VALID!</h2>
+                <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight">VALID TICKET!</h2>
                 <p className="text-green-100 font-medium mb-6">{message}</p>
                 <div className="bg-black/20 rounded-2xl p-4 text-left mb-8">
-                  <p className="text-[10px] text-green-200 uppercase tracking-widest mb-1">Nama Peserta</p>
+                  <p className="text-[10px] text-green-200 uppercase tracking-widest mb-1">Attendee Name</p>
                   <p className="text-xl font-black text-white leading-tight mb-1">{getAttendeeName()}</p>
                   <p className="text-sm text-green-100 font-medium">{ticketData?.session_name}</p>
                 </div>
                 <button onClick={resetScanner} className="w-full bg-white text-[#27AE60] py-4 rounded-xl font-bold uppercase tracking-widest shadow-lg hover:bg-green-50 transition-all active:scale-95">
-                  Lanjut Scan (Next)
+                  Scan Next Ticket
                 </button>
               </div>
             )}
@@ -156,17 +151,17 @@ export default function Scanner() {
                 <div className="w-24 h-24 bg-white text-[#E24A29] rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
                   <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                 </div>
-                <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight">DITOLAK!</h2>
+                <h2 className="text-3xl font-black text-white mb-2 uppercase tracking-tight">DENIED!</h2>
                 <p className="text-red-100 font-bold mb-6">{message}</p>
                 {ticketData && (
                   <div className="bg-black/20 rounded-2xl p-4 text-left mb-8">
-                    <p className="text-[10px] text-red-200 uppercase tracking-widest mb-1">Data Tiket Tercatat:</p>
+                    <p className="text-[10px] text-red-200 uppercase tracking-widest mb-1">Ticket Data Record:</p>
                     <p className="text-xl font-black text-white leading-tight mb-1">{getAttendeeName()}</p>
                     <p className="text-sm text-red-100 font-medium">{ticketData?.session_name}</p>
                   </div>
                 )}
                 <button onClick={resetScanner} className="w-full bg-white text-[#E24A29] py-4 rounded-xl font-bold uppercase tracking-widest shadow-lg hover:bg-red-50 transition-all active:scale-95">
-                  Scan Tiket Lain
+                  Scan Another Ticket
                 </button>
               </div>
             )}

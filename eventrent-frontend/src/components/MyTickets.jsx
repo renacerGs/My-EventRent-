@@ -18,7 +18,7 @@ const formatPrettyDate = (dateString) => {
     const dateObj = new Date(rawDate);
     if (isNaN(dateObj.getTime())) return dateString;
     const options = { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' };
-    const formattedDate = new Intl.DateTimeFormat('id-ID', options).format(dateObj);
+    const formattedDate = new Intl.DateTimeFormat('en-US', options).format(dateObj);
     return `${formattedDate}${timePart}`;
   } catch (error) {
     return dateString;
@@ -30,7 +30,7 @@ const formatPurchaseTime = (dateString) => {
   try {
     const dateObj = new Date(dateString);
     const options = { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' };
-    return new Intl.DateTimeFormat('id-ID', options).format(dateObj);
+    return new Intl.DateTimeFormat('en-US', options).format(dateObj);
   } catch (error) {
     return dateString;
   }
@@ -70,23 +70,20 @@ export default function MyTickets() {
         return;
       }
 
-      // 🔥 AMBIL TOKEN DARI BRANKAS
       const token = localStorage.getItem('supabase_token');
 
       if (!token) {
         setLoading(false);
-        return; // Jangan nembak kalau nggak ada token
+        return; 
       }
 
       try {
-        // 🔥 TAMBAHIN HEADERS & HAPUS `?userId=${user.id}` KARENA UDAH DIAMBIL ALIH SATPAM
         const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/tickets/my`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
         
-        // ✅ SABUK PENGAMAN (Cek apakah response beneran Array)
         const rawTickets = Array.isArray(response.data) ? response.data : [];
 
         const grouped = {};
@@ -111,7 +108,7 @@ export default function MyTickets() {
 
         setGroupedOrders(Object.values(grouped));
       } catch (error) {
-        console.error("Gagal mengambil data tiket:", error);
+        console.error("Failed to fetch ticket data:", error);
       } finally {
         setLoading(false);
       }
@@ -134,7 +131,7 @@ export default function MyTickets() {
   };
 
   const openQR = (trx, globalIndex) => {
-    const attendeeName = trx.attendee_name || `Peserta ${globalIndex + 1}`;
+    const attendeeName = trx.attendee_name || `Attendee ${globalIndex + 1}`;
     
     setSelectedQR({ 
       ...trx, 
@@ -168,14 +165,14 @@ export default function MyTickets() {
       const link = document.createElement('a');
       link.href = image;
       const cleanName = selectedQR.attendeeName.replace(/[^a-zA-Z0-9]/g, '_');
-      // Bikin nama filenya makin keren pakai ID tiket!
-      link.download = `Tiket_${selectedQR.ticket_id}_${cleanName}.png`;
+      
+      link.download = `Ticket_${selectedQR.ticket_id}_${cleanName}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (err) {
-      console.error("Gagal download gambar tiket", err);
-      toast.error("Oops, gagal download tiket. Coba lagi bro!");
+      console.error("Failed to download ticket image", err);
+      toast.error("Oops, failed to download ticket. Try again, bro!");
     } finally {
       window.scrollTo(0, currentScroll);
       setIsDownloading(false);
@@ -204,12 +201,12 @@ export default function MyTickets() {
              </p>
              <p className="text-[10px] font-semibold text-gray-500 flex items-center gap-1.5 mb-1.5">
                <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>
-               Tiket ({orderGroup.total_quantity})
+               Tickets ({orderGroup.total_quantity})
              </p>
              <p className="text-[10px] text-gray-400 capitalize mb-1">{formatPrettyDate(orderGroup.event_date)}</p>
              <div className="mt-auto text-right w-full">
                 <span className={`text-[11px] font-bold uppercase tracking-wide ${isPast ? 'text-gray-400' : 'text-[#FF6B35]'}`}>
-                  {isPast ? 'Selesai' : 'Berhasil'}
+                  {isPast ? 'Completed' : 'Success'}
                 </span>
              </div>
           </div>
@@ -219,7 +216,7 @@ export default function MyTickets() {
              <div className="flex flex-row justify-between items-start gap-4 mb-4">
                <div>
                  <div className="flex items-center gap-2 mb-3">
-                   <span className="bg-gray-100 text-gray-500 text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Order Dikonfirmasi</span>
+                   <span className="bg-gray-100 text-gray-500 text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Order Confirmed</span>
                    <span className="text-xs font-bold text-gray-400">{formatPurchaseTime(orderGroup.purchase_date)}</span>
                  </div>
                  <h3 className="text-2xl font-extrabold text-gray-900 leading-tight mb-2 group-hover:text-[#FF6B35] transition-colors">{orderGroup.title}</h3>
@@ -229,12 +226,12 @@ export default function MyTickets() {
                  </p>
                </div>
                <span className={`text-[10px] self-start font-black px-4 py-1.5 rounded-full uppercase tracking-wider whitespace-nowrap ${isPast ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'}`}>
-                 {isPast ? 'Event Berakhir' : 'Tiket Aktif'}
+                 {isPast ? 'Event Ended' : 'Active Ticket'}
                </span>
              </div>
              <div className="flex items-center justify-between mt-2 pt-4 border-t border-gray-50">
                <div className="bg-orange-50 px-4 py-2 rounded-xl border border-orange-100">
-                 <p className="text-[#FF6B35] font-bold text-sm">Total <span className="text-lg font-black">{orderGroup.total_quantity}</span> Tiket</p>
+                 <p className="text-[#FF6B35] font-bold text-sm">Total <span className="text-lg font-black">{orderGroup.total_quantity}</span> Tickets</p>
                </div>
                <div className="text-gray-400 group-hover:text-[#FF6B35] bg-gray-50 p-3 rounded-full transition-colors border border-gray-100">
                  <svg className={`w-5 h-5 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
@@ -270,21 +267,20 @@ export default function MyTickets() {
                           {sg.session_name}
                         </h4>
                         <p className="text-[10px] md:text-xs text-gray-500 font-semibold mt-1 pl-3.5 md:pl-4 hidden md:block">
-                          Jadwal: {formatPrettyDate(sg.session_date)} | {sg.start_time?.slice(0,5)} - {sg.end_time?.slice(0,5)}
+                          Schedule: {formatPrettyDate(sg.session_date)} | {sg.start_time?.slice(0,5)} - {sg.end_time?.slice(0,5)}
                         </p>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 pl-0 md:pl-4">
                         {sg.tickets.map((trx, tIndex) => {
-                          const attendeeName = trx.attendee_name || `Peserta ${tIndex + 1}`;
+                          const attendeeName = trx.attendee_name || `Attendee ${tIndex + 1}`;
                           const isScanned = trx.is_scanned; 
                           
                           return (
                             <div key={trx.ticket_id} className={`bg-white border rounded-xl md:rounded-2xl p-3 md:p-4 flex flex-row items-center justify-between shadow-sm transition-colors gap-3 ${isScanned ? 'border-gray-200 opacity-60' : 'border-gray-200 hover:border-[#FF6B35]'}`}>
                               <div className="overflow-hidden">
-                                {/* 👇 UPDATE: Nampilin TKT-XXXXX biar elegan 👇 */}
                                 <span className="text-[9px] md:text-[10px] text-[#FF6B35] font-black uppercase tracking-widest block mb-0.5 md:mb-1">
-                                  {isScanned ? 'TIKET TERPAKAI' : trx.ticket_id}
+                                  {isScanned ? 'TICKET USED' : trx.ticket_id}
                                 </span>
                                 <p className={`font-bold text-xs md:text-sm truncate uppercase ${isScanned ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
                                   {attendeeName}
@@ -298,7 +294,7 @@ export default function MyTickets() {
                                   : isScanned ? 'bg-green-50 text-green-600 border border-green-200 cursor-not-allowed' 
                                   : 'bg-[#FF6B35] text-white hover:bg-orange-600 active:scale-95 shadow-md shadow-orange-100'}`}
                               >
-                                {isPast ? 'Expired' : isScanned ? 'Dipakai' : 'Buka QR'}
+                                {isPast ? 'Expired' : isScanned ? 'Used' : 'Open QR'}
                               </button>
                             </div>
                           );
@@ -329,12 +325,10 @@ export default function MyTickets() {
                 </div>
                 <div className="p-6 md:p-8 flex flex-col items-center -mt-8 md:-mt-10 relative z-10 bg-white rounded-t-[24px] md:rounded-t-[32px]">
                   
-                  {/* 👇 FIX: Nambahin &ecc=H dan encodeURIComponent biar barcode-nya rapet sama persis kayak email 👇 */}
                   <div className="bg-white p-3 md:p-5 rounded-[20px] md:rounded-[24px] shadow-lg border border-gray-100 mb-2">
                     <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=H&data=${encodeURIComponent(selectedQR.uniqueQRData)}`} alt="QR" className="w-40 h-40 md:w-48 md:h-48 mix-blend-multiply" crossOrigin="anonymous" />
                   </div>
                   
-                  {/* 👇 Nambahin teks ID Tiket (TKT-XXXX) di bawah Barcode 👇 */}
                   <p className="text-[10px] md:text-xs font-black text-gray-400 uppercase tracking-widest mb-4 border-b-2 border-dashed border-gray-200 pb-4 px-8">
                     {selectedQR.ticket_id}
                   </p>
@@ -352,7 +346,7 @@ export default function MyTickets() {
               <div className="mt-4 flex gap-3">
                 <button onClick={() => setShowQR(false)} className="w-14 shrink-0 py-3 md:py-4 bg-gray-200 text-gray-600 rounded-xl md:rounded-2xl font-bold flex items-center justify-center hover:bg-gray-300 transition-all active:scale-95">✕</button>
                 <button onClick={handleDownloadImage} disabled={isDownloading} className="flex-1 py-3 md:py-4 bg-[#FF6B35] text-white rounded-xl md:rounded-2xl font-bold hover:bg-[#E85526] transition-all uppercase tracking-widest text-[10px] md:text-xs shadow-xl shadow-orange-100/50 active:scale-95 disabled:bg-gray-400 disabled:cursor-wait">
-                  {isDownloading ? 'Menyimpan...' : 'Simpan ke Galeri'}
+                  {isDownloading ? 'Saving...' : 'Save to Gallery'}
                 </button>
               </div>
             </motion.div>
@@ -365,14 +359,14 @@ export default function MyTickets() {
         <div className="bg-gray-50 md:bg-transparent sticky md:relative top-0 z-40 pt-4 md:pt-0 mb-4 md:mb-8">
            <div className="hidden md:block">
              <h1 className="text-4xl font-extrabold mb-2 text-gray-900 tracking-tight">My Tickets</h1>
-             <p className="text-gray-500 mb-8 font-medium">Riwayat pembelian dan e-ticket kamu.</p>
+             <p className="text-gray-500 mb-8 font-medium">Your purchase history and e-tickets.</p>
            </div>
            <div className="flex border-b border-gray-200 bg-white md:bg-transparent rounded-t-[20px] md:rounded-none px-2 md:px-0 pt-2 md:pt-0">
              <button onClick={() => setActiveTab('aktif')} className={`flex-1 py-3.5 text-xs md:text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'aktif' ? 'border-b-2 border-[#FF6B35] text-[#FF6B35]' : 'border-b-2 border-transparent text-gray-400 hover:text-gray-600'}`}>
-               Tiket Aktif
+               Active Tickets
              </button>
              <button onClick={() => setActiveTab('riwayat')} className={`flex-1 py-3.5 text-xs md:text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'riwayat' ? 'border-b-2 border-[#FF6B35] text-[#FF6B35]' : 'border-b-2 border-transparent text-gray-400 hover:text-gray-600'}`}>
-               Daftar Transaksi
+               Transaction List
              </button>
            </div>
         </div>
@@ -388,8 +382,8 @@ export default function MyTickets() {
               <div className="w-20 h-20 md:w-24 md:h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6">
                 <svg className="w-10 h-10 md:w-12 md:h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path></svg>
               </div>
-              <h3 className="text-lg md:text-2xl font-black text-gray-900 mb-2 md:mb-3">{activeTab === 'aktif' ? 'Belum Ada Tiket Aktif' : 'Belum Ada Transaksi'}</h3>
-              <p className="text-sm md:text-base text-gray-500 font-medium">Ayo cari event seru dan beli tiketnya sekarang!</p>
+              <h3 className="text-lg md:text-2xl font-black text-gray-900 mb-2 md:mb-3">{activeTab === 'aktif' ? 'There are no active tickets yet' : 'No Transactions Yet'}</h3>
+              <p className="text-sm md:text-base text-gray-500 font-medium">Come find exciting events and buy tickets now!</p>
             </div>
           )}
         </div>

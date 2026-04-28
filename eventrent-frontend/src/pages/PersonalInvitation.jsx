@@ -17,7 +17,7 @@ export default function PersonalInvitation() {
   const [isOpen, setIsOpen] = useState(false);
 
   const searchParams = new URLSearchParams(location.search);
-  const guestName = searchParams.get("to") || "Bapak/Ibu/Saudara/i";
+  const guestName = searchParams.get("to") || "Guest";
 
   useEffect(() => {
     fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`)
@@ -27,16 +27,16 @@ export default function PersonalInvitation() {
         setIsLoading(false);
       })
       .catch(err => {
-        console.error("Gagal ngambil data event:", err);
+        console.error("Failed to fetch event data:", err);
         setIsLoading(false);
       });
   }, [id]);
 
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-50"><p className="font-bold text-blue-500 animate-pulse">Menyiapkan Undangan...</p></div>;
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50"><p className="font-bold text-blue-500 animate-pulse">Preparing Invitation...</p></div>;
   }
   if (!eventData) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">Undangan tidak ditemukan.</div>;
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">Invitation not found.</div>;
   }
 
   let details = eventData?.eventDetails || eventData?.event_details || {};
