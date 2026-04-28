@@ -75,6 +75,12 @@ export class AppController {
     return await this.appService.toggleEventVisibility(id, req.user.id);
   }
 
+  // --- ENDPOINT SESSIONS KHUSUS MOBILE ---
+  @Get('events/:id/sessions')
+  async getEventSessionsMobile(@Param('id') eventId: string) {
+    return await this.appService.getEventSessions(Number(eventId));
+  }
+
   // ==========================================
   // --- LIKES ---
   // ==========================================

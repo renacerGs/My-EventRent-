@@ -149,6 +149,34 @@ export class AppService implements OnModuleInit {
     }
   }
 
+  // --- AMBIL SESI EVENT (KHUSUS MOBILE) ---
+  async getEventSessions(eventId: number) {
+    try {
+      const sessionQuery = `
+        SELECT id, name, description, TO_CHAR(session_date, 'Dy, DD Mon YYYY') as date, 
+               start_time, end_time, contact_person, event_type, price, stock,
+               name_place, place, city, province, map_url 
+        FROM event_sessions
+        WHERE event_id = $1
+        ORDER BY session_date ASC, start_time ASC
+      `;
+      const sessionRes = await this.pool.query(sessionQuery, [eventId]);
+      const sessions = sessionRes.rows;
+
+      // Ambil juga custom questions tiap sesi biar lengkap
+      for (let session of sessions) {
+        const qQuery = `SELECT id, question_text, answer_type, is_required, options FROM session_questions WHERE session_id = $1`;
+        const qRes = await this.pool.query(qQuery, [session.id]);
+        session.questions = qRes.rows;
+      }
+
+      return sessions;
+    } catch (err) {
+      console.error("Error getEventSessions:", err);
+      throw new InternalServerErrorException('Gagal mengambil data sesi event');
+    }
+  }
+
   async getMyEvents(userId: number) {
     try {
       const query = `
