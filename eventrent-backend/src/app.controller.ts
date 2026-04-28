@@ -1,4 +1,3 @@
-// src/app.controller.ts
 import { Controller, Get, Post, Body, Query, Delete, Param, Put, Patch, UseGuards, Req } from '@nestjs/common'; 
 import { AppService } from './app.service';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
@@ -11,7 +10,7 @@ export class AppController {
   constructor(private readonly appService: AppService) {}
 
   // ==========================================
-  // --- EVENTS ---
+  // --- FITUR EVENTS ---
   // ==========================================
   @ApiTags('Events') 
   @ApiOperation({ summary: 'Mendapatkan semua event' })
@@ -35,6 +34,14 @@ export class AppController {
     return await this.appService.getEventById(id);
   }
 
+  // 🔥 ENDPOINT SESSIONS KHUSUS MOBILE (FLUTTER)
+  @ApiTags('Events')
+  @ApiOperation({ summary: 'Ambil sesi event (Khusus Mobile)' })
+  @Get('events/:id/sessions')
+  async getEventSessionsMobile(@Param('id') eventId: string) {
+    return await this.appService.getEventSessions(Number(eventId));
+  }
+
   @ApiTags('Events')
   @ApiOperation({ summary: 'Membuat event baru' })
   @UseGuards(SupabaseGuard)
@@ -45,19 +52,19 @@ export class AppController {
   }
 
   @ApiTags('Events')
-  @ApiOperation({ summary: 'Menghapus event' })
-  @UseGuards(SupabaseGuard)
-  @Delete('events/:id')
-  async deleteEvent(@Param('id') id: number, @Req() req) {
-    return await this.appService.deleteEvent(id, req.user.id);
-  }
-
-  @ApiTags('Events')
   @ApiOperation({ summary: 'Mengubah data event' })
   @UseGuards(SupabaseGuard)
   @Put('events/:id')
   async updateEvent(@Param('id') id: number, @Req() req, @Body() eventData: any) {
     return await this.appService.updateEvent(id, req.user.id, eventData);
+  }
+
+  @ApiTags('Events')
+  @ApiOperation({ summary: 'Menghapus event' })
+  @UseGuards(SupabaseGuard)
+  @Delete('events/:id')
+  async deleteEvent(@Param('id') id: number, @Req() req) {
+    return await this.appService.deleteEvent(id, req.user.id);
   }
 
   @ApiTags('Events')
@@ -75,14 +82,8 @@ export class AppController {
     return await this.appService.toggleEventVisibility(id, req.user.id);
   }
 
-  // --- ENDPOINT SESSIONS KHUSUS MOBILE ---
-  @Get('events/:id/sessions')
-  async getEventSessionsMobile(@Param('id') eventId: string) {
-    return await this.appService.getEventSessions(Number(eventId));
-  }
-
   // ==========================================
-  // --- LIKES ---
+  // --- FITUR LIKES ---
   // ==========================================
   @ApiTags('Likes')
   @UseGuards(SupabaseGuard)
@@ -99,7 +100,7 @@ export class AppController {
   }
 
   // ==========================================
-  // --- ORDERS (PESANAN SAYA) - FITUR BARU 🔥 ---
+  // --- FITUR ORDERS (PESANAN SAYA) ---
   // ==========================================
   @ApiTags('Orders')
   @ApiOperation({ summary: 'Bikin pesanan baru & dapatkan Token Midtrans' })
@@ -118,7 +119,7 @@ export class AppController {
   }
 
   // ==========================================
-  // --- TICKETS ---
+  // --- FITUR TICKETS & ATTENDEES ---
   // ==========================================
   @ApiTags('Tickets')
   @ApiOperation({ summary: 'Membeli tiket (Bebas Satpam biar Guest bisa beli)' })
@@ -138,7 +139,6 @@ export class AppController {
     }
 
     const safeUserId = typeof data.userId === 'number' || typeof data.userId === 'string' ? data.userId : null;
-
     return await this.appService.buyTicket(safeUserId, data.eventId, finalCart || [], finalAnswers, email, data.orderId);
   }
 
@@ -157,20 +157,21 @@ export class AppController {
 
   @ApiTags('Tickets')
   @UseGuards(SupabaseGuard)
-  @Get('events/:id/attendees')
-  async getAttendees(@Param('id') id: number, @Req() req) {
-    return await this.appService.getEventAttendees(id, req.user.id);
-  }
-
-  @ApiTags('Tickets')
-  @UseGuards(SupabaseGuard)
   @Post('tickets/scan')
   async scanTicket(@Req() req, @Body() body: { ticketId: string, eventId: number }) {
     return this.appService.scanTicket(body.ticketId, body.eventId, req.user.id);
   }
 
-  // 🔥 Rute baru buat list peserta di Event Dashboard Agen
   @ApiTags('Tickets')
+  @UseGuards(SupabaseGuard)
+  @Get('events/:id/attendees')
+  async getAttendees(@Param('id') id: number, @Req() req) {
+    return await this.appService.getEventAttendees(id, req.user.id);
+  }
+
+  // 🔥 ENDPOINT TIKET KHUSUS MOBILE (FLUTTER)
+  @ApiTags('Tickets')
+  @ApiOperation({ summary: 'Ambil list peserta untuk Event Dashboard Agen (Khusus Mobile)' })
   @UseGuards(SupabaseGuard)
   @Get('events/:eventId/tickets')
   async getEventTickets(@Param('eventId') eventId: string) {
@@ -178,7 +179,7 @@ export class AppController {
   }
 
   // ==========================================
-  // --- AGENTS (KEPANITIAAN) ---
+  // --- FITUR AGENTS (KEPANITIAAN) ---
   // ==========================================
   @ApiTags('Agents')
   @UseGuards(SupabaseGuard)
@@ -216,7 +217,7 @@ export class AppController {
   }
 
   // ==========================================
-  // --- USERS & PROFILES ---
+  // --- FITUR USERS & PROFILES ---
   // ==========================================
   @ApiTags('Users')
   @UseGuards(SupabaseGuard)
@@ -239,15 +240,24 @@ export class AppController {
   }
 
   // ==========================================
-  // --- NOTIFICATIONS ---
+  // --- FITUR NOTIFICATIONS ---
   // ==========================================
   
-  // 🔥 Rute baru sesuai request App Flutter
+  // 🔥 ENDPOINT GET NOTIF (DIPAKAI MOBILE & WEB)
   @ApiTags('Notifications')
   @UseGuards(SupabaseGuard)
   @Get('notifications')
   async getMyNotifications(@Req() req) {
     return await this.appService.getMyNotifications(req.user.id);
+  }
+
+  // 🔥 ENDPOINT RESPOND NOTIF (KHUSUS MOBILE FLUTTER)
+  @ApiTags('Notifications')
+  @ApiOperation({ summary: 'Merespon undangan notifikasi (Khusus Mobile)' })
+  @UseGuards(SupabaseGuard) // ⚠️ Jangan lupa dipasangin guard biar aman!
+  @Post('notifications/respond')
+  async respondNotif(@Body() body: { notifId: number; action: string }) {
+    return await this.appService.respondToNotification(body.notifId, body.action);
   }
 
   // Rute notifikasi lama (tetap dibiarkan biar web nggak error kalau masih pakai ini)
@@ -273,7 +283,7 @@ export class AppController {
   }
 
   // ==========================================
-  // --- REPORTS / KENDALA ---
+  // --- FITUR REPORTS / KENDALA ---
   // ==========================================
   @ApiTags('Reports')
   @UseGuards(SupabaseGuard)
@@ -297,7 +307,7 @@ export class AppController {
   }
 
   // ==========================================
-  // --- RECRUITMENT (JOB BOARD) ---
+  // --- FITUR RECRUITMENT (JOB BOARD) ---
   // ==========================================
   @ApiTags('Recruitment')
   @UseGuards(SupabaseGuard)
@@ -358,7 +368,7 @@ export class AppController {
   }
 
   // ==========================================
-  // --- PAYOUT / PENGGAJIAN AGEN ---
+  // --- FITUR PAYOUT / PENGGAJIAN AGEN ---
   // ==========================================
   @ApiTags('Payout')
   @UseGuards(SupabaseGuard)
@@ -381,7 +391,7 @@ export class AppController {
   }
 
   // ==========================================
-  // --- PAYMENTS (MIDTRANS) ---
+  // --- FITUR PAYMENTS (MIDTRANS) & WEBHOOK ---
   // ==========================================
   @ApiTags('Payments')
   @Post('payment/test-midtrans')

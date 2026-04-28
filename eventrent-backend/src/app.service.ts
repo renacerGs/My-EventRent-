@@ -1,6 +1,5 @@
 import { Injectable, OnModuleInit, InternalServerErrorException, UnauthorizedException, BadRequestException, NotFoundException } from '@nestjs/common';
 import { Pool } from 'pg';
-// bcrypt dihapus karena udah gak ngurusin hash password lagi
 import * as nodemailer from 'nodemailer';
 import * as dotenv from 'dotenv'; 
 import * as QRCode from 'qrcode';
@@ -18,9 +17,7 @@ export class AppService implements OnModuleInit {
   constructor() {
     this.pool = new Pool({
       connectionString: process.env.DATABASE_URL, 
-      ssl: {
-        rejectUnauthorized: false,
-      },
+      ssl: { rejectUnauthorized: false },
       max: 5, 
       idleTimeoutMillis: 30000, 
       connectionTimeoutMillis: 5000, 
@@ -33,6 +30,7 @@ export class AppService implements OnModuleInit {
         pass: process.env.EMAIL_PASS  
       }
     });
+
     this.snap = new midtransClient.Snap({
       isProduction: false,
       serverKey: process.env.MIDTRANS_SERVER_KEY,
@@ -59,7 +57,9 @@ export class AppService implements OnModuleInit {
     return `TKT-${code}`; 
   }
 
-  // --- EVENTS ---
+  // ==========================================
+  // FITUR EVENTS
+  // ==========================================
 
   async getEvents() {
     try {
@@ -101,9 +101,7 @@ export class AppService implements OnModuleInit {
       `;
       const eventRes = await this.pool.query(eventQuery, [eventId]);
       
-      if (eventRes.rows.length === 0) {
-        throw new BadRequestException('Event tidak ditemukan');
-      }
+      if (eventRes.rows.length === 0) throw new BadRequestException('Event tidak ditemukan');
 
       const eventData = eventRes.rows[0];
 
@@ -163,7 +161,6 @@ export class AppService implements OnModuleInit {
       const sessionRes = await this.pool.query(sessionQuery, [eventId]);
       const sessions = sessionRes.rows;
 
-      // Ambil juga custom questions tiap sesi biar lengkap
       for (let session of sessions) {
         const qQuery = `SELECT id, question_text, answer_type, is_required, options FROM session_questions WHERE session_id = $1`;
         const qRes = await this.pool.query(qQuery, [session.id]);
@@ -180,10 +177,8 @@ export class AppService implements OnModuleInit {
   async getMyEvents(userId: number) {
     try {
       const query = `
-        SELECT e.id, e.title, 
-               TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start,
-               TO_CHAR(e.event_end, 'Dy, DD Mon YYYY') as date_end,
-               e.name_place, e.city, e.place, 
+        SELECT e.id, e.title, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start,
+               TO_CHAR(e.event_end, 'Dy, DD Mon YYYY') as date_end, e.name_place, e.city, e.place, 
                e.image_url as img, c.name as category, e.is_private,
                COALESCE((SELECT MIN(price) FROM event_sessions WHERE event_id = e.id), 0) as price,
                COALESCE((SELECT SUM(stock) FROM event_sessions WHERE event_id = e.id), 0) as stock,
@@ -332,9 +327,7 @@ export class AppService implements OnModuleInit {
     try {
       const checkRes = await this.pool.query('SELECT is_private FROM events WHERE id = $1 AND created_by = $2', [eventId, userId]);
       
-      if (checkRes.rows.length === 0) {
-        throw new UnauthorizedException('Event tidak ditemukan atau bukan milikmu!');
-      }
+      if (checkRes.rows.length === 0) throw new UnauthorizedException('Event tidak ditemukan atau bukan milikmu!');
 
       const currentStatus = checkRes.rows[0].is_private;
       const newStatus = !currentStatus;
@@ -390,7 +383,9 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // --- TICKETS, ATTENDEES, & SCANNER ---
+  // ==========================================
+  // FITUR TICKETS, ATTENDEES, & SCANNER
+  // ==========================================
   
   async buyTicket(userId: number | null, eventId: number, cart: any[], formAnswers: any, guestEmail?: string, orderId?: string) {
     const client = await this.pool.connect();
@@ -399,7 +394,6 @@ export class AppService implements OnModuleInit {
 
       if (orderId) {
         const checkOrder = await client.query('SELECT payment_status FROM orders WHERE order_id = $1 FOR UPDATE', [orderId]);
-        
         if (checkOrder.rows.length > 0 && checkOrder.rows[0].payment_status === 'SUCCESS') {
           await client.query('ROLLBACK');
           console.log(`[BLOKIR] Pesanan ${orderId} udah dicetak tiketnya. Cegah double print!`);
@@ -424,7 +418,6 @@ export class AppService implements OnModuleInit {
       if (!isAttending) {
         const firstSessionRes = await client.query('SELECT id FROM event_sessions WHERE event_id = $1 LIMIT 1', [eventId]);
         const dummySessionId = firstSessionRes.rows[0]?.id || null;
-        
         const ticketCode = this.generateTicketCode(); 
 
         await client.query(
@@ -528,11 +521,7 @@ export class AppService implements OnModuleInit {
             <td width="65%" style="padding: 30px; vertical-align: middle;">
               <h4 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 2px;">Admit One</h4>
               <h2 style="color: #0f172a; margin: 0 0 15px 0; font-size: 26px; line-height: 1.2; font-weight: 900;">${eventTitle}</h2>
-              
-              <p style="color: #64748b; font-size: 13px; margin: 0 0 25px 0; line-height: 1.5;">
-                Tunjukkan QR Code di pintu masuk.<br/>Tiket ini bersifat rahasia dan hanya berlaku 1 kali scan.
-              </p>
-
+              <p style="color: #64748b; font-size: 13px; margin: 0 0 25px 0; line-height: 1.5;">Tunjukkan QR Code di pintu masuk.<br/>Tiket ini bersifat rahasia dan hanya berlaku 1 kali scan.</p>
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td>
@@ -542,17 +531,12 @@ export class AppService implements OnModuleInit {
                 </tr>
               </table>
             </td>
-            
             <td width="35%" style="background-color: #FF6B35; padding: 25px 20px; text-align: center; vertical-align: middle; border-left: 2px dashed rgba(255,255,255,0.4);">
               <h3 style="color: #ffffff; margin: 0 0 15px 0; font-size: 14px; letter-spacing: 2px; text-transform: uppercase;">Entry Pass</h3>
-              
               <div style="background-color: #ffffff; padding: 10px; border-radius: 8px; display: inline-block; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
                 <img src="cid:${uniqueCid}" alt="QR Code" style="width: 110px; height: 110px; display: block;" />
               </div>
-              
-              <p style="color: #ffffff; margin: 0; font-family: 'Courier New', Courier, monospace; font-size: 16px; letter-spacing: 1.5px; font-weight: bold; background-color: rgba(0,0,0,0.2); padding: 5px 10px; border-radius: 4px; display: inline-block;">
-                ${code}
-              </p>
+              <p style="color: #ffffff; margin: 0; font-family: 'Courier New', Courier, monospace; font-size: 16px; letter-spacing: 1.5px; font-weight: bold; background-color: rgba(0,0,0,0.2); padding: 5px 10px; border-radius: 4px; display: inline-block;">${code}</p>
             </td>
           </tr>
         </table>
@@ -572,23 +556,15 @@ export class AppService implements OnModuleInit {
       attachments: emailAttachments, 
       html: `
         <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; background-color: #f8fafc;">
-          
           <div style="text-align: center; padding: 20px 0;">
              <h1 style="color: #0f172a; margin: 0; font-size: 24px; font-weight: 900; letter-spacing: 1px;">YOUR EVENT TICKETS</h1>
              <p style="color: #64748b; font-size: 14px; margin-top: 5px;">Terima kasih telah melakukan pemesanan!</p>
           </div>
-          
           ${qrCodesHtml}
-          
           <div style="text-align: center; margin-top: 30px; padding: 20px; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
             <p style="margin: 0; font-size: 15px; color: #334155;">Total Pembayaran Keseluruhan:</p>
             <h2 style="margin: 5px 0 0 0; color: #FF6B35; font-size: 24px;">Rp ${totalPrice.toLocaleString('id-ID')}</h2>
           </div>
-          
-          <p style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 30px; line-height: 1.6;">
-            Email ini dikirim secara otomatis oleh sistem.<br/>
-            <strong>Powered by EventRent</strong>
-          </p>
         </div>
       `
     };
@@ -670,16 +646,13 @@ export class AppService implements OnModuleInit {
         isAgent = agentCheck.rows.length > 0;
       }
 
-      if (!isOwner && !isAgent) {
-        throw new UnauthorizedException('Akses ditolak! Bukan panitia atau pemilik event.');
-      }
+      if (!isOwner && !isAgent) throw new UnauthorizedException('Akses ditolak! Bukan panitia atau pemilik event.');
 
       const query = `
         SELECT t.ticket_code as ticket_id, t.purchase_date, t.price,
                t.attendee_name, t.attendee_email, t.custom_answers, t.is_scanned, t.pax, t.greeting, t.is_attending,
                u.name as buyer_name, COALESCE(u.email, t.guest_email) as buyer_email, u.picture as buyer_pic,
-               s.name as session_name,
-               scanner.name as scanned_by_name
+               s.name as session_name, scanner.name as scanned_by_name
         FROM tickets t
         LEFT JOIN users u ON t.user_id = u.id
         JOIN event_sessions s ON t.session_id = s.id
@@ -708,9 +681,7 @@ export class AppService implements OnModuleInit {
         isAgent = agentCheck.rows.length > 0;
       }
 
-      if (!isOwner && !isAgent) {
-        throw new UnauthorizedException('Akses ditolak! Kamu bukan pembuat event atau panitia di event ini.');
-      }
+      if (!isOwner && !isAgent) throw new UnauthorizedException('Akses ditolak! Kamu bukan panitia di event ini.');
 
       const ticketRes = await this.pool.query(`
         SELECT t.id, t.is_scanned, t.scanned_at, t.price, t.pax, t.greeting, t.is_attending,
@@ -726,9 +697,7 @@ export class AppService implements OnModuleInit {
 
       const ticket = ticketRes.rows[0];
 
-      if (!ticket.is_attending) {
-        return { valid: false, message: 'TAMU INI TELAH MENGKONFIRMASI TIDAK HADIR.' };
-      }
+      if (!ticket.is_attending) return { valid: false, message: 'TAMU INI TELAH MENGKONFIRMASI TIDAK HADIR.' };
 
       if (ticket.is_scanned) {
         const scanWaktu = new Date(ticket.scanned_at).toLocaleString('id-ID');
@@ -747,7 +716,9 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // --- AGENTS (PANITIA/EO) ---
+  // ==========================================
+  // FITUR AGENTS (PANITIA/EO)
+  // ==========================================
 
   async addAgent(eventId: number, eoId: number, agentEmail: string, role: string = 'Agen') {
     try {
@@ -755,13 +726,13 @@ export class AppService implements OnModuleInit {
       if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
 
       const userRes = await this.pool.query('SELECT id FROM users WHERE email = $1', [agentEmail]);
-      if (userRes.rows.length === 0) throw new BadRequestException('Email tidak ditemukan. Pastikan agen sudah daftar akun EventRent.');
+      if (userRes.rows.length === 0) throw new BadRequestException('Email tidak ditemukan.');
       const agentId = userRes.rows[0].id;
 
-      if (agentId == eoId) throw new BadRequestException('Anda adalah pembuat event, tidak perlu ditambahkan sebagai agen.');
+      if (agentId == eoId) throw new BadRequestException('Anda adalah pembuat event.');
 
       const checkAgent = await this.pool.query('SELECT id FROM event_agents WHERE event_id = $1 AND user_id = $2', [eventId, agentId]);
-      if (checkAgent.rows.length > 0) throw new BadRequestException('Agen ini sudah terdaftar di event ini!');
+      if (checkAgent.rows.length > 0) throw new BadRequestException('Agen sudah terdaftar!');
 
       const insertRes = await this.pool.query(
         'INSERT INTO event_agents (event_id, user_id, role, is_accepted) VALUES ($1, $2, $3, FALSE) RETURNING *',
@@ -772,13 +743,12 @@ export class AppService implements OnModuleInit {
       await this.pool.query(
         `INSERT INTO notifications (user_id, title, message, type, related_event_id)
          VALUES ($1, $2, $3, 'INVITATION_AGENT', $4)`,
-        [agentId, 'Undangan Kepanitiaan Baru 🎫', `Anda diundang menjadi ${role} untuk event: ${eventTitle}.`, eventId]
+        [agentId, 'Undangan Kepanitiaan 🎫', `Anda diundang menjadi ${role} untuk event: ${eventTitle}.`, eventId]
       );
 
-      return { message: 'Undangan kepanitiaan berhasil dikirim ke agen!', data: insertRes.rows[0] };
+      return { message: 'Undangan berhasil dikirim!', data: insertRes.rows[0] };
     } catch (err) {
       if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
-      console.error(err);
       throw new InternalServerErrorException('Gagal menambahkan agen');
     }
   }
@@ -812,15 +782,15 @@ export class AppService implements OnModuleInit {
       const eventTitle = eventCheck.rows[0].title;
 
       const delRes = await this.pool.query('DELETE FROM event_agents WHERE event_id = $1 AND user_id = $2 RETURNING id', [eventId, agentId]);
-      if (delRes.rowCount === 0) throw new BadRequestException('Agen tidak ditemukan di event ini');
+      if (delRes.rowCount === 0) throw new BadRequestException('Agen tidak ditemukan');
 
       await this.pool.query(
         `INSERT INTO notifications (user_id, title, message, type, related_event_id)
          VALUES ($1, $2, $3, 'INFO', $4)`,
-        [agentId, 'Pemberhentian Tugas 🛑', `Anda telah diberhentikan dari kepanitiaan untuk event: ${eventTitle}.`, eventId]
+        [agentId, 'Pemberhentian Tugas 🛑', `Anda telah diberhentikan dari kepanitiaan event: ${eventTitle}.`, eventId]
       );
 
-      return { message: 'Agen berhasil diberhentikan dan notifikasi telah dikirim.' };
+      return { message: 'Agen berhasil diberhentikan.' };
     } catch (err) {
       if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
       throw new InternalServerErrorException('Gagal menghapus agen');
@@ -833,9 +803,7 @@ export class AppService implements OnModuleInit {
       if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
 
       const updateRes = await this.pool.query(
-        `UPDATE event_agents SET 
-         role = COALESCE($1, role), 
-         rating_given = COALESCE($2, rating_given) 
+        `UPDATE event_agents SET role = COALESCE($1, role), rating_given = COALESCE($2, rating_given) 
          WHERE event_id = $3 AND user_id = $4 RETURNING *`,
         [data.role, data.rating_given, eventId, agentId]
       );
@@ -844,7 +812,7 @@ export class AppService implements OnModuleInit {
       return { message: 'Data agen diperbarui', data: updateRes.rows[0] };
     } catch (err) {
       if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
-      throw new InternalServerErrorException('Gagal mengupdate data agen');
+      throw new InternalServerErrorException('Gagal mengupdate agen');
     }
   }
 
@@ -862,21 +830,16 @@ export class AppService implements OnModuleInit {
       const { rows } = await this.pool.query(query, [agentId]);
       return rows;
     } catch (err) {
-      throw new InternalServerErrorException('Gagal mengambil daftar tugas agen');
+      throw new InternalServerErrorException('Gagal mengambil daftar tugas');
     }
   }
 
   // --- PROFILE DATA (Update doang) ---
-
   async updateProfile(userId: number, data: any) {
     const res = await this.pool.query(
       `UPDATE users 
-       SET name = $1, 
-           picture = COALESCE($2, picture),
-           bank_name = COALESCE($3, bank_name),
-           bank_account = COALESCE($4, bank_account),
-           bank_account_name = COALESCE($5, bank_account_name),
-           phone = COALESCE($6, phone)
+       SET name = $1, picture = COALESCE($2, picture), bank_name = COALESCE($3, bank_name),
+           bank_account = COALESCE($4, bank_account), bank_account_name = COALESCE($5, bank_account_name), phone = COALESCE($6, phone)
        WHERE id = $7 
        RETURNING id, name, email, picture, bank_name, bank_account, bank_account_name, phone`,
       [data.name, data.img || null, data.bank_name, data.bank_account, data.bank_account_name, data.phone, userId]
@@ -885,19 +848,12 @@ export class AppService implements OnModuleInit {
   }
 
   // --- RIWAYAT SCAN AGEN ---
-  
   async getAgentScanHistory(userId: number) {
     try {
       const query = `
-        SELECT 
-          t.ticket_code as ticket_id, 
-          t.attendee_name, 
-          e.title as event_title, 
-          s.name as session_name, 
-          TO_CHAR(t.scanned_at, 'HH24:MI') as scan_time, 
-          TO_CHAR(t.scanned_at, 'DD Mon YYYY') as scan_date,
-          t.scanned_at as raw_date,
-          'success' as status
+        SELECT t.ticket_code as ticket_id, t.attendee_name, e.title as event_title, s.name as session_name, 
+               TO_CHAR(t.scanned_at, 'HH24:MI') as scan_time, TO_CHAR(t.scanned_at, 'DD Mon YYYY') as scan_date,
+               t.scanned_at as raw_date, 'success' as status
         FROM tickets t
         JOIN events e ON t.event_id = e.id
         JOIN event_sessions s ON t.session_id = s.id
@@ -907,13 +863,15 @@ export class AppService implements OnModuleInit {
       const { rows } = await this.pool.query(query, [userId]);
       return rows;
     } catch (err) {
-      console.error(err);
-      throw new InternalServerErrorException('Gagal mengambil riwayat scan agen');
+      throw new InternalServerErrorException('Gagal mengambil riwayat scan');
     }
   }
 
-  // --- NOTIFICATIONS SYSTEM ---
+  // ==========================================
+  // FITUR NOTIFICATIONS SYSTEM
+  // ==========================================
 
+  // (Fungsi Bawaan Web)
   async getNotifications(userId: number) {
     try {
       const { rows } = await this.pool.query('SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
@@ -923,6 +881,39 @@ export class AppService implements OnModuleInit {
     }
   }
 
+  // (Fungsi Baru yang Udah Diperbarui buat Mobile)
+  async getMyNotifications(userId: number) {
+    try {
+      const res = await this.pool.query(
+        `SELECT id, title, message, type, is_read, related_event_id, created_at 
+         FROM notifications 
+         WHERE user_id = $1 
+         ORDER BY created_at DESC`,
+        [userId]
+      );
+      return res.rows;
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      return []; 
+    }
+  }
+
+  // (Fungsi Respon Singkat Khusus Mobile)
+  async respondToNotification(notifId: number, action: string) {
+    try {
+      await this.pool.query(`UPDATE notifications SET is_read = true WHERE id = $1`, [notifId]);
+      if (action === 'accept') {
+        return { message: 'Undangan berhasil diterima!' };
+      } else {
+        return { message: 'Undangan berhasil ditolak.' };
+      }
+    } catch (error) {
+      console.error('Error respond notification:', error);
+      throw new InternalServerErrorException('Gagal merespon notifikasi');
+    }
+  }
+
+  // (Fungsi Respon Lengkap Asli Web)
   async respondAgentInvitation(notifId: number, userId: number, action: 'accept' | 'reject') {
     try {
       const notifRes = await this.pool.query('SELECT related_event_id FROM notifications WHERE id = $1 AND user_id = $2', [notifId, userId]);
@@ -939,25 +930,22 @@ export class AppService implements OnModuleInit {
 
       if (action === 'accept') {
         await this.pool.query('UPDATE event_agents SET is_accepted = TRUE WHERE event_id = $1 AND user_id = $2', [eventId, userId]);
-        
         await this.pool.query(
           `INSERT INTO notifications (user_id, title, message, type, related_event_id)
            VALUES ($1, $2, $3, 'INFO', $4)`,
-          [eoId, 'Undangan Agen Diterima! 🎉', `Agen ${agentName} telah menerima undangan untuk menjadi panitia di event: ${eventTitle}.`, eventId]
+          [eoId, 'Undangan Agen Diterima! 🎉', `Agen ${agentName} menerima undangan di event: ${eventTitle}.`, eventId]
         );
       } else {
         await this.pool.query('DELETE FROM event_agents WHERE event_id = $1 AND user_id = $2', [eventId, userId]);
-
         await this.pool.query(
           `INSERT INTO notifications (user_id, title, message, type, related_event_id)
            VALUES ($1, $2, $3, 'INFO', $4)`,
-          [eoId, 'Undangan Agen Ditolak ❌', `Agen ${agentName} menolak tawaran untuk menjadi panitia di event: ${eventTitle}.`, eventId]
+          [eoId, 'Undangan Agen Ditolak ❌', `Agen ${agentName} menolak tawaran di event: ${eventTitle}.`, eventId]
         );
       }
 
       await this.pool.query('UPDATE notifications SET is_read = TRUE, type = $1 WHERE id = $2', [action === 'accept' ? 'INVITATION_ACCEPTED' : 'INVITATION_REJECTED', notifId]);
-
-      return { message: action === 'accept' ? 'Undangan berhasil diterima! Selamat bertugas.' : 'Undangan berhasil ditolak.' };
+      return { message: action === 'accept' ? 'Undangan berhasil diterima!' : 'Undangan berhasil ditolak.' };
     } catch (err) {
       if (err instanceof BadRequestException) throw err;
       throw new InternalServerErrorException('Gagal memproses undangan');
@@ -969,14 +957,13 @@ export class AppService implements OnModuleInit {
     return { success: true };
   }
 
-  // --- EVENT REPORTS SYSTEM ---
+  // ==========================================
+  // FITUR EVENT REPORTS SYSTEM
+  // ==========================================
 
   async createEventReport(eventId: number, agentId: number, message: string) {
     try {
-      await this.pool.query(
-        'INSERT INTO event_reports (event_id, agent_id, message) VALUES ($1, $2, $3)',
-        [eventId, agentId, message]
-      );
+      await this.pool.query('INSERT INTO event_reports (event_id, agent_id, message) VALUES ($1, $2, $3)', [eventId, agentId, message]);
 
       const eventRes = await this.pool.query('SELECT created_by, title FROM events WHERE id = $1', [eventId]);
       const eoId = eventRes.rows[0].created_by;
@@ -988,7 +975,7 @@ export class AppService implements OnModuleInit {
       await this.pool.query(
         `INSERT INTO notifications (user_id, title, message, type, related_event_id)
          VALUES ($1, $2, $3, 'REPORT_ISSUE', $4)`,
-        [eoId, `⚠️ Ada Kendala di: ${eventTitle}`, `Agen ${agentName} melaporkan masalah. Segera cek Dashboard Event!`, eventId]
+        [eoId, `⚠️ Ada Kendala di: ${eventTitle}`, `Agen ${agentName} melaporkan masalah!`, eventId]
       );
 
       return { success: true, message: 'Laporan berhasil dikirim' };
@@ -1023,7 +1010,6 @@ export class AppService implements OnModuleInit {
         JOIN events e ON r.event_id = e.id
         WHERE r.id = $1 AND e.created_by = $2
       `, [reportId, eoId]);
-      
       if (check.rows.length === 0) throw new UnauthorizedException('Akses ditolak');
 
       await this.pool.query("UPDATE event_reports SET status = 'RESOLVED' WHERE id = $1", [reportId]);
@@ -1044,31 +1030,22 @@ export class AppService implements OnModuleInit {
         VALUES ($1, $2, $3, $4, $5, $6, TRUE)
         RETURNING *
       `;
-      const values = [data.eventId, data.eoId, data.role, data.quota, data.fee, data.description];
-      const res = await this.pool.query(query, values);
+      const res = await this.pool.query(query, [data.eventId, data.eoId, data.role, data.quota, data.fee, data.description]);
       return res.rows[0];
     } catch (err) {
       throw new InternalServerErrorException('Gagal membuat lowongan kerja');
     }
   }
 
-  // 🔥 INI DIA FUNGSI EDIT YANG UDAH GUE FIX 🔥
   async updateJobPosting(jobId: number, eoId: number, data: any) {
     try {
       const res = await this.pool.query(
-        `UPDATE job_postings 
-         SET role = $1, quota = $2, fee = $3, description = $4
-         WHERE id = $5 AND eo_id = $6 
-         RETURNING *`,
+        `UPDATE job_postings SET role = $1, quota = $2, fee = $3, description = $4 WHERE id = $5 AND eo_id = $6 RETURNING *`,
         [data.role, data.quota, data.fee, data.description, jobId, eoId]
       );
-      
-      if (res.rowCount === 0) {
-        throw new Error('Lowongan tidak ditemukan atau Anda tidak berhak mengeditnya');
-      }
+      if (res.rowCount === 0) throw new Error('Lowongan tidak ditemukan');
       return res.rows[0];
     } catch (error) {
-      console.error('Error updating job:', error);
       throw new Error('Gagal mengubah lowongan');
     }
   }
@@ -1076,41 +1053,26 @@ export class AppService implements OnModuleInit {
   async getAllActiveJobs(page: number = 1, limit: number = 10) {
     try {
       const offset = (page - 1) * limit; 
-      
       const query = `
-        SELECT 
-          j.*, 
-          e.title as event_title, 
-          TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date,
-          e.image_url as event_img,
-          e.city as event_location,
-          u.name as eo_name,
-          u.picture as eo_pic
+        SELECT j.*, e.title as event_title, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date,
+               e.image_url as event_img, e.city as event_location, u.name as eo_name, u.picture as eo_pic
         FROM job_postings j
         JOIN events e ON j.event_id = e.id
         JOIN users u ON j.eo_id = u.id
-        WHERE j.is_active = TRUE 
-        AND e.event_end >= CURRENT_DATE 
+        WHERE j.is_active = TRUE AND e.event_end >= CURRENT_DATE 
         ORDER BY j.created_at DESC
         LIMIT $1 OFFSET $2
       `;
       const { rows } = await this.pool.query(query, [limit, offset]);
-      
       return rows; 
     } catch (err) {
-      console.error('Error getAllActiveJobs:', err);
       throw new InternalServerErrorException('Gagal mengambil daftar lowongan');
     }
   }
 
   async getJobsByEvent(eventId: number, eoId: number) {
     try {
-      const query = `
-        SELECT * FROM job_postings 
-        WHERE event_id = $1 AND eo_id = $2
-        ORDER BY created_at DESC
-      `;
-      const { rows } = await this.pool.query(query, [eventId, eoId]);
+      const { rows } = await this.pool.query('SELECT * FROM job_postings WHERE event_id = $1 AND eo_id = $2 ORDER BY created_at DESC', [eventId, eoId]);
       return rows;
     } catch (err) {
       throw new InternalServerErrorException('Gagal mengambil lowongan EO');
@@ -1121,12 +1083,7 @@ export class AppService implements OnModuleInit {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN'); 
-
-      const query = `
-        INSERT INTO job_applications (job_id, user_id, status)
-        VALUES ($1, $2, 'PENDING')
-        RETURNING *
-      `;
+      const query = `INSERT INTO job_applications (job_id, user_id, status) VALUES ($1, $2, 'PENDING') RETURNING *`;
       const { rows } = await client.query(query, [jobId, userId]);
       const application = rows[0];
 
@@ -1141,16 +1098,10 @@ export class AppService implements OnModuleInit {
       
       if (infoRes.rows.length > 0) {
         const info = infoRes.rows[0];
-        
         await client.query(
           `INSERT INTO notifications (user_id, title, message, type, related_event_id)
            VALUES ($1, $2, $3, 'NEW_APPLICANT', $4)`,
-          [
-            info.eo_id, 
-            'Pelamar Baru! 🚀', 
-            `${info.applicant_name} melamar untuk posisi ${info.role} di event ${info.event_title}. Cek tab Recruitment sekarang!`, 
-            info.event_id
-          ]
+          [info.eo_id, 'Pelamar Baru! 🚀', `${info.applicant_name} melamar posisi ${info.role} di event ${info.event_title}.`, info.event_id]
         );
       }
 
@@ -1158,10 +1109,7 @@ export class AppService implements OnModuleInit {
       return application;
     } catch (err: any) {
       await client.query('ROLLBACK');
-      if (err.code === '23505') { 
-        throw new BadRequestException('Lu udah pernah ngelamar di posisi ini bro!');
-      }
-      console.error(err);
+      if (err.code === '23505') throw new BadRequestException('Lu udah pernah ngelamar di posisi ini bro!');
       throw new InternalServerErrorException('Gagal mengirim lamaran');
     } finally {
       client.release();
@@ -1171,9 +1119,7 @@ export class AppService implements OnModuleInit {
   async getApplicantsByEvent(eventId: number, eoId: number) {
     try {
       const query = `
-        SELECT a.id, a.status, a.user_id, 
-               u.name as user_name, u.picture as user_pic,
-               j.role as role_applied
+        SELECT a.id, a.status, a.user_id, u.name as user_name, u.picture as user_pic, j.role as role_applied
         FROM job_applications a
         JOIN users u ON a.user_id = u.id
         JOIN job_postings j ON a.job_id = j.id
@@ -1191,58 +1137,38 @@ export class AppService implements OnModuleInit {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-
-      const updateQuery = `
-        UPDATE job_applications 
-        SET status = $1 
-        WHERE id = $2 
-        RETURNING user_id, job_id
-      `;
+      const updateQuery = `UPDATE job_applications SET status = $1 WHERE id = $2 RETURNING user_id, job_id`;
       const appRes = await client.query(updateQuery, [action, applicationId]);
       
       if (appRes.rows.length === 0) throw new BadRequestException('Lamaran tidak ditemukan');
-      
-      const applicantId = appRes.rows[0].user_id;
-      const jobId = appRes.rows[0].job_id;
+      const { user_id: applicantId, job_id: jobId } = appRes.rows[0];
 
       const jobRes = await client.query(`
         SELECT j.role, j.event_id, e.title as event_name 
-        FROM job_postings j
-        JOIN events e ON j.event_id = e.id
-        WHERE j.id = $1 AND j.eo_id = $2
+        FROM job_postings j JOIN events e ON j.event_id = e.id WHERE j.id = $1 AND j.eo_id = $2
       `, [jobId, eoId]);
 
       if (jobRes.rows.length === 0) throw new UnauthorizedException('Bukan lowongan milik lu bro');
-      
       const jobInfo = jobRes.rows[0];
 
       if (action === 'ACCEPTED') {
         const checkAgent = await client.query('SELECT id FROM event_agents WHERE event_id = $1 AND user_id = $2', [jobInfo.event_id, applicantId]);
-        
         if (checkAgent.rows.length === 0) {
-          await client.query(
-            `INSERT INTO event_agents (event_id, user_id, role, is_accepted) VALUES ($1, $2, $3, TRUE)`,
-            [jobInfo.event_id, applicantId, jobInfo.role]
-          );
+          await client.query(`INSERT INTO event_agents (event_id, user_id, role, is_accepted) VALUES ($1, $2, $3, TRUE)`, [jobInfo.event_id, applicantId, jobInfo.role]);
         }
-
         await client.query(
-          `INSERT INTO notifications (user_id, title, message, type, related_event_id)
-           VALUES ($1, $2, $3, 'JOB_ACCEPTED', $4)`,
-          [applicantId, 'Lamaran Diterima! 🎉', `Selamat! Lo diterima sebagai ${jobInfo.role} di event ${jobInfo.event_name}. Cek Daftar Tugas lu sekarang!`, jobInfo.event_id]
+          `INSERT INTO notifications (user_id, title, message, type, related_event_id) VALUES ($1, $2, $3, 'JOB_ACCEPTED', $4)`,
+          [applicantId, 'Lamaran Diterima! 🎉', `Selamat! Lo diterima sebagai ${jobInfo.role} di event ${jobInfo.event_name}.`, jobInfo.event_id]
         );
-      } 
-      else if (action === 'REJECTED') {
+      } else if (action === 'REJECTED') {
         await client.query(
-          `INSERT INTO notifications (user_id, title, message, type, related_event_id)
-           VALUES ($1, $2, $3, 'JOB_REJECTED', $4)`,
-          [applicantId, 'Lamaran Ditolak 😔', `Maaf bro, lamaran lu untuk posisi ${jobInfo.role} di event ${jobInfo.event_name} belum bisa diterima. Tetap semangat!`, jobInfo.event_id]
+          `INSERT INTO notifications (user_id, title, message, type, related_event_id) VALUES ($1, $2, $3, 'JOB_REJECTED', $4)`,
+          [applicantId, 'Lamaran Ditolak 😔', `Maaf bro, lamaran lu untuk posisi ${jobInfo.role} di event ${jobInfo.event_name} belum diterima.`, jobInfo.event_id]
         );
       }
 
       await client.query('COMMIT');
       return { message: `Pelamar berhasil ${action}` };
-
     } catch (err) {
       await client.query('ROLLBACK');
       if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
@@ -1259,20 +1185,12 @@ export class AppService implements OnModuleInit {
   async getEventPayouts(eventId: number, eoId: number) {
     try {
       const check = await this.pool.query('SELECT id FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
-      if (check.rows.length === 0) throw new UnauthorizedException('Akses ditolak. Lu bukan EO event ini.');
+      if (check.rows.length === 0) throw new UnauthorizedException('Akses ditolak.');
 
       const query = `
-        SELECT 
-          ea.user_id as agent_id, 
-          ea.role, 
-          u.name as agent_name, 
-          u.picture as agent_pic, 
-          u.bank_name, 
-          u.bank_account, 
-          u.bank_account_name,
-          COALESCE(p.amount, 0) as amount_paid,
-          COALESCE(p.status, 'PENDING') as status,
-          p.paid_at
+        SELECT ea.user_id as agent_id, ea.role, u.name as agent_name, u.picture as agent_pic, 
+               u.bank_name, u.bank_account, u.bank_account_name,
+               COALESCE(p.amount, 0) as amount_paid, COALESCE(p.status, 'PENDING') as status, p.paid_at
         FROM event_agents ea
         JOIN users u ON ea.user_id = u.id
         LEFT JOIN agent_payouts p ON p.event_id = ea.event_id AND p.agent_id = ea.user_id
@@ -1290,27 +1208,16 @@ export class AppService implements OnModuleInit {
     try {
       const check = await this.pool.query('SELECT id, title FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
       if (check.rows.length === 0) throw new UnauthorizedException('Akses ditolak.');
-      const eventTitle = check.rows[0].title;
+      
+      const checkPaid = await this.pool.query(`SELECT id FROM agent_payouts WHERE event_id = $1 AND agent_id = $2 AND status = 'PAID'`, [eventId, agentId]);
+      if (checkPaid.rows.length > 0) throw new BadRequestException('Bro, agen ini sudah lu bayar lunas sebelumnya!');
 
-      const checkPaid = await this.pool.query(
-        `SELECT id FROM agent_payouts WHERE event_id = $1 AND agent_id = $2 AND status = 'PAID'`,
-        [eventId, agentId]
-      );
-      if (checkPaid.rows.length > 0) {
-        throw new BadRequestException('Bro, agen ini sudah lu bayar lunas sebelumnya!');
-      }
-
-      const query = `
-        INSERT INTO agent_payouts (event_id, agent_id, amount, status, paid_at, proof_url)
-        VALUES ($1, $2, $3, 'PAID', NOW(), $4)
-        RETURNING *;
-      `;
+      const query = `INSERT INTO agent_payouts (event_id, agent_id, amount, status, paid_at, proof_url) VALUES ($1, $2, $3, 'PAID', NOW(), $4) RETURNING *;`;
       const res = await this.pool.query(query, [eventId, agentId, amount, proofUrl]);
 
       await this.pool.query(
-        `INSERT INTO notifications (user_id, title, message, type, related_event_id)
-         VALUES ($1, $2, $3, 'PAYOUT_SUCCESS', $4)`,
-        [agentId, 'Gajian Cair! 💸', `EO telah mengirimkan honor Rp ${amount.toLocaleString('id-ID')} untuk event ${eventTitle}. Cek riwayat untuk melihat bukti transfer.`, eventId]
+        `INSERT INTO notifications (user_id, title, message, type, related_event_id) VALUES ($1, $2, $3, 'PAYOUT_SUCCESS', $4)`,
+        [agentId, 'Gajian Cair! 💸', `EO mengirim honor Rp ${amount.toLocaleString('id-ID')} untuk event ${check.rows[0].title}.`, eventId]
       );
 
       return { message: 'Berhasil ditandai lunas dan bukti tersimpan!', data: res.rows[0] };
@@ -1322,20 +1229,13 @@ export class AppService implements OnModuleInit {
 
   async deleteJobPosting(jobId: number, eoId: number) {
     try {
-      const checkQuery = 'SELECT id FROM job_postings WHERE id = $1 AND eo_id = $2';
-      const checkRes = await this.pool.query(checkQuery, [jobId, eoId]);
+      const checkRes = await this.pool.query('SELECT id FROM job_postings WHERE id = $1 AND eo_id = $2', [jobId, eoId]);
+      if (checkRes.rows.length === 0) throw new UnauthorizedException('Lowongan tidak ditemukan.');
 
-      if (checkRes.rows.length === 0) {
-        throw new UnauthorizedException('Lowongan tidak ditemukan atau lo bukan pemiliknya bro.');
-      }
-
-      const deleteQuery = 'DELETE FROM job_postings WHERE id = $1 AND eo_id = $2 RETURNING id';
-      await this.pool.query(deleteQuery, [jobId, eoId]);
-
-      return { success: true, message: 'Lowongan berhasil dibatalkan/dihapus!' };
+      await this.pool.query('DELETE FROM job_postings WHERE id = $1 AND eo_id = $2 RETURNING id', [jobId, eoId]);
+      return { success: true, message: 'Lowongan berhasil dihapus!' };
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
-      console.error('Error deleteJobPosting:', err);
       throw new InternalServerErrorException('Gagal menghapus lowongan kerja.');
     }
   }
@@ -1352,134 +1252,78 @@ export class AppService implements OnModuleInit {
       const result = await this.pool.query(query, [agentId]);
       return result.rows; 
     } catch (err) {
-      console.error(err);
-      throw new InternalServerErrorException('Gagal mengambil data pendapatan agen');
+      throw new InternalServerErrorException('Gagal mengambil pendapatan agen');
     }
   }
+
+  // ==========================================
+  // FITUR PEMBAYARAN MIDTRANS & ORDERS
+  // ==========================================
 
   async createMidtransTransaction(orderId: string, grossAmount: number, customer: { name: string, email: string }, enabledPayments?: string[]) {
     try {
       const parameter: any = {
-        transaction_details: {
-          order_id: orderId, 
-          gross_amount: grossAmount 
-        },
-        customer_details: {
-          first_name: customer.name,
-          email: customer.email
-        }
+        transaction_details: { order_id: orderId, gross_amount: grossAmount },
+        customer_details: { first_name: customer.name, email: customer.email }
       };
-
-      if (enabledPayments && enabledPayments.length > 0) {
-        parameter.enabled_payments = enabledPayments;
-      }
+      if (enabledPayments && enabledPayments.length > 0) parameter.enabled_payments = enabledPayments;
 
       const transaction = await this.snap.createTransaction(parameter);
-      
-      return {
-        token: transaction.token,
-        redirect_url: transaction.redirect_url
-      };
+      return { token: transaction.token, redirect_url: transaction.redirect_url };
     } catch (err) {
-      console.error('Midtrans Error:', err);
       throw new InternalServerErrorException('Gagal membuat tagihan pembayaran Midtrans');
     }
   }
 
   async handleMidtransWebhook(payload: any) {
     const { order_id, status_code, gross_amount, signature_key, transaction_status } = payload;
-
     const serverKey = process.env.MIDTRANS_SERVER_KEY;
     const stringToHash = order_id + status_code + gross_amount + serverKey;
     const hashed = crypto.createHash('sha512').update(stringToHash).digest('hex');
 
-    if (hashed !== signature_key) {
-      console.error('🚨 [WEBHOOK] Signature tidak valid! Ada indikasi manipulasi.');
-      throw new BadRequestException('Invalid Signature');
-    }
-
-    console.log(`💬 [WEBHOOK] Status Transaksi ${order_id}: ${transaction_status}`);
+    if (hashed !== signature_key) throw new BadRequestException('Invalid Signature');
 
     if (transaction_status === 'settlement' || transaction_status === 'capture') {
-      console.log(`✅ [WEBHOOK SUCCESS] PESANAN ${order_id} TELAH DIBAYAR LUNAS SEBESAR Rp ${gross_amount}!`);
       await this.pool.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [order_id]);
-    } 
-    else if (transaction_status === 'pending') {
-      console.log(`⏳ [WEBHOOK PENDING] Menunggu user mentransfer pembayaran untuk ${order_id}...`);
-    } 
-    else if (transaction_status === 'expire' || transaction_status === 'cancel' || transaction_status === 'deny') {
-      console.log(`❌ [WEBHOOK FAILED] Transaksi ${order_id} gagal/kadaluarsa.`);
+    } else if (transaction_status === 'expire' || transaction_status === 'cancel' || transaction_status === 'deny') {
       await this.pool.query(`UPDATE orders SET payment_status = 'FAILED' WHERE order_id = $1`, [order_id]);
     }
-
     return { status: 'OK' };
   }
-
-  // ==========================================
-  // FITUR ORDERS (PESANAN SAYA)
-  // ==========================================
 
   async createCheckoutOrder(userId: number, data: any) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-
       const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
       let totalPrice = 0;
       
       if (data.cart && data.cart.length > 0) {
         for (const item of data.cart) {
           const sessionRes = await client.query('SELECT price FROM event_sessions WHERE id = $1', [item.sessionId]);
-          const sessionPrice = sessionRes.rows.length > 0 ? Number(sessionRes.rows[0].price) : 0;
-          totalPrice += sessionPrice * Number(item.qty || item.quantity || 1);
+          totalPrice += (sessionRes.rows.length > 0 ? Number(sessionRes.rows[0].price) : 0) * Number(item.qty || item.quantity || 1);
         }
       }
 
-      let snapToken = null;
-      let redirectUrl = null;
+      let snapToken = null; let redirectUrl = null;
 
       if (totalPrice > 0) {
         const userRes = await client.query('SELECT name, email FROM users WHERE id = $1', [userId]);
         const user = userRes.rows[0] || { name: 'Guest', email: 'guest@eventrent.com' };
-
-        const midtrans = await this.createMidtransTransaction(
-          orderId, 
-          totalPrice, 
-          { name: user.name, email: user.email },
-          data.enabledPayments
-        );
-        snapToken = midtrans.token;
-        redirectUrl = midtrans.redirect_url;
+        const midtrans = await this.createMidtransTransaction(orderId, totalPrice, { name: user.name, email: user.email }, data.enabledPayments);
+        snapToken = midtrans.token; redirectUrl = midtrans.redirect_url;
       }
 
-      const query = `
-        INSERT INTO orders (order_id, user_id, event_id, total_price, snap_token, payment_status, ticket_details)
-        VALUES ($1, $2, $3, $4, $5, 'PENDING', $6)
-        RETURNING *
-      `;
-      const values = [
-        orderId, 
-        userId, 
-        data.eventId, 
-        totalPrice, 
-        snapToken, 
-        JSON.stringify({ cart: data.cart, formAnswers: data.formAnswers })
-      ];
-      
-      const res = await client.query(query, values);
+      const res = await client.query(
+        `INSERT INTO orders (order_id, user_id, event_id, total_price, snap_token, payment_status, ticket_details)
+         VALUES ($1, $2, $3, $4, $5, 'PENDING', $6) RETURNING *`,
+        [orderId, userId, data.eventId, totalPrice, snapToken, JSON.stringify({ cart: data.cart, formAnswers: data.formAnswers })]
+      );
       
       await client.query('COMMIT');
-      
-      return { 
-        message: 'Pesanan berhasil dibuat', 
-        order: res.rows[0],
-        snapToken: snapToken,
-        redirectUrl: redirectUrl
-      };
-
+      return { message: 'Pesanan berhasil dibuat', order: res.rows[0], snapToken: snapToken, redirectUrl: redirectUrl };
     } catch (err) {
       await client.query('ROLLBACK');
-      console.error("Error Checkout Order:", err);
       throw new InternalServerErrorException('Gagal membuat pesanan');
     } finally {
       client.release();
@@ -1490,54 +1334,26 @@ export class AppService implements OnModuleInit {
     try {
       const query = `
         SELECT o.*, e.title as event_title, e.image_url as event_img, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date
-        FROM orders o
-        JOIN events e ON o.event_id = e.id
-        WHERE o.user_id = $1
-        ORDER BY 
-          CASE WHEN o.payment_status = 'PENDING' THEN 1 ELSE 2 END ASC,
-          o.created_at DESC
+        FROM orders o JOIN events e ON o.event_id = e.id WHERE o.user_id = $1
+        ORDER BY CASE WHEN o.payment_status = 'PENDING' THEN 1 ELSE 2 END ASC, o.created_at DESC
       `;
       const { rows } = await this.pool.query(query, [userId]);
       return rows;
     } catch (err) {
-      console.error("Error Get My Orders:", err);
       throw new InternalServerErrorException('Gagal mengambil daftar pesanan');
     }
   }
 
-  // Ambil daftar peserta/tiket berdasarkan Event ID (REVISI KOLOM)
+  // --- Ambil tiket khusus event ---
   async getEventTickets(eventId: number) {
     try {
       const res = await this.pool.query(
-        // 👇 Ganti created_at jadi purchase_date
         `SELECT id, ticket_code, attendee_name, attendee_email, pax, is_attending, custom_answers, purchase_date 
-         FROM tickets 
-         WHERE event_id = $1 
-         ORDER BY purchase_date DESC`,
-        [eventId]
+         FROM tickets WHERE event_id = $1 ORDER BY purchase_date DESC`, [eventId]
       );
       return res.rows;
     } catch (error) {
-      console.error('Error fetching tickets:', error);
       throw new InternalServerErrorException('Gagal mengambil data peserta');
-    }
-  }
-
-  // Ambil daftar notifikasi milik user yang lagi login
-  async getMyNotifications(userId: number) {
-    try {
-      const res = await this.pool.query(
-        // 👇 GUE TAMBAHIN related_event_id SAMA type DI SINI BRO 👇
-        `SELECT id, title, message, type, is_read, related_event_id, created_at 
-         FROM notifications 
-         WHERE user_id = $1 
-         ORDER BY created_at DESC`,
-        [userId]
-      );
-      return res.rows;
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-      return []; 
     }
   }
 }
