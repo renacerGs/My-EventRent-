@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 import toast from 'react-hot-toast';
-import { Landmark } from 'lucide-react'; // 🔥 Import icon bank
+import { Landmark } from 'lucide-react'; 
 
 import CustomDatePicker from './shared/CustomDatePicker';
 
@@ -30,7 +30,6 @@ export default function EditPublicEvent() {
   const [formData, setFormData] = useState({
     title: '', phone: '', category: '', description: '', place: '',
     namePlace: '', city: '', province: '', mapUrl: '', eventStart: '', eventEnd: '', oldImgUrl: '',
-    // 🔥 STATE BARU: Buat nyimpen payment methods
     paymentMethods: {
       qris: true,
       va: true,
@@ -46,17 +45,26 @@ export default function EditPublicEvent() {
 
   const categories = ['Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports', 'Seminar', 'Workshop'];
 
+  // 🔥 GET DATA EVENT (DITAMBAHIN TOKEN BIAR SATPAM NGGAK MARAH)
   useEffect(() => {
     if (!userId) { navigate('/'); return; }
 
-    fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`) 
-      .then(res => {
-        if (!res.ok) throw new Error("Gagal load event");
-        return res.json();
-      })
-      .then(found => {
+    const fetchEditData = async () => {
+      try {
+        const token = localStorage.getItem('supabase_token');
+        if (!token) throw new Error("No token found");
+
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}` // 👈 Ini KTP lu bro
+          }
+        });
+
+        if (!res.ok) throw new Error("Failed to load event data");
+        const found = await res.json();
+
         if (found.category === 'Wedding' || found.category === 'Personal' || found.is_private) {
-          toast.error("Ini adalah Private Event. Silakan edit melalui menu yang sesuai.");
+          toast.error("This is a Private Event. Please edit through the appropriate menu.");
           navigate('/manage');
           return;
         }
@@ -74,17 +82,19 @@ export default function EditPublicEvent() {
           eventStart: formatDateForInput(found.date_start), 
           eventEnd: formatDateForInput(found.date_end),
           oldImgUrl: found.img || '',
-          // 🔥 NANGKEP DATA DARI DATABASE
           paymentMethods: found.paymentMethods || { qris: true, va: true, transferBank: false }
         });
         setImagePreview(found.img);
         setIsLoading(false);
-      })
-      .catch(err => {
+
+      } catch (err) {
         console.error(err);
-        toast.error("Gagal memuat data edit");
+        toast.error("Failed to load event details");
         navigate('/manage');
-      });
+      }
+    };
+
+    fetchEditData();
   }, [id, navigate, userId]);
 
   const handleChange = (e) => {
@@ -96,7 +106,6 @@ export default function EditPublicEvent() {
     }
   };
 
-  // 🔥 FUNGSI BARU: Toggle Checkbox Pembayaran
   const togglePaymentMethod = (method) => {
     setFormData(prev => ({
       ...prev,
@@ -115,17 +124,20 @@ export default function EditPublicEvent() {
     }
   };
 
+  // 🔥 SUBMIT DATA EVENT (DITAMBAHIN TOKEN JUGA)
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // 🔥 Validasi minimal 1 metode pembayaran kepilih
     if (!formData.paymentMethods.qris && !formData.paymentMethods.va && !formData.paymentMethods.transferBank) {
-      return toast.error("Minimal harus mengaktifkan satu metode pembayaran!");
+      return toast.error("You must enable at least one payment method!");
     }
 
     setIsSaving(true);
     
     try {
+      const token = localStorage.getItem('supabase_token');
+      if (!token) throw new Error("Authentication failed");
+
       let finalImageUrl = formData.oldImgUrl;
 
       if (imageFile) {
@@ -136,7 +148,7 @@ export default function EditPublicEvent() {
           .from('event-posters')
           .upload(fileName, imageFile, { contentType: imageFile.type, upsert: false });
 
-        if (error) throw new Error("Gagal mengunggah gambar baru ke Supabase.");
+        if (error) throw new Error("Failed to upload new image to Supabase.");
         
         const { data: publicUrlData } = supabase.storage.from('event-posters').getPublicUrl(fileName);
         finalImageUrl = publicUrlData.publicUrl;
@@ -148,12 +160,15 @@ export default function EditPublicEvent() {
         location: { place: formData.place, namePlace: formData.namePlace, city: formData.city, province: formData.province, mapUrl: formData.mapUrl },
         img: finalImageUrl, 
         isPrivate: false,
-        paymentMethods: formData.paymentMethods // 🔥 KIRIM KE DATABASE
+        paymentMethods: formData.paymentMethods 
       };
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}?userId=${userId}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // 👈 Token lu wajib ikut
+        },
         body: JSON.stringify(payload)
       });
 
@@ -161,11 +176,11 @@ export default function EditPublicEvent() {
         setShowSuccessModal(true);
         setTimeout(() => { navigate('/manage'); }, 1500); 
       } else {
-        toast.error("Gagal update event. Pastikan kamu pembuat event ini.");
+        toast.error("Failed to update event. Make sure you are the event organizer.");
       }
     } catch (err) {
       console.error(err);
-      toast.error(err.message || "Terjadi kesalahan saat menyimpan data.");
+      toast.error(err.message || "An error occurred while saving data.");
     } finally {
       setIsSaving(false);
     }
@@ -183,7 +198,7 @@ export default function EditPublicEvent() {
         
         <div className="flex items-center justify-between mb-6">
            <h1 className="text-3xl font-black text-gray-900 uppercase tracking-tight">Edit Public Event</h1>
-           <button onClick={() => navigate('/manage')} className="text-gray-400 hover:text-red-500 font-bold text-xs uppercase tracking-widest transition-colors">Batal</button>
+           <button onClick={() => navigate('/manage')} className="text-gray-400 hover:text-red-500 font-bold text-xs uppercase tracking-widest transition-colors">Cancel</button>
         </div>
 
         <div className="bg-[#FFF5F0] border-l-[6px] border-[#FF6B35] p-5 mb-8 rounded-r-2xl shadow-sm flex items-start gap-4">
@@ -191,9 +206,9 @@ export default function EditPublicEvent() {
               <svg className="w-5 h-5 text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
            </div>
            <div>
-             <h3 className="text-sm font-black text-[#FF6B35] mb-1 uppercase tracking-wider">Perhatian Buat Organizer</h3>
+             <h3 className="text-sm font-black text-[#FF6B35] mb-1 uppercase tracking-wider">Notice for Organizers</h3>
              <p className="text-xs text-gray-600 leading-relaxed font-medium">
-               Untuk menjaga validitas dan keamanan data transaksi peserta yang sudah membeli tiket, <strong className="text-gray-900 font-bold">Sesi Tiket, Harga, Kuota, dan Custom Form TIDAK DAPAT DIUBAH</strong> setelah event dibuat. Anda hanya dapat memperbarui informasi dasar di bawah ini.
+               To maintain data validity and transaction security for attendees who have purchased tickets, <strong className="text-gray-900 font-bold">Ticket Sessions, Prices, Quotas, and Custom Forms CANNOT BE EDITED</strong> after the event is created. You can only update the basic information below.
              </p>
            </div>
         </div>
@@ -216,7 +231,7 @@ export default function EditPublicEvent() {
                 </select>
               </div>
               <div>
-                <label className={labelStyle}>Contact Person (WA)</label>
+                <label className={labelStyle}>Contact Person (WhatsApp)</label>
                 <input type="text" name="phone" value={formData.phone} onChange={handleChange} required className={inputStyle} />
               </div>
             </div>
@@ -232,59 +247,58 @@ export default function EditPublicEvent() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
-                <label className={labelStyle}>Tanggal Mulai</label>
+                <label className={labelStyle}>Start Date</label>
                 <CustomDatePicker 
                   theme="public"
                   value={formData.eventStart} 
                   onChange={(newDate) => handleChange({ name: 'eventStart', value: newDate })} 
-                  placeholder="Pilih Tanggal Mulai"
+                  placeholder="Select Start Date"
                 />
               </div>
               <div>
-                <label className={labelStyle}>Tanggal Selesai</label>
+                <label className={labelStyle}>End Date</label>
                 <CustomDatePicker 
                   theme="public"
                   value={formData.eventEnd} 
                   onChange={(newDate) => handleChange({ name: 'eventEnd', value: newDate })} 
-                  placeholder="Pilih Tanggal Selesai"
+                  placeholder="Select End Date"
                 />
               </div>
             </div>
 
             <div className="mb-6">
-              <label className={labelStyle}>Nama Tempat / Gedung</label>
-              <input type="text" name="namePlace" value={formData.namePlace} onChange={handleChange} placeholder="Contoh: Palur Plaza" className={inputStyle} />
+              <label className={labelStyle}>Venue / Building Name</label>
+              <input type="text" name="namePlace" value={formData.namePlace} onChange={handleChange} placeholder="E.g., Grand Ballroom Hotel" className={inputStyle} />
             </div>
 
             <div className="mb-6">
-              <label className={labelStyle}>Alamat Lengkap</label>
+              <label className={labelStyle}>Full Address</label>
               <input type="text" name="place" value={formData.place} onChange={handleChange} required className={inputStyle} />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
-                <label className={labelStyle}>Kota</label>
+                <label className={labelStyle}>City</label>
                 <input type="text" name="city" value={formData.city} onChange={handleChange} required className={inputStyle} />
               </div>
               <div>
-                <label className={labelStyle}>Provinsi</label>
+                <label className={labelStyle}>Province</label>
                 <input type="text" name="province" value={formData.province} onChange={handleChange} required className={inputStyle} />
               </div>
             </div>
 
             <div>
-              <label className={labelStyle}>Google Maps URL (Opsional)</label>
+              <label className={labelStyle}>Google Maps URL (Optional)</label>
               <input type="url" name="mapUrl" value={formData.mapUrl} onChange={handleChange} placeholder="https://goo.gl/maps/..." className={inputStyle} />
             </div>
           </div>
 
-          {/* 🔥 BAGIAN BARU: EDIT METODE PEMBAYARAN 🔥 */}
           <div className={sectionStyle}>
-            <h2 className="text-xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4">Setting Metode Pembayaran</h2>
-            <p className="text-sm text-gray-500 mb-6 font-medium">Ubah metode pembayaran yang Anda terima dari peserta.</p>
+            <h2 className="text-xl font-bold text-gray-900 mb-6 border-b border-gray-100 pb-4">Payment Methods Setting</h2>
+            <p className="text-sm text-gray-500 mb-6 font-medium">Select the payment methods you want to offer to your attendees.</p>
 
             <div className="space-y-4">
-              {/* Card Opsi QRIS */}
+              {/* QRIS */}
               <label className={`flex items-center p-4 md:p-5 border-2 rounded-2xl cursor-pointer transition-all ${formData.paymentMethods.qris ? 'border-[#FF6B35] bg-orange-50/50' : 'border-gray-100 hover:bg-gray-50'}`}>
                 <div className="flex items-center justify-center mr-4">
                   <input type="checkbox" checked={formData.paymentMethods.qris} onChange={() => togglePaymentMethod('qris')} className="w-5 h-5 rounded cursor-pointer accent-[#FF6B35]" />
@@ -294,11 +308,11 @@ export default function EditPublicEvent() {
                 </div>
                 <div>
                   <p className="font-bold text-gray-900 md:text-lg">QR Code (QRIS)</p>
-                  <p className="text-xs text-gray-500 mt-0.5">GOPAY, OVO, DANA, DLL.</p>
+                  <p className="text-xs text-gray-500 mt-0.5">GOPAY, OVO, DANA, ETC.</p>
                 </div>
               </label>
 
-              {/* Card Opsi Virtual Account */}
+              {/* Virtual Account */}
               <label className={`flex items-center p-4 md:p-5 border-2 rounded-2xl cursor-pointer transition-all ${formData.paymentMethods.va ? 'border-[#FF6B35] bg-orange-50/50' : 'border-gray-100 hover:bg-gray-50'}`}>
                 <div className="flex items-center justify-center mr-4">
                   <input type="checkbox" checked={formData.paymentMethods.va} onChange={() => togglePaymentMethod('va')} className="w-5 h-5 rounded cursor-pointer accent-[#FF6B35]" />
@@ -308,11 +322,11 @@ export default function EditPublicEvent() {
                 </div>
                 <div>
                   <p className="font-bold text-gray-900 md:text-lg">Virtual Account</p>
-                  <p className="text-xs text-gray-500 mt-0.5">BCA, MANDIRI, BNI, BRI, DLL.</p>
+                  <p className="text-xs text-gray-500 mt-0.5">BCA, MANDIRI, BNI, BRI, ETC.</p>
                 </div>
               </label>
 
-              {/* Card Opsi Transfer Bank */}
+              {/* Transfer Bank */}
               <label className={`flex items-center p-4 md:p-5 border-2 rounded-2xl cursor-pointer transition-all ${formData.paymentMethods.transferBank ? 'border-[#FF6B35] bg-orange-50/50' : 'border-gray-100 hover:bg-gray-50'}`}>
                 <div className="flex items-center justify-center mr-4">
                   <input type="checkbox" checked={formData.paymentMethods.transferBank} onChange={() => togglePaymentMethod('transferBank')} className="w-5 h-5 rounded cursor-pointer accent-[#FF6B35]" />
@@ -321,8 +335,8 @@ export default function EditPublicEvent() {
                   <Landmark className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="font-bold text-gray-900 md:text-lg">Transfer Bank</p>
-                  <p className="text-xs text-gray-500 mt-0.5">BCA, MANDIRI, PERMATA, DLL.</p>
+                  <p className="font-bold text-gray-900 md:text-lg">Bank Transfer</p>
+                  <p className="text-xs text-gray-500 mt-0.5">BCA, MANDIRI, PERMATA, ETC.</p>
                 </div>
               </label>
             </div>
@@ -341,17 +355,17 @@ export default function EditPublicEvent() {
               <div className="flex-1 text-center md:text-left w-full">
                 <label className="cursor-pointer inline-flex items-center justify-center gap-2 bg-gray-900 text-white px-8 py-4 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-black transition-all shadow-md w-full md:w-auto">
                   <svg className="w-4 h-4 text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-                  Ganti Gambar
+                  Change Image
                   <input type="file" className="hidden" onChange={handleImageChange} accept="image/*" />
                 </label>
-                <p className="text-[10px] text-gray-400 mt-4 font-bold uppercase tracking-wider">Maksimal 2MB. Format: JPG, PNG, WEBP.</p>
+                <p className="text-[10px] text-gray-400 mt-4 font-bold uppercase tracking-wider">Max 2MB. Format: JPG, PNG, WEBP.</p>
               </div>
             </div>
           </div>
 
           <div className="flex justify-end pt-4">
             <button type="submit" disabled={isSaving} className="w-full md:w-auto bg-[#FF6B35] text-white px-12 py-4 rounded-xl font-bold text-sm uppercase tracking-widest shadow-xl shadow-orange-100 hover:bg-[#E85526] hover:-translate-y-1 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0">
-              {isSaving ? 'Menyimpan...' : 'Simpan Perubahan'}
+              {isSaving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>
@@ -366,9 +380,9 @@ export default function EditPublicEvent() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h3 className="text-2xl font-black text-gray-900 mb-2 uppercase tracking-tight">Sukses!</h3>
+            <h3 className="text-2xl font-black text-gray-900 mb-2 uppercase tracking-tight">Success!</h3>
             <p className="text-gray-500 text-sm font-medium mb-2">
-              Detail event publik berhasil diperbarui.
+              Public event details updated successfully.
             </p>
           </div>
         </div>

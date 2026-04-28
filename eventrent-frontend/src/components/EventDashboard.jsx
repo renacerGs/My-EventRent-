@@ -77,7 +77,7 @@ export default function EventDashboard() {
       const eventData = await resEvent.json();
 
       const resAttendees = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/attendees`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` } // Token added here
       });
       const dataAttendees = await resAttendees.json();
 
@@ -116,21 +116,18 @@ export default function EventDashboard() {
       setEvent(prev => JSON.stringify(prev) === JSON.stringify(eventData) ? prev : eventData);
       setGroupedAttendees(prev => JSON.stringify(prev) === JSON.stringify(finalAttendees) ? prev : finalAttendees);
       
-    } catch (err) { 
-      console.error(err); 
-    } finally { 
-      setLoading(false);
-      setIsRefreshing(false);
-    }
+    } catch (err) { console.error(err); } 
+    finally { setLoading(false); setIsRefreshing(false); }
   };
 
+  // 🔥 FETCH AGENTS (UDAH DITAMBAHIN TOKEN)
   const fetchAgents = async () => {
     const sessionData = await supabase.auth.getSession();
     const token = sessionData.data.session?.access_token;
     if (!token) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/agents`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` } // Token added here
       });
       if (res.ok) {
         const data = await res.json();
@@ -141,13 +138,14 @@ export default function EventDashboard() {
     }
   };
 
+  // 🔥 FETCH REPORTS (UDAH DITAMBAHIN TOKEN)
   const fetchReports = async () => {
     const sessionData = await supabase.auth.getSession();
     const token = sessionData.data.session?.access_token;
     if (!token) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/reports`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` } // Token added here! Ini yg bikin 401 kemaren!
       });
       if (res.ok) {
         const data = await res.json();
@@ -158,13 +156,14 @@ export default function EventDashboard() {
     }
   };
 
+  // 🔥 FETCH RECRUITMENT DATA (UDAH DITAMBAHIN TOKEN)
   const fetchRecruitmentData = async () => {
     const sessionData = await supabase.auth.getSession();
     const token = sessionData.data.session?.access_token;
     if (!token) return;
     try {
       const resJobs = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/jobs`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` } // Token added here! Ini yg bikin 401 kemaren!
       });
       if (resJobs.ok) setJobs(await resJobs.json());
 
@@ -177,13 +176,14 @@ export default function EventDashboard() {
     }
   };
 
+  // 🔥 FETCH PAYOUTS (UDAH DITAMBAHIN TOKEN)
   const fetchPayouts = async () => {
     const sessionData = await supabase.auth.getSession();
     const token = sessionData.data.session?.access_token;
     if (!token) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/payouts`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: { 'Authorization': `Bearer ${token}` } // Token added here
       });
       if (res.ok) setPayouts(await res.json());
     } catch (err) {
@@ -366,10 +366,7 @@ export default function EventDashboard() {
       if (res.ok) {
         toast.success(action === 'ACCEPTED' ? 'Applicant accepted & registered as Agent!' : 'Applicant rejected.', { id: toastId });
         fetchRecruitmentData(); 
-        if (action === 'ACCEPTED') {
-          fetchAgents(); 
-          fetchPayouts(); 
-        }
+        if (action === 'ACCEPTED') { fetchAgents(); fetchPayouts(); }
       } else {
         toast.error(data.message || 'Failed to process application.', { id: toastId });
       }
@@ -404,10 +401,7 @@ export default function EventDashboard() {
         throw new Error('Failed to upload transfer proof to Storage');
       }
 
-      const { data: publicUrlData } = supabase.storage
-        .from('payout-receipts')
-        .getPublicUrl(fileName);
-        
+      const { data: publicUrlData } = supabase.storage.from('payout-receipts').getPublicUrl(fileName);
       const uploadedProofUrl = publicUrlData.publicUrl;
 
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/payouts/pay`, {
@@ -416,11 +410,7 @@ export default function EventDashboard() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ 
-          agentId, 
-          amount: Number(amount),
-          proofUrl: uploadedProofUrl 
-        })
+        body: JSON.stringify({ agentId, amount: Number(amount), proofUrl: uploadedProofUrl })
       });
       const data = await res.json();
 
@@ -464,9 +454,7 @@ export default function EventDashboard() {
     return () => clearInterval(intervalId); 
   }, [id, user?.id, navigate]); 
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, selectedSessionFilter, selectedStatusFilter]); 
+  useEffect(() => { setCurrentPage(1); }, [searchQuery, selectedSessionFilter, selectedStatusFilter]); 
 
   const handleAddAgent = async (e) => {
     e.preventDefault();
@@ -948,7 +936,7 @@ export default function EventDashboard() {
         </div>
       )}
 
-      {/* MODAL GLOBAL LAINNYA */}
+      {/* MODAL GLOBAL */}
       {popup.show && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4 transition-all">
           <div className="bg-white rounded-[24px] md:rounded-[32px] p-6 md:p-8 max-w-sm w-full shadow-2xl transform text-center">
@@ -1348,14 +1336,14 @@ export default function EventDashboard() {
                             <button 
                               onClick={() => openEditJob(job)}
                               className="p-2 text-blue-500 bg-blue-50 hover:bg-blue-600 hover:text-white rounded-lg transition-all"
-                              title="Edit Lowongan"
+                              title="Edit Job"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                             </button>
                             <button 
                               onClick={() => initiateDeleteJob(job.id)}
                               className="p-2 text-red-500 bg-red-50 hover:bg-red-600 hover:text-white rounded-lg transition-all"
-                              title="Hapus Lowongan"
+                              title="Delete Job"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-4v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                             </button>
