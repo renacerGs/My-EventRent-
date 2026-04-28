@@ -254,10 +254,15 @@ export class AppController {
   // 🔥 ENDPOINT RESPOND NOTIF (KHUSUS MOBILE FLUTTER)
   @ApiTags('Notifications')
   @ApiOperation({ summary: 'Merespon undangan notifikasi (Khusus Mobile)' })
-  @UseGuards(SupabaseGuard) // ⚠️ Jangan lupa dipasangin guard biar aman!
+  @UseGuards(SupabaseGuard) // ⚠️ WAJIB PAKE GUARD BIAR TAU SIAPA YANG LOGIN
   @Post('notifications/respond')
-  async respondNotif(@Body() body: { notifId: number; action: string }) {
-    return await this.appService.respondToNotification(body.notifId, body.action);
+  async respondNotif(@Req() req, @Body() body: { notifId: number; action: string }) {
+    // KITA TEMBAK LANGSUNG KE FUNGSI ASLI YANG NGE-UPDATE DATABASE!
+    return await this.appService.respondAgentInvitation(
+      body.notifId, 
+      req.user.id, 
+      body.action as 'accept' | 'reject'
+    );
   }
 
   // Rute notifikasi lama (tetap dibiarkan biar web nggak error kalau masih pakai ini)

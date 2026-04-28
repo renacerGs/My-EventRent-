@@ -150,6 +150,9 @@ export class AppService implements OnModuleInit {
   // --- AMBIL SESI EVENT (KHUSUS MOBILE) ---
   async getEventSessions(eventId: number) {
     try {
+      if (!eventId || isNaN(eventId)) {
+        return []; // Balikin array kosong aja daripada meledak
+      }
       const sessionQuery = `
         SELECT id, name, description, TO_CHAR(session_date, 'Dy, DD Mon YYYY') as date, 
                start_time, end_time, contact_person, event_type, price, stock,
