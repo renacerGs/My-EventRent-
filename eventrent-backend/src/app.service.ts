@@ -1523,10 +1523,12 @@ export class AppService implements OnModuleInit {
     }
   }
 
+  // Ambil daftar notifikasi milik user yang lagi login
   async getMyNotifications(userId: number) {
     try {
       const res = await this.pool.query(
-        `SELECT id, title, message, is_read, created_at 
+        // 👇 GUE TAMBAHIN related_event_id SAMA type DI SINI BRO 👇
+        `SELECT id, title, message, type, is_read, related_event_id, created_at 
          FROM notifications 
          WHERE user_id = $1 
          ORDER BY created_at DESC`,
