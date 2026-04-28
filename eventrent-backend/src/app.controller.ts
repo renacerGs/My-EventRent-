@@ -169,13 +169,13 @@ export class AppController {
     return await this.appService.getEventAttendees(id, req.user.id);
   }
 
-  // 🔥 ENDPOINT TIKET KHUSUS MOBILE (FLUTTER)
+  // 🔥 ENDPOINT TIKET KHUSUS MOBILE (FLUTTER) - UDAH DI-UPGRADE!
   @ApiTags('Tickets')
   @ApiOperation({ summary: 'Ambil list peserta untuk Event Dashboard Agen (Khusus Mobile)' })
-  @UseGuards(SupabaseGuard)
+  @UseGuards(SupabaseGuard) // 👈 Satpam tetep nyala
   @Get('events/:eventId/tickets')
-  async getEventTickets(@Param('eventId') eventId: string) {
-    return this.appService.getEventTickets(Number(eventId));
+  async getEventTickets(@Param('eventId') eventId: string, @Req() req) {
+    return this.appService.getEventAttendees(Number(eventId), req.user.id);
   }
 
   // ==========================================
