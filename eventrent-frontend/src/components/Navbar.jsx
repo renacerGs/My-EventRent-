@@ -299,6 +299,76 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     navigate('/');
   };
 
+  // 🔥 LOGIC STYLE (WARNA & ICON) PER KATEGORI 🔥
+  const getNotifStyle = (type, isRead) => {
+    const styles = {
+      'REPORT_ISSUE': {
+        borderColor: isAgentMode ? 'border-l-rose-500' : 'border-l-red-500',
+        bgUnread: isAgentMode ? 'bg-rose-500/10' : 'bg-red-50/60',
+        textColor: isAgentMode ? 'text-rose-400' : 'text-red-600',
+        iconBg: isAgentMode ? 'bg-rose-500/20 text-rose-400' : 'bg-red-100 text-red-500',
+        dotColor: isAgentMode ? 'bg-rose-500' : 'bg-red-500',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      },
+      'PAYOUT_SUCCESS': {
+        borderColor: 'border-l-emerald-500',
+        bgUnread: isAgentMode ? 'bg-emerald-500/10' : 'bg-emerald-50/60',
+        textColor: isAgentMode ? 'text-emerald-400' : 'text-emerald-600',
+        iconBg: isAgentMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-500',
+        dotColor: 'bg-emerald-500',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      },
+      'INVITATION_AGENT': {
+        borderColor: 'border-l-blue-500',
+        bgUnread: isAgentMode ? 'bg-blue-500/10' : 'bg-blue-50/60',
+        textColor: isAgentMode ? 'text-blue-400' : 'text-blue-600',
+        iconBg: isAgentMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-500',
+        dotColor: 'bg-blue-500',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+      },
+      'NEW_APPLICANT': {
+        borderColor: 'border-l-purple-500',
+        bgUnread: isAgentMode ? 'bg-purple-500/10' : 'bg-purple-50/60',
+        textColor: isAgentMode ? 'text-purple-400' : 'text-purple-600',
+        iconBg: isAgentMode ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-500',
+        dotColor: 'bg-purple-500',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+      },
+      'DEFAULT': {
+        borderColor: isAgentMode ? 'border-l-orange-500' : 'border-l-[#FF6B35]',
+        bgUnread: isAgentMode ? 'bg-orange-500/10' : 'bg-orange-50/40',
+        textColor: isAgentMode ? 'text-orange-400' : 'text-[#FF6B35]',
+        iconBg: isAgentMode ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-[#FF6B35]',
+        dotColor: isAgentMode ? 'bg-orange-500' : 'bg-[#FF6B35]',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      }
+    };
+
+    const style = styles[type] || styles['DEFAULT'];
+
+    if (!isRead) {
+      return {
+        wrapperClass: `${style.bgUnread} border-l-4 ${style.borderColor}`,
+        titleClass: style.textColor,
+        descClass: isAgentMode ? 'text-slate-300 font-medium' : 'text-gray-700 font-medium',
+        dateClass: isAgentMode ? 'text-slate-500' : 'text-gray-400',
+        dotClass: style.dotColor,
+        iconClass: style.iconBg,
+        iconSvg: style.iconSvg
+      };
+    } else {
+      return {
+        wrapperClass: isAgentMode ? `bg-slate-800/30 border-l-4 border-l-transparent hover:bg-slate-800/80` : `bg-white border-l-4 border-l-transparent hover:bg-gray-50`,
+        titleClass: isAgentMode ? `text-slate-300` : `text-gray-900`,
+        descClass: isAgentMode ? 'text-slate-400' : 'text-gray-500',
+        dateClass: isAgentMode ? 'text-slate-600' : 'text-gray-400',
+        dotClass: `hidden`,
+        iconClass: isAgentMode ? `bg-slate-700/50 text-slate-500` : `bg-gray-100 text-gray-400`,
+        iconSvg: style.iconSvg
+      };
+    }
+  };
+
   return (
     <>
       <nav className={`backdrop-blur-md flex items-center justify-between px-4 md:px-8 py-3 md:py-4 shadow-sm sticky top-0 z-[100] text-left font-sans transition-all duration-300 gap-3 md:gap-6 ${isAgentMode ? 'bg-slate-900 border-b border-slate-800' : 'bg-white/80'}`}>
@@ -357,57 +427,60 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                   )}
                 </button>
 
-                <div className={`absolute right-0 top-full mt-3 w-[280px] md:w-[350px] bg-white rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 transform origin-top-right transition-all duration-300 z-[60] flex flex-col overflow-hidden ${showNotifDropdown ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
+                <div className={`absolute right-0 top-full mt-3 w-[280px] md:w-[350px] rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] border transform origin-top-right transition-all duration-300 z-[60] flex flex-col overflow-hidden ${showNotifDropdown ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'} ${isAgentMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-100'}`}>
                   
-                  <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
-                    <h3 className="font-black text-gray-900 text-xs uppercase tracking-widest">Notifications</h3>
+                  <div className={`px-4 py-3 border-b flex justify-between items-center shrink-0 ${isAgentMode ? 'bg-slate-800/50 border-slate-700' : 'bg-gray-50/50 border-gray-100'}`}>
+                    <h3 className={`font-black text-xs uppercase tracking-widest ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>Notifications</h3>
                     {unreadCount > 0 && <span className="bg-[#FF6B35] text-white px-2 py-0.5 rounded-md text-[9px] font-bold">{unreadCount} New</span>}
                   </div>
                   
                   <div className="max-h-[300px] overflow-y-auto overscroll-contain">
                     {displayedNotifications.length > 0 ? (
-                      displayedNotifications.map(notif => (
-                        <div 
-                          key={notif.id} 
-                          className={`p-4 border-b hover:bg-gray-50 transition-colors cursor-pointer flex gap-3 ${
-                            !notif.is_read 
-                              ? 'bg-orange-50/60 border-l-4 border-l-[#FF6B35] border-b-orange-100/50' 
-                              : 'bg-white border-l-4 border-l-transparent border-b-gray-50'
-                          }`} 
-                          onClick={() => handleNotifClick(notif)}
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className={`font-bold text-sm ${!notif.is_read ? 'text-[#FF6B35]' : 'text-gray-900'}`}>
-                                {notif.title}
-                              </p>
-                              {!notif.is_read && <span className="w-2 h-2 rounded-full bg-[#FF6B35] shadow-sm shadow-orange-200"></span>}
-                            </div>
-                            <p className={`text-xs leading-relaxed ${!notif.is_read ? 'text-gray-700 font-medium' : 'text-gray-500'}`}>
-                              {notif.message}
-                            </p>
-                            
-                            {notif.type === 'INVITATION_AGENT' && !notif.is_read && (
-                              <div className="flex gap-2 mt-3">
-                                <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'reject'); }} className="flex-1 bg-red-50 text-red-500 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-colors">Decline</button>
-                                <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'accept'); }} className="flex-1 bg-[#FF6B35] text-white py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-colors shadow-md">Accept</button>
+                      displayedNotifications.map(notif => {
+                        const style = getNotifStyle(notif.type, notif.is_read);
+
+                        return (
+                          <div 
+                            key={notif.id} 
+                            className={`p-4 border-b cursor-pointer flex gap-3 ${style.wrapperClass} ${isAgentMode ? 'border-b-slate-700/50' : 'border-b-gray-50'}`} 
+                            onClick={() => handleNotifClick(notif)}
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className={`font-bold text-sm ${style.titleClass}`}>
+                                  {notif.title}
+                                </p>
+                                {!notif.is_read && <span className={`w-2 h-2 rounded-full shadow-sm ${style.dotClass}`}></span>}
                               </div>
-                            )}
+                              <p className={`text-xs leading-relaxed ${style.descClass}`}>
+                                {notif.message}
+                              </p>
+                              <p className={`text-[10px] mt-1 font-bold uppercase tracking-wider ${style.dateClass}`}>
+                                {new Date(notif.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                              </p>
+                              
+                              {notif.type === 'INVITATION_AGENT' && !notif.is_read && (
+                                <div className="flex gap-2 mt-3">
+                                  <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'reject'); }} className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${isAgentMode ? 'bg-slate-700 text-rose-400 hover:bg-slate-600' : 'bg-red-50 text-red-500 hover:bg-red-100'}`}>Decline</button>
+                                  <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'accept'); }} className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md transition-colors ${isAgentMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-[#FF6B35] text-white hover:bg-orange-600'}`}>Accept</button>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     ) : (
-                      <div className="p-6 text-center text-gray-400 text-xs font-bold">No new notifications.</div>
+                      <div className={`p-6 text-center text-xs font-bold ${isAgentMode ? 'text-slate-500' : 'text-gray-400'}`}>No new notifications.</div>
                     )}
                   </div>
                   
-                  <div className="border-t border-gray-100 bg-gray-50/50 p-2 shrink-0">
+                  <div className={`border-t p-2 shrink-0 ${isAgentMode ? 'border-slate-700 bg-slate-800/50' : 'border-gray-100 bg-gray-50/50'}`}>
                     <button 
                       onClick={() => { 
                         setShowNotifDropdown(false);
                         navigate('/notifications'); 
                       }} 
-                      className="block w-full text-center py-2.5 text-[10px] md:text-xs font-black text-[#FF6B35] hover:text-orange-600 uppercase tracking-widest transition-colors rounded-xl hover:bg-orange-50"
+                      className={`block w-full text-center py-2.5 text-[10px] md:text-xs font-black uppercase tracking-widest transition-colors rounded-xl ${isAgentMode ? 'text-orange-400 hover:bg-slate-700' : 'text-[#FF6B35] hover:text-orange-600 hover:bg-orange-50'}`}
                     >
                       View All Notifications
                     </button>

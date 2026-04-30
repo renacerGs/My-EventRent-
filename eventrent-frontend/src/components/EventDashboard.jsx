@@ -986,38 +986,77 @@ export default function EventDashboard() {
         </div>
       )}
 
+      {/* ======================= MODAL AGENT PROFILE (SMOOTH NAVY-ORANGE) ======================= */}
       {agentDetailModal && (
-        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-[32px] p-8 max-w-sm w-full shadow-2xl transform">
-            <div className="flex justify-between items-start mb-6">
-              <h3 className="text-lg font-black text-gray-900 uppercase tracking-widest">Agent Profile</h3>
-              <button onClick={() => setAgentDetailModal(null)} className="text-gray-400 hover:text-gray-900 transition-colors">✕</button>
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 animate-fadeIn">
+          {/* Main Card with Smooth Diagonal Gradient Navy to Orange */}
+          <div className="bg-gradient-to-br from-[#020024] via-[#090979] to-[#ff8121] rounded-[32px] p-6 max-w-sm w-full shadow-2xl transform relative overflow-hidden text-white border border-white/10">
+
+            {/* Abstract glowing orbs to make it feel alive & dynamic */}
+            <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none opacity-50 mix-blend-screen">
+               <div className="absolute -top-12 -left-12 w-48 h-48 bg-blue-500/40 rounded-full blur-[60px]"></div>
+               <div className="absolute -bottom-8 -right-8 w-48 h-48 bg-orange-400/60 rounded-full blur-[60px]"></div>
             </div>
-            <div className="flex flex-col items-center mb-6">
-              <img src={agentDetailModal.picture} alt={agentDetailModal.name} className="w-24 h-24 rounded-full object-cover border-4 border-orange-50 shadow-md mb-4" />
-              <h4 className="text-xl font-black text-gray-900">{agentDetailModal.name}</h4>
-              <p className="text-xs text-gray-500 font-bold">{agentDetailModal.email}</p>
-              {agentDetailModal.phone && (
-                <p className="text-xs text-[#FF6B35] font-black mt-1">📞 {agentDetailModal.phone}</p>
-              )}
-              <div className="bg-yellow-50 text-yellow-600 px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest flex items-center gap-1.5 mt-3">
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>
-                {agentDetailModal.rating_given ? `${agentDetailModal.rating_given}.0` : 'No Rating Yet'}
+
+            <div className="relative z-10">
+              <div className="flex justify-between items-start mb-4">
+                <span className="bg-white/10 backdrop-blur-md border border-white/20 text-white px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase shadow-sm">
+                  {agentDetailModal.role || 'Event Agent'}
+                </span>
+                <button onClick={() => setAgentDetailModal(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 border border-white/10 transition-colors backdrop-blur-md shadow-sm">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
               </div>
-            </div>
-            <div className="bg-gray-50 p-5 rounded-2xl border border-gray-100">
-              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-3 border-b border-gray-200 pb-2">Payment Information</p>
-              {agentDetailModal.bank_name && agentDetailModal.bank_account ? (
-                <div className="space-y-2">
-                  <p className="text-xs text-gray-500 font-bold">Bank: <span className="text-gray-900">{agentDetailModal.bank_name}</span></p>
-                  <p className="text-xs text-gray-500 font-bold">Acc. No: <span className="text-gray-900 font-mono tracking-wider font-black">{agentDetailModal.bank_account}</span></p>
-                  <p className="text-xs text-gray-500 font-bold">A/N: <span className="text-gray-900 uppercase font-black">{agentDetailModal.bank_account_name}</span></p>
+
+              <div className="flex flex-col items-center mb-6 mt-2">
+                <img src={agentDetailModal.picture || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} alt={agentDetailModal.name} className="w-20 h-20 rounded-full object-cover border-2 border-white/50 shadow-[0_0_20px_rgba(0,0,0,0.4)] mb-3 bg-[#020024]" />
+                <h4 className="text-xl font-black tracking-tight">{agentDetailModal.name}</h4>
+                <p className="text-[10px] font-bold text-white/70 tracking-widest uppercase mt-0.5">{agentDetailModal.email}</p>
+              </div>
+
+              {/* Stats Row - Clean & Minimalist */}
+              <div className="flex justify-between items-center bg-white/5 backdrop-blur-md rounded-2xl p-4 mb-6 border border-white/10 shadow-inner">
+                <div className="text-center flex-1 border-r border-white/10">
+                  <p className="text-lg font-black text-yellow-400 flex items-center justify-center gap-1 drop-shadow-md">
+                    ★ {agentDetailModal.rating_given ? `${agentDetailModal.rating_given}.0` : '-'}
+                  </p>
+                  <p className="text-[9px] uppercase tracking-widest text-white/60 mt-0.5">Rating</p>
                 </div>
-              ) : (
-                <p className="text-xs text-gray-500 font-bold italic">This agent has not completed their bank account details.</p>
-              )}
+                <div className="text-center flex-1">
+                  <p className="text-lg font-black text-white flex items-center justify-center gap-1 drop-shadow-md">
+                    🎫 ?
+                  </p>
+                  <p className="text-[9px] uppercase tracking-widest text-white/60 mt-0.5">Events</p>
+                </div>
+              </div>
+
+              {/* Bank Info Glass Card */}
+              <div className="bg-white/5 backdrop-blur-md p-4 rounded-2xl border border-white/10 mb-6 shadow-inner">
+                <p className="text-[9px] font-black text-white/50 uppercase tracking-widest mb-2 pb-2 border-b border-white/10">Payment Info</p>
+                {agentDetailModal.bank_name && agentDetailModal.bank_account ? (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-white/60 uppercase">Bank</span>
+                      <span className="text-xs font-black">{agentDetailModal.bank_name}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-white/60 uppercase">Acc No.</span>
+                      <span className="text-sm font-mono tracking-wider font-black text-white-300 drop-shadow-sm">{agentDetailModal.bank_account}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] text-white/60 uppercase">Name</span>
+                      <span className="text-[10px] uppercase font-black">{agentDetailModal.bank_account_name}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-white/50 font-bold italic text-center py-2">Agent has not set up bank details.</p>
+                )}
+              </div>
+
+              <button onClick={() => setAgentDetailModal(null)} className="w-full bg-white/10 hover:bg-white/20 backdrop-blur-md text-white border border-white/20 font-black py-3.5 rounded-xl transition-colors uppercase tracking-widest text-[10px] shadow-lg">
+                Close Profile
+              </button>
             </div>
-            <button onClick={() => setAgentDetailModal(null)} className="w-full mt-6 bg-gray-900 text-white font-bold py-3.5 rounded-xl hover:bg-black uppercase tracking-widest text-[10px]">Close Details</button>
           </div>
         </div>
       )}
@@ -1376,7 +1415,7 @@ export default function EventDashboard() {
                           </div>
                           {app.status === 'PENDING' ? (
                             <div className="flex gap-2 w-full md:w-auto">
-                              <button onClick={() => setConfirmRespondApp({ show: true, appId: app.id, action: 'REJECTED' })} className="flex-1 md:flex-none px-4 py-2 border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors">Reject</button>
+                              <button onClick={() => setConfirmRespondApp({ show: true, appId: app.id, action: 'REJECTED' })} className="flex-1 md:flex-none px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors shadow-sm">Reject</button>
                               <button onClick={() => setConfirmRespondApp({ show: true, appId: app.id, action: 'ACCEPTED' })} className="flex-1 md:flex-none px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors shadow-sm">Accept</button>
                             </div>
                           ) : (
@@ -1452,7 +1491,7 @@ export default function EventDashboard() {
                             <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-emerald-200">
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg> Paid
                             </span>
-                            <span className="text-[9px] text-gray-400 font-bold uppercase mt-1">{new Date(agent.paid_at).toLocaleString('id-ID', {day: 'numeric', month:'short', hour:'2-digit', minute:'2-digit'})}</span>
+                            <span className="text-[9px] text-gray-400 font-bold uppercase mt-1">{new Date(agent.paid_at).toLocaleString('en-US', {day: 'numeric', month:'short', hour:'2-digit', minute:'2-digit'})}</span>
                           </div>
                         ) : (
                           <button 

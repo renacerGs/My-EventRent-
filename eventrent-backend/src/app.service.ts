@@ -1014,6 +1014,10 @@ export class AppService implements OnModuleInit {
     return { success: true };
   }
 
+<<<<<<< HEAD
+=======
+  // 🔥 FUNGSI BARU: HAPUS BANYAK NOTIF SEKALIGUS 🔥
+>>>>>>> 2e9381a26812cf273ff9347d1cfcb3ca2295dac0
   async deleteNotifications(notifIds: number[], userId: number) {
     try {
       const query = 'DELETE FROM notifications WHERE id = ANY($1) AND user_id = $2';
@@ -1024,6 +1028,10 @@ export class AppService implements OnModuleInit {
     }
   }
 
+<<<<<<< HEAD
+=======
+  // 🔥 FUNGSI BARU: HAPUS SEMUA NOTIFIKASI 🔥
+>>>>>>> 2e9381a26812cf273ff9347d1cfcb3ca2295dac0
   async deleteAllNotifications(userId: number) {
     try {
       const query = 'DELETE FROM notifications WHERE user_id = $1';
