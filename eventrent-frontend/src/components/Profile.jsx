@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-
-// 👇 IMPORT SUPABASE LU DI SINI
 import { supabase } from '../supabase'; 
 
 export default function Profile() {
@@ -22,7 +20,12 @@ export default function Profile() {
 
   const [bankData, setBankData] = useState({ bank_name: '', bank_account: '', bank_account_name: '' });
 
+  // State untuk Notifikasi Info/Success/Error
   const [popup, setPopup] = useState({ isOpen: false, message: '', type: 'info', action: null });
+  
+  // STATE BARU UNTUK MODAL KONFIRMASI DELETE AKUN
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const showPopup = (message, type = 'info', action = null) => {
     setPopup({ isOpen: true, message, type, action });
@@ -215,14 +218,60 @@ export default function Profile() {
     }
   };
 
+  // 🔥 FUNGSI PEMUSNAH AKUN (MANGGIL BACKEND) 🔥
+  const handleDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    try {
+      const token = localStorage.getItem('supabase_token');
+      
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/me`, {
+        method: 'DELETE',
+        headers: { 
+          'Authorization': `Bearer ${token}` 
+        }
+      });
+
+      if (res.ok) {
+        // 🔥 FIX 403 FORBIDDEN: 
+        // Karena backend udah hapus akun lu di server Supabase, 
+        // proses signOut ini pasti ditolak (403). Kita try-catch aja biar silent.
+        try {
+          await supabase.auth.signOut();
+        } catch (e) {
+          console.log("Sesi sudah dihancurkan oleh backend.");
+        }
+
+        // Bersihkan brankas lokal
+        localStorage.removeItem('user');
+        localStorage.removeItem('supabase_token');
+        localStorage.removeItem('agentMode');
+        
+        setShowDeleteModal(false);
+        navigate('/');
+      } else {
+        const data = await res.json();
+        // Munculin pop up error dari backend (misal: "Akun masih dipakai di Event")
+        showPopup(data.message || "Gagal menghapus akun, coba lagi nanti.", "error");
+        setShowDeleteModal(false);
+      }
+    } catch (error) {
+      console.error("Error Delete Account:", error);
+      showPopup("Koneksi server bermasalah.", "error");
+      setShowDeleteModal(false);
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  };
+  
   if (!user) return null;
   
-  const isGoogleUser = !!user.googleId; 
+  const isGoogleUser = !!user.googleId || user.email?.includes('gmail'); // deteksi fallback
   const isAgentMode = user.role === 'agent';
 
+  // 🔥 UPDATE: Ubah warna focus menyesuaikan Agent Mode dengan biru #2596be
   const inputStyle = `w-full border rounded-xl px-5 py-4 text-sm font-bold focus:outline-none transition-all ${
     isAgentMode 
-      ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-orange-500 focus:ring-1 focus:ring-orange-500' 
+      ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-[#2596be] focus:ring-1 focus:ring-[#2596be]' 
       : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#FF6B35] focus:ring-1 focus:ring-[#FF6B35]'
   }`;
   
@@ -235,10 +284,9 @@ export default function Profile() {
   return (
     <div className={`min-h-screen pt-10 pb-20 font-sans relative ${isAgentMode ? 'bg-[#0f172a]' : 'bg-[#F8F9FA]'}`}>
       
-      {isAgentMode && (
-        <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-orange-500/10 to-transparent pointer-events-none"></div>
-      )}
+      {/* 🔴 Gradasi oren sudah dihapus dari sini */}
 
+      {/* MODAL POPUP STANDAR (INFO/SUCCESS/ERROR) */}
       <AnimatePresence>
         {popup.isOpen && (
           <div className="fixed inset-0 z-[120] flex flex-col items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
@@ -275,10 +323,53 @@ export default function Profile() {
         )}
       </AnimatePresence>
 
+      {/* MODAL KONFIRMASI HAPUS AKUN */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="w-full max-w-md bg-white rounded-[32px] p-8 text-center shadow-2xl relative overflow-hidden"
+            >
+              <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-5 shadow-inner">
+                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              
+              <h2 className="text-2xl font-black text-gray-900 mb-2 uppercase tracking-tight">Delete Account?</h2>
+              <p className="text-gray-500 font-medium mb-8 text-sm leading-relaxed">
+                Tindakan ini tidak bisa dibatalkan. Semua data, riwayat pesanan tiket, dan progres kepanitiaan kamu akan dihapus selamanya.
+              </p>
+              
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={isDeletingAccount}
+                  className="flex-1 py-4 bg-gray-100 text-gray-600 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-gray-200 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleDeleteAccount}
+                  disabled={isDeletingAccount}
+                  className="flex-1 py-4 bg-red-600 text-white rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-red-700 shadow-lg shadow-red-500/30 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {isDeletingAccount ? 'DELETING...' : 'YES, DELETE'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <div className="max-w-5xl mx-auto px-4 md:px-8 relative z-10">
         
         <div className="flex items-center gap-4 mb-8">
-          <button onClick={() => navigate(-1)} className={`w-12 h-12 flex items-center justify-center rounded-full border shadow-sm transition-all active:scale-95 ${isAgentMode ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-orange-500 hover:border-orange-500' : 'bg-white border-gray-200 text-gray-500 hover:text-[#FF6B35] hover:border-[#FF6B35]'}`}>
+          {/* 🔥 UPDATE: Ubah warna hover back button Agent Mode ke biru #2596be */}
+          <button onClick={() => navigate(-1)} className={`w-12 h-12 flex items-center justify-center rounded-full border shadow-sm transition-all active:scale-95 ${isAgentMode ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-[#2596be] hover:border-[#2596be]' : 'bg-white border-gray-200 text-gray-500 hover:text-[#FF6B35] hover:border-[#FF6B35]'}`}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
           </button>
           <h1 className={`text-3xl md:text-4xl font-black uppercase tracking-tight m-0 ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>My Account</h1>
@@ -333,7 +424,8 @@ export default function Profile() {
                   </div>
 
                   <div className={`pt-4 mt-6 border-t ${isAgentMode ? 'border-slate-700' : 'border-gray-100'}`}>
-                    <h3 className={`text-[10px] font-black mb-4 uppercase tracking-widest w-max px-3 py-1.5 rounded-lg border ${isAgentMode ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : 'bg-orange-50 text-[#FF6B35] border-orange-100'}`}>🏦 ACCOUNT DATA (FOR AGENTS)</h3>
+                    {/* 🔥 UPDATE: Label header account data ke biru #2596be */}
+                    <h3 className={`text-[10px] font-black mb-4 uppercase tracking-widest w-max px-3 py-1.5 rounded-lg border ${isAgentMode ? 'bg-[#2596be]/10 text-[#2596be] border-[#2596be]/20' : 'bg-orange-50 text-[#FF6B35] border-orange-100'}`}>🏦 ACCOUNT DATA (FOR AGENTS)</h3>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
@@ -353,10 +445,11 @@ export default function Profile() {
                   </div>
 
                   <div className="pt-6">
+                    {/* 🔥 UPDATE: Button Save Changes dinamis Agent = #2596be, User = #FF6B35 */}
                     <button 
                       type="submit" 
                       disabled={isLoadingProfile}
-                      className={`w-full sm:w-auto bg-[#FF6B35] text-white px-10 py-4 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-[#E85526] transition-all active:scale-95 disabled:opacity-50 shadow-xl ${isAgentMode ? 'shadow-orange-500/20' : 'shadow-orange-100/50'}`}
+                      className={`w-full sm:w-auto text-white px-10 py-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 shadow-xl ${isAgentMode ? 'bg-[#2596be] hover:bg-[#1f7ca0] shadow-[#2596be]/20' : 'bg-[#FF6B35] hover:bg-[#E85526] shadow-orange-100/50'}`}
                     >
                       {isLoadingProfile ? 'SAVING...' : 'SAVE CHANGES'}
                     </button>
@@ -395,13 +488,29 @@ export default function Profile() {
                     <input type="password" value={passData.confirmPass} onChange={e => setPassData({...passData, confirmPass: e.target.value})} className={inputStyle} placeholder="••••••••" required />
                   </div>
                   <div className="pt-2">
-                     <button type="submit" disabled={isLoadingPass} className={`w-full text-white py-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 ${isAgentMode ? 'bg-slate-700 hover:bg-slate-600' : 'bg-gray-900 hover:bg-black'}`}>
+                     <button type="submit" disabled={isLoadingPass} className={`w-full text-white py-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 ${isAgentMode ? 'bg-[#2596be] hover:bg-[#1f7ca0]' : 'bg-gray-900 hover:bg-black'}`}>
                       {isLoadingPass ? 'PROCESSING...' : 'CHANGE PASSWORD'}
                     </button>
                   </div>
                 </form>
               )}
             </div>
+
+            {/* DANGER ZONE */}
+            <div className={`p-8 rounded-[32px] shadow-sm border ${isAgentMode ? 'bg-red-900/10 border-red-900/50 backdrop-blur-sm' : 'bg-red-50 border-red-100'}`}>
+              <h2 className={`text-xl font-black mb-2 uppercase tracking-wide ${isAgentMode ? 'text-red-500' : 'text-red-600'}`}>Danger Zone</h2>
+              <p className={`text-xs font-bold leading-relaxed mb-6 ${isAgentMode ? 'text-red-400/80' : 'text-red-500/80'}`}>
+                Hati-hati! Menghapus akun bersifat permanen. Seluruh data tiket dan riwayat event lu bakal hilang.
+              </p>
+              
+              <button 
+                onClick={() => setShowDeleteModal(true)}
+                className="w-full bg-red-600 text-white py-4 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-500/30"
+              >
+                DELETE MY ACCOUNT
+              </button>
+            </div>
+
           </div>
 
         </div>

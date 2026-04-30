@@ -58,21 +58,20 @@ export class SupabaseGuard implements CanActivate {
         
         const meta = user.user_metadata || {};
         const fullName = meta.custom_full_name || meta.full_name || meta.name || 'User Baru';
-        // Ambil foto dari metadata Google
         const avatarUrl = meta.custom_avatar_url || meta.picture || meta.avatar_url || '';
 
         try {
-          // Bikin record baru & langsung kembalikan datanya pakai RETURNING
-          // Note: Pastikan nama kolom gambar kamu 'picture' sesuai query select di atas
+          // 👇 KUNCI PERBAIKANNYA DI SINI BRO! 👇
+          // Kita HAPUS 'id' dari kolom insert. Biar database Postgres lu yang otomatis ngasih angka ID-nya!
           const insertRes = await this.pool.query(
-            `INSERT INTO users (id, email, name, picture) 
-             VALUES ($1, $2, $3, $4) 
+            `INSERT INTO users (email, name, picture) 
+             VALUES ($1, $2, $3) 
              RETURNING id, email, name, role, picture, phone, bank_name, bank_account, bank_account_name`,
-            [user.id, email, fullName, avatarUrl]
+            [email, fullName, avatarUrl]
           );
 
           request.user = insertRes.rows[0]; 
-          return true; // Pintu dibuka, user berhasil di-ruqyah!
+          return true; 
         } catch (insertError) {
           console.error('Gagal melakukan auto-heal pada user:', insertError);
           throw new UnauthorizedException('Gagal sinkronisasi data akun. Hubungi Admin.');

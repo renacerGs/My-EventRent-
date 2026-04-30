@@ -5,6 +5,7 @@ import * as dotenv from 'dotenv';
 import * as QRCode from 'qrcode';
 import * as midtransClient from 'midtrans-client';
 import * as crypto from 'crypto';
+import { createClient } from '@supabase/supabase-js';
 
 dotenv.config(); 
 
@@ -147,11 +148,10 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // --- AMBIL SESI EVENT (KHUSUS MOBILE) ---
   async getEventSessions(eventId: number) {
     try {
       if (!eventId || isNaN(eventId)) {
-        return []; // Balikin array kosong aja daripada meledak
+        return []; 
       }
       const sessionQuery = `
         SELECT id, name, description, TO_CHAR(session_date, 'Dy, DD Mon YYYY') as date, 
@@ -837,7 +837,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // --- PROFILE DATA (Update doang) ---
   async updateProfile(userId: number, data: any) {
     const res = await this.pool.query(
       `UPDATE users 
@@ -850,7 +849,55 @@ export class AppService implements OnModuleInit {
     return res.rows[0];
   }
 
-  // --- RIWAYAT SCAN AGEN ---
+  async deleteUserAccount(userId: number, email: string) {
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new InternalServerErrorException('Konfigurasi Supabase Admin belum diset!');
+    }
+
+    const supabaseAdmin = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY 
+    );
+
+    const client = await this.pool.connect();
+    
+    try {
+      await client.query('BEGIN'); 
+
+      const userRes = await client.query('SELECT picture FROM users WHERE id = $1', [userId]);
+      const pictureUrl = userRes.rows[0]?.picture;
+
+      if (pictureUrl && pictureUrl.includes('supabase')) {
+        const pathname = new URL(pictureUrl).pathname;
+        const filePath = pathname.substring(pathname.indexOf('avatars/') + 8); 
+        await supabaseAdmin.storage.from('avatars').remove([filePath.split('?')[0]]);
+      }
+
+      await client.query('DELETE FROM users WHERE id = $1', [userId]);
+
+      const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers();
+      if (authUsers?.users) {
+        const targetUser = authUsers.users.find(u => u.email === email);
+        if (targetUser) await supabaseAdmin.auth.admin.deleteUser(targetUser.id);
+      }
+
+      await client.query('COMMIT'); 
+      return { success: true, message: 'Akun dan foto berhasil dimusnahkan permanen!' };
+      
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      
+      if (err.code === '23503') {
+        throw new BadRequestException('Gagal: Akun ini tidak bisa dihapus karena masih digunakan sebagai pembuat Event, agen, atau memiliki tiket yang sedang berjalan.');
+      }
+
+      console.error('Error hapus akun:', err);
+      throw new InternalServerErrorException('Terjadi kesalahan pada server saat menghapus akun.');
+    } finally {
+      client.release();
+    }
+  }
+
   async getAgentScanHistory(userId: number) {
     try {
       const query = `
@@ -874,7 +921,6 @@ export class AppService implements OnModuleInit {
   // FITUR NOTIFICATIONS SYSTEM
   // ==========================================
 
-  // (Fungsi Bawaan Web)
   async getNotifications(userId: number) {
     try {
       const { rows } = await this.pool.query('SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
@@ -884,7 +930,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // (Fungsi Baru yang Udah Diperbarui buat Mobile)
   async getMyNotifications(userId: number) {
     try {
       const res = await this.pool.query(
@@ -901,7 +946,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // (Fungsi Respon Singkat Khusus Mobile)
   async respondToNotification(notifId: number, action: string) {
     try {
       await this.pool.query(`UPDATE notifications SET is_read = true WHERE id = $1`, [notifId]);
@@ -916,48 +960,78 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // (Fungsi Respon Lengkap Asli Web)
+  // 🔥 UPDATE: FUNGSI UNTUK MERESPON INVITASI DAN MENGUBAH TIPE NOTIFIKASI SECARA PERMANEN 🔥
   async respondAgentInvitation(notifId: number, userId: number, action: 'accept' | 'reject') {
+    const client = await this.pool.connect();
     try {
-      const notifRes = await this.pool.query('SELECT related_event_id FROM notifications WHERE id = $1 AND user_id = $2', [notifId, userId]);
+      await client.query('BEGIN');
+
+      const notifRes = await client.query('SELECT related_event_id FROM notifications WHERE id = $1 AND user_id = $2', [notifId, userId]);
       if (notifRes.rows.length === 0) throw new BadRequestException('Notifikasi tidak valid');
       
       const eventId = notifRes.rows[0].related_event_id;
 
-      const eventInfo = await this.pool.query('SELECT created_by, title FROM events WHERE id = $1', [eventId]);
+      const eventInfo = await client.query('SELECT created_by, title FROM events WHERE id = $1', [eventId]);
       const eoId = eventInfo.rows[0].created_by;
       const eventTitle = eventInfo.rows[0].title;
 
-      const agentInfo = await this.pool.query('SELECT name FROM users WHERE id = $1', [userId]);
+      const agentInfo = await client.query('SELECT name FROM users WHERE id = $1', [userId]);
       const agentName = agentInfo.rows[0].name;
 
       if (action === 'accept') {
-        await this.pool.query('UPDATE event_agents SET is_accepted = TRUE WHERE event_id = $1 AND user_id = $2', [eventId, userId]);
-        await this.pool.query(
+        await client.query('UPDATE event_agents SET is_accepted = TRUE WHERE event_id = $1 AND user_id = $2', [eventId, userId]);
+        await client.query(
           `INSERT INTO notifications (user_id, title, message, type, related_event_id)
            VALUES ($1, $2, $3, 'INFO', $4)`,
           [eoId, 'Undangan Agen Diterima! 🎉', `Agen ${agentName} menerima undangan di event: ${eventTitle}.`, eventId]
         );
       } else {
-        await this.pool.query('DELETE FROM event_agents WHERE event_id = $1 AND user_id = $2', [eventId, userId]);
-        await this.pool.query(
+        await client.query('DELETE FROM event_agents WHERE event_id = $1 AND user_id = $2', [eventId, userId]);
+        await client.query(
           `INSERT INTO notifications (user_id, title, message, type, related_event_id)
            VALUES ($1, $2, $3, 'INFO', $4)`,
           [eoId, 'Undangan Agen Ditolak ❌', `Agen ${agentName} menolak tawaran di event: ${eventTitle}.`, eventId]
         );
       }
 
-      await this.pool.query('UPDATE notifications SET is_read = TRUE, type = $1 WHERE id = $2', [action === 'accept' ? 'INVITATION_ACCEPTED' : 'INVITATION_REJECTED', notifId]);
+      // 🔥 BAGIAN KRUSIAL: Update tipe notifikasi di DB berdasarkan action 🔥
+      const newType = action === 'accept' ? 'INVITATION_ACCEPTED' : 'INVITATION_REJECTED';
+      await client.query('UPDATE notifications SET is_read = TRUE, type = $1 WHERE id = $2', [newType, notifId]);
+
+      await client.query('COMMIT');
       return { message: action === 'accept' ? 'Undangan berhasil diterima!' : 'Undangan berhasil ditolak.' };
     } catch (err) {
+      await client.query('ROLLBACK');
       if (err instanceof BadRequestException) throw err;
       throw new InternalServerErrorException('Gagal memproses undangan');
+    } finally {
+      client.release();
     }
   }
 
   async markNotificationRead(notifId: number, userId: number) {
     await this.pool.query('UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2', [notifId, userId]);
     return { success: true };
+  }
+
+  async deleteNotifications(notifIds: number[], userId: number) {
+    try {
+      const query = 'DELETE FROM notifications WHERE id = ANY($1) AND user_id = $2';
+      await this.pool.query(query, [notifIds, userId]);
+      return { message: 'Notifikasi berhasil dihapus!' };
+    } catch (error) {
+      throw new InternalServerErrorException('Gagal menghapus notifikasi');
+    }
+  }
+
+  async deleteAllNotifications(userId: number) {
+    try {
+      const query = 'DELETE FROM notifications WHERE user_id = $1';
+      await this.pool.query(query, [userId]);
+      return { message: 'Semua notifikasi berhasil dibersihkan!' };
+    } catch (error) {
+      throw new InternalServerErrorException('Gagal membersihkan notifikasi');
+    }
   }
 
   // ==========================================
@@ -1347,7 +1421,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // --- Ambil tiket khusus event ---
   async getEventTickets(eventId: number) {
     try {
       const res = await this.pool.query(

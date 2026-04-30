@@ -60,30 +60,26 @@ export default function App() {
 
   // 🔥 DETEKSI & HANDLE ERROR URL DARI SUPABASE GOOGLE AUTH 🔥
   useEffect(() => {
-    // Supabase bisa menaruh error di search (?) atau hash (#)
     const queryParams = new URLSearchParams(location.search);
     const hashParams = new URLSearchParams(location.hash.replace('#', '?'));
     
     const errorDesc = queryParams.get('error_description') || hashParams.get('error_description');
 
     if (errorDesc) {
-      // 1. Tampilkan Pop-up Modern
       toast.error(errorDesc.replace(/\+/g, ' '), {
         duration: 6000,
         style: {
-          background: '#fee2e2', // red-100
-          color: '#991b1b', // red-800
-          border: '1px solid #f87171', // red-400
+          background: '#fee2e2', 
+          color: '#991b1b', 
+          border: '1px solid #f87171', 
           fontWeight: 'bold'
         },
       });
 
-      // 2. Bersihkan URL (Hapus error parameters) tanpa reload halaman
       navigate(location.pathname, { replace: true });
     }
   }, [location, navigate]);
 
-  // Sembunyikan Navbar/Footer di Halaman Undangan DAN Form RSVP
   const isInvitationPage = 
     location.pathname.startsWith('/invitation') || 
     location.pathname.startsWith('/party') || 
@@ -111,8 +107,8 @@ export default function App() {
     return children;
   };
 
-  // 🔥 FUNGSI GLOBAL BUAT NANGANIN LOGIN SUCCESS (Biar DRY) 🔥
-  const handleLoginSuccess = (userData) => {
+  // Set default showToast = true biar dari LoginModal tetep muncul
+  const handleLoginSuccess = (userData, showToast = true) => {
     setUser(userData); 
     try {
       localStorage.setItem('user', JSON.stringify(userData)); 
@@ -120,6 +116,18 @@ export default function App() {
       localStorage.setItem('user', JSON.stringify({ ...userData, picture: null }));
     }
     setIsLoginOpen(false); 
+
+    // Cuma eksekusi toast kalau showToast true
+    if (showToast) {
+      if (userData.role === 'agent') {
+        // Kasih id: 'auth-toast' biar toast nggak numpuk kalau kepanggil 2x
+        toast.success(`Berhasil masuk portal agen, ${userData.name}!`, { id: 'auth-toast' });
+        if (location.pathname === '/') navigate('/agent');
+      } else {
+        toast.success('Kembali ke mode Reguler.', { id: 'auth-toast' }); 
+        if (location.pathname === '/agent') navigate('/');
+      }
+    }
   };
 
   return (
@@ -147,6 +155,7 @@ export default function App() {
           onLogout={() => {
             setUser(null);
             localStorage.removeItem('user');
+            localStorage.removeItem('agentMode'); // Bersihin memori mode agen
             toast.success('Berhasil logout bro!'); 
           }}
           onLoginSuccess={handleLoginSuccess}
@@ -213,16 +222,8 @@ export default function App() {
       <LoginModal 
         isOpen={isLoginOpen} 
         onClose={() => setIsLoginOpen(false)} 
-        onLoginSuccess={(userData) => {
-          handleLoginSuccess(userData); 
-          
-          if (userData.role === 'agent') {
-            toast.success(`Berhasil masuk portal agen, ${userData.name}!`);
-            navigate('/agent'); 
-          } else {
-            toast.success('Login berhasil! Welcome back bro.'); 
-          }
-        }}
+        // 🔥 Cukup panggil handleLoginSuccess, karena urusan lempar melempar URL udah dihandle di dalamnya
+        onLoginSuccess={handleLoginSuccess}
       />
 
       {!isInvitationPage && <Footer />}

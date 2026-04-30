@@ -106,7 +106,12 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
   const isAgentMode = user?.role === 'agent';
 
   useEffect(() => {
+    let isMounted = true;
+    let isLoggingOut = false;
+
     const syncUserProfile = async (session) => {
+      if (isLoggingOut || !session?.access_token) return;
+
       try {
         const token = session.access_token;
         localStorage.setItem('supabase_token', token);
@@ -115,10 +120,16 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
           headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        if (res.ok) {
+        if (res.ok && isMounted) {
           const richUser = await res.json();
           richUser.role = localStorage.getItem('agentMode') === 'true' ? 'agent' : (richUser.role || 'user');
-          if (onLoginSuccess) onLoginSuccess(richUser);
+          // 🔥 FIX: Kirim false agar saat web ke-refresh (auto-sync), pop-up toast tidak muncul dobel
+          if (onLoginSuccess) onLoginSuccess(richUser, false);
+        } else if (res.status === 401) {
+          isLoggingOut = true;
+          localStorage.removeItem('supabase_token');
+          await supabase.auth.signOut();
+          if (onLogout) onLogout();
         }
       } catch (err) {
         console.error("Gagal sync user:", err);
@@ -131,14 +142,17 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
+        isLoggingOut = false;
         syncUserProfile(session);
       } else if (event === 'SIGNED_OUT') {
+        isLoggingOut = true;
         localStorage.removeItem('supabase_token');
         if(onLogout) onLogout();
       }
     });
 
     return () => {
+      isMounted = false;
       authListener.subscription.unsubscribe();
     };
   }, []);
@@ -193,7 +207,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
       const token = localStorage.getItem('supabase_token');
       if (!token) return;
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/me/notifications`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -270,10 +284,13 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     
     localStorage.setItem('agentMode', !isAgentMode);
     
-    if(onLoginSuccess) onLoginSuccess(updatedUser); 
+    // 🔥 FIX: Kirim true karena ini interaksi manual dari user (biar pop-up muncul 1 kali)
+    if(onLoginSuccess) onLoginSuccess(updatedUser, true); 
 
     setIsDropdownOpen(false);
-    window.location.href = isAgentMode ? '/' : '/agent'; 
+    
+    // 🔥 FIX: Ganti window.location.href dengan navigate! Anti hard-reload club!
+    navigate(isAgentMode ? '/' : '/agent'); 
   };
 
   const handleActualLogout = async () => {

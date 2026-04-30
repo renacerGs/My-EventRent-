@@ -3,10 +3,8 @@ import { useGoogleLogin } from '@react-oauth/google';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, CheckCircle2, RefreshCw, ArrowLeft, UserCircle2, Briefcase, KeyRound } from 'lucide-react'; 
 
-// 👇 IMPORT SUPABASE LU DI SINI
 import { supabase } from '../supabase'; 
 
-// 🔥 UBAHAN: Terima activeColor biar matanya bisa ganti warna Biru/Orange
 const AnimatedEyeToggle = ({ isVisible, activeColor = "#FF6B35" }) => {
   const strokeColor = "#9ca3af"; 
 
@@ -26,10 +24,11 @@ const OtpVerification = ({ email, onVerified, onCancel, isAgentMode }) => {
   const [resendCooldown, setResendCooldown] = useState(0);
   const inputRefs = useRef([]);
 
-  const themeColor = isAgentMode ? 'text-blue-600' : 'text-[#FF6B35]';
-  const themeBg = isAgentMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-[#FF6B35] hover:bg-[#e85526]';
-  const themeRing = isAgentMode ? 'focus:ring-blue-500/30 focus:border-blue-500' : 'focus:ring-[#FF6B35]/30 focus:border-[#FF6B35]';
-  const themeIconBg = isAgentMode ? 'bg-blue-50 text-blue-600' : 'bg-[#FF6B35]/10 text-[#FF6B35]';
+  // 🔥 UPDATE WARNA AGEN KE #0f172a
+  const themeColor = isAgentMode ? 'text-[#0f172a]' : 'text-[#FF6B35]';
+  const themeBg = isAgentMode ? 'bg-[#0f172a] hover:bg-[#1f7ca0]' : 'bg-[#FF6B35] hover:bg-[#e85526]';
+  const themeRing = isAgentMode ? 'focus:ring-[#0f172a]/30 focus:border-[#0f172a]' : 'focus:ring-[#FF6B35]/30 focus:border-[#FF6B35]';
+  const themeIconBg = isAgentMode ? 'bg-[#0f172a]/10 text-[#0f172a]' : 'bg-[#FF6B35]/10 text-[#FF6B35]';
 
   const verifyOtpCode = async (codeToVerify) => {
     if (codeToVerify.length < 6 || isLoading) return;
@@ -220,7 +219,6 @@ const ForgotPasswordScreen = ({ onCancel, onPasswordResetSuccess }) => {
 
   return (
     <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full h-full flex flex-col justify-center items-center bg-white p-6 sm:p-8">
-      {/* 🔥 UBAHAN: Forgot Password jadi ORANGE FULL 🔥 */}
       <div className="w-16 h-16 bg-[#FF6B35]/10 text-[#FF6B35] rounded-full flex items-center justify-center mb-6">
         <KeyRound className="w-8 h-8" />
       </div>
@@ -312,6 +310,10 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
     try {
       setIsLoading(true);
       setErrorMsg('');
+      
+      // 🔥 FIX GOOGLE AUTH: SIMPAN PILIHAN AGEN KE LOCAL STORAGE SEBELUM PINDAH HALAMAN 🔥
+      localStorage.setItem('agentMode', isAgentMode ? 'true' : 'false');
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
       });
@@ -356,6 +358,9 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
 
         const token = data.session.access_token;
         localStorage.setItem('supabase_token', token);
+        
+        // Simpan mode ke brankas biar pas refresh tetap kebaca
+        localStorage.setItem('agentMode', isAgentMode ? 'true' : 'false');
 
         const loggedInUser = { 
           ...data.user, 
@@ -374,6 +379,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
   };
 
   const handleOtpSuccess = (userData) => {
+    localStorage.setItem('agentMode', isAgentMode ? 'true' : 'false');
     onLoginSuccess(userData);
     onClose(); 
   };
@@ -400,8 +406,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
           </div>
         ) : (
           <>
-            {/* 🔥 UBAHAN: Header Mobile dinamis (Hitam kalau Agen) 🔥 */}
-            <div className={`md:hidden relative w-full px-6 py-10 overflow-hidden flex flex-col items-center justify-center text-center shadow-sm transition-colors duration-500 ${isAgentMode ? 'bg-gray-900' : 'bg-[#FF6B35]'}`}>
+            {/* 🔥 UPDATE: Background Agent jadi Biru #0f172a 🔥 */}
+            <div className={`md:hidden relative w-full px-6 py-10 overflow-hidden flex flex-col items-center justify-center text-center shadow-sm transition-colors duration-500 ${isAgentMode ? 'bg-[#0f172a]' : 'bg-[#FF6B35]'}`}>
               <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
               <div className="absolute bottom-[-20%] left-[-10%] w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
               
@@ -427,7 +433,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                 </h2>
               </div>
 
-              {/* 🔥 UBAHAN: Toggle UI dinamis (Biru/Orange) 🔥 */}
+              {/* 🔥 UPDATE: Warna switch toggle ke #0f172a 🔥 */}
               <div className="w-full bg-gray-100 p-1 rounded-xl flex items-center justify-between mb-6 shadow-inner relative">
                 <div 
                   className={`absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-lg shadow-sm transition-all duration-300 ease-out z-0`}
@@ -436,7 +442,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                 <button type="button" onClick={() => setIsAgentMode(false)} className={`flex-1 py-2 text-[10px] sm:text-xs font-black uppercase tracking-widest z-10 transition-colors flex items-center justify-center gap-1.5 ${!isAgentMode ? 'text-[#FF6B35]' : 'text-gray-400 hover:text-gray-600'}`}>
                   <UserCircle2 className="w-3.5 h-3.5" /> Reguler
                 </button>
-                <button type="button" onClick={() => setIsAgentMode(true)} className={`flex-1 py-2 text-[10px] sm:text-xs font-black uppercase tracking-widest z-10 transition-colors flex items-center justify-center gap-1.5 ${isAgentMode ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
+                <button type="button" onClick={() => setIsAgentMode(true)} className={`flex-1 py-2 text-[10px] sm:text-xs font-black uppercase tracking-widest z-10 transition-colors flex items-center justify-center gap-1.5 ${isAgentMode ? 'text-[#0f172a]' : 'text-gray-400 hover:text-gray-600'}`}>
                   <Briefcase className="w-3.5 h-3.5" /> Agen
                 </button>
               </div>
@@ -454,21 +460,21 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                 <motion.div key={isSignUp ? 'form-signup' : 'form-signin'} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.3 }}>
                   <form onSubmit={handleSubmit} className="space-y-3.5 md:space-y-4">
                     {isSignUp && (
-                      <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Full Name" className={`w-full px-5 py-3.5 md:py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:bg-white border border-transparent transition-all text-sm ${isAgentMode ? 'focus:ring-blue-500/30 focus:border-blue-100' : 'focus:ring-[#FF6B35]/30 focus:border-orange-100'}`} required />
+                      <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Full Name" className={`w-full px-5 py-3.5 md:py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:bg-white border border-transparent transition-all text-sm ${isAgentMode ? 'focus:ring-[#0f172a]/30 focus:border-[#0f172a]/30' : 'focus:ring-[#FF6B35]/30 focus:border-orange-100'}`} required />
                     )}
-                    <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Email" className={`w-full px-5 py-3.5 md:py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:bg-white border border-transparent transition-all text-sm ${isAgentMode ? 'focus:ring-blue-500/30 focus:border-blue-100' : 'focus:ring-[#FF6B35]/30 focus:border-orange-100'}`} required />
+                    <input type="email" name="email" value={formData.email} onChange={handleChange} placeholder="Email" className={`w-full px-5 py-3.5 md:py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:bg-white border border-transparent transition-all text-sm ${isAgentMode ? 'focus:ring-[#0f172a]/30 focus:border-[#0f172a]/30' : 'focus:ring-[#FF6B35]/30 focus:border-orange-100'}`} required />
                     
                     <div className="relative w-full group">
-                      <input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} placeholder="Password" className={`w-full pl-5 pr-12 py-3.5 md:py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:bg-white border border-transparent transition-all text-sm ${isAgentMode ? 'focus:ring-blue-500/30 focus:border-blue-100' : 'focus:ring-[#FF6B35]/30 focus:border-orange-100'}`} required />
+                      <input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} placeholder="Password" className={`w-full pl-5 pr-12 py-3.5 md:py-3 bg-gray-50 rounded-2xl outline-none focus:ring-2 focus:bg-white border border-transparent transition-all text-sm ${isAgentMode ? 'focus:ring-[#0f172a]/30 focus:border-[#0f172a]/30' : 'focus:ring-[#FF6B35]/30 focus:border-orange-100'}`} required />
                       <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-4 top-1/2 -translate-y-1/2 focus:outline-none flex items-center justify-center p-1.5 z-10">
-                        {/* 🔥 UBAHAN: Mata dinamis warnanya 🔥 */}
-                        <AnimatedEyeToggle isVisible={showPassword} activeColor={isAgentMode ? "#2563eb" : "#FF6B35"} />
+                        {/* 🔥 UPDATE: Mata dinamis warnanya 🔥 */}
+                        <AnimatedEyeToggle isVisible={showPassword} activeColor={isAgentMode ? "#0f172a" : "#FF6B35"} />
                       </button>
                     </div>
 
                     {!isSignUp && (
                       <div className="flex justify-end w-full">
-                        <button type="button" onClick={() => setShowForgotPassword(true)} className={`text-[10px] font-bold text-gray-500 transition-colors uppercase tracking-widest cursor-pointer ${isAgentMode ? 'hover:text-blue-600' : 'hover:text-[#FF6B35]'}`}>
+                        <button type="button" onClick={() => setShowForgotPassword(true)} className={`text-[10px] font-bold text-gray-500 transition-colors uppercase tracking-widest cursor-pointer ${isAgentMode ? 'hover:text-[#0f172a]' : 'hover:text-[#FF6B35]'}`}>
                           Lupa Password?
                         </button>
                       </div>
@@ -477,8 +483,8 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                     {errorMsg && <p className="text-red-500 text-[10px] text-center font-bold bg-red-50 py-2.5 rounded-xl italic">{errorMsg}</p>}
                     {successMsg && <p className="text-green-600 text-[10px] text-center font-bold bg-green-50 py-2.5 rounded-xl italic">{successMsg}</p>}
 
-                    {/* 🔥 UBAHAN: Tombol dinamis warnanya (Biru/Orange) 🔥 */}
-                    <button type="submit" disabled={isLoading} className={`w-full py-4 text-white rounded-2xl font-black uppercase text-xs tracking-widest transition-all active:scale-95 disabled:opacity-50 italic mt-2 ${isAgentMode ? 'bg-blue-600 hover:bg-blue-700 shadow-[0_8px_20px_-6px_rgba(37,99,235,0.5)]' : 'bg-[#FF6B35] hover:bg-[#e85526] shadow-[0_8px_20px_-6px_rgba(255,107,53,0.5)]'}`}>
+                    {/* 🔥 UPDATE: Tombol dinamis warnanya (Biru/Orange) 🔥 */}
+                    <button type="submit" disabled={isLoading} className={`w-full py-4 text-white rounded-2xl font-black uppercase text-xs tracking-widest transition-all active:scale-95 disabled:opacity-50 italic mt-2 ${isAgentMode ? 'bg-[#0f172a] hover:bg-[#1f7ca0] shadow-[0_8px_20px_-6px_rgba(37,150,190,0.5)]' : 'bg-[#FF6B35] hover:bg-[#e85526] shadow-[0_8px_20px_-6px_rgba(255,107,53,0.5)]'}`}>
                       {isLoading ? 'Processing...' : (isSignUp ? 'Sign Up' : (isAgentMode ? 'Masuk Portal Agen' : 'Sign In'))}
                     </button>
                   </form>
@@ -487,15 +493,15 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
 
               <div className="md:hidden mt-8 pt-6 border-t border-gray-100 text-center">
                  <p className="text-[11px] text-gray-500 font-medium">{isSignUp ? "Already have an account?" : "Don't have an account?"}</p>
-                 <button type="button" onClick={() => { setIsSignUp(!isSignUp); setErrorMsg(''); setSuccessMsg(''); setShowPassword(false); }} className={`mt-2 font-black text-xs uppercase tracking-widest active:scale-95 transition-transform ${isAgentMode ? 'text-blue-600' : 'text-[#FF6B35]'}`}>
+                 <button type="button" onClick={() => { setIsSignUp(!isSignUp); setErrorMsg(''); setSuccessMsg(''); setShowPassword(false); }} className={`mt-2 font-black text-xs uppercase tracking-widest active:scale-95 transition-transform ${isAgentMode ? 'text-[#0f172a]' : 'text-[#FF6B35]'}`}>
                    {isSignUp ? "Sign In Here" : "Create Account"}
                  </button>
               </div>
             </div>
 
-            {/* 🔥 UBAHAN: Background Kanan Desktop dinamis (Hitam kalau Agen) 🔥 */}
+            {/* 🔥 UPDATE: Background Kanan Desktop dinamis (Biru #0f172a) 🔥 */}
             <div className={`hidden md:flex absolute top-0 left-0 w-1/2 h-full transition-transform duration-700 ease-in-out z-100 ${isSignUp ? '-translate-x-0' : 'translate-x-full'}`}>
-              <div className={`h-full w-full flex flex-col items-center justify-center text-white p-12 text-center relative overflow-hidden transition-colors duration-500 ${isAgentMode ? 'bg-gray-900' : 'bg-[#FF6B35]'}`}>
+              <div className={`h-full w-full flex flex-col items-center justify-center text-white p-12 text-center relative overflow-hidden transition-colors duration-500 ${isAgentMode ? 'bg-[#0f172a]' : 'bg-[#FF6B35]'}`}>
                 <div className="absolute top-[-10%] right-[-10%] w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
                 <div className="absolute bottom-[-10%] left-[-10%] w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
 
@@ -507,7 +513,7 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
                     <p className="text-sm font-medium mb-10 opacity-90 leading-relaxed">
                       {isSignUp ? "Enter your personal details to stay connected with the best events." : "Sign up if you still don't have an account and join the party!"}
                     </p>
-                    <button type="button" onClick={() => { setIsSignUp(!isSignUp); setErrorMsg(''); setSuccessMsg(''); setShowPassword(false); }} className={`px-12 py-3 border-2 border-white rounded-2xl font-black uppercase text-[10px] tracking-[2px] transition-all active:scale-90 hover:bg-white ${isAgentMode ? 'hover:text-gray-900' : 'hover:text-[#FF6B35]'}`}>
+                    <button type="button" onClick={() => { setIsSignUp(!isSignUp); setErrorMsg(''); setSuccessMsg(''); setShowPassword(false); }} className={`px-12 py-3 border-2 border-white rounded-2xl font-black uppercase text-[10px] tracking-[2px] transition-all active:scale-90 hover:bg-white ${isAgentMode ? 'hover:text-[#0f172a]' : 'hover:text-[#FF6B35]'}`}>
                       {isSignUp ? 'Sign In' : 'Sign Up'}
                     </button>
                   </motion.div>
@@ -520,3 +526,4 @@ export default function LoginModal({ isOpen, onClose, onLoginSuccess }) {
     </div>
   );
 }
+

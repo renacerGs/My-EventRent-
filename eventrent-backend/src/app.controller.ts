@@ -226,6 +226,14 @@ export class AppController {
     return await this.appService.updateProfile(req.user.id, data);
   }
 
+  @ApiTags('Users')
+  @ApiOperation({ summary: 'Menghapus akun permanen (User & Storage)' })
+  @UseGuards(SupabaseGuard)
+  @Delete('users/me')
+  async deleteMyAccount(@Req() req) {
+    return await this.appService.deleteUserAccount(req.user.id, req.user.email);
+  }
+
   @UseGuards(SupabaseGuard)
   @Get('users/:id/scan-history')
   async getScanHistory(@Req() req) {
@@ -285,6 +293,24 @@ export class AppController {
   @Patch('notifications/:id/read')
   async markNotifRead(@Param('id') notifId: number, @Req() req) {
     return await this.appService.markNotificationRead(notifId, req.user.id);
+  }
+
+  // 🔥 ENDPOINT BARU: HAPUS SPESIFIK NOTIFIKASI 🔥
+  @ApiTags('Notifications')
+  @ApiOperation({ summary: 'Menghapus banyak notifikasi berdasarkan ID' })
+  @UseGuards(SupabaseGuard)
+  @Delete('notifications')
+  async deleteNotifications(@Req() req, @Body() body: { notifIds: number[] }) {
+    return await this.appService.deleteNotifications(body.notifIds, req.user.id);
+  }
+
+  // 🔥 ENDPOINT BARU: HAPUS SEMUA NOTIFIKASI 🔥
+  @ApiTags('Notifications')
+  @ApiOperation({ summary: 'Menghapus SEMUA notifikasi milik user yang login' })
+  @UseGuards(SupabaseGuard)
+  @Delete('notifications/all')
+  async deleteAllNotifications(@Req() req) {
+    return await this.appService.deleteAllNotifications(req.user.id);
   }
 
   // ==========================================
