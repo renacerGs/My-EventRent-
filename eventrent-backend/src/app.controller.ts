@@ -313,10 +313,6 @@ export class AppController {
     return await this.appService.deleteAllNotifications(req.user.id);
   }
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 2e9381a26812cf273ff9347d1cfcb3ca2295dac0
   // ==========================================
   // --- FITUR REPORTS / KENDALA ---
   // ==========================================
