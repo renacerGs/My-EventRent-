@@ -82,17 +82,26 @@ export default function EditWeddingEvent() {
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [cropTarget, setCropTarget] = useState(null); 
 
+  // 🔥 FETCH DATA LAMA (DITAMBAHIN KTP TOKEN)
   useEffect(() => {
     if (!userId) { navigate('/'); return; }
 
-    fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`)
-      .then(res => {
-        if (!res.ok) throw new Error("Gagal load event");
-        return res.json();
-      })
-      .then(found => {
+    const fetchEventData = async () => {
+      try {
+        const token = localStorage.getItem('supabase_token');
+        if (!token) throw new Error("No token found");
+
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}` // 👈 Token lu wajib ikut
+          }
+        });
+
+        if (!res.ok) throw new Error("Failed to load event data");
+        const found = await res.json();
+
         if (found.category !== 'Wedding' && found.category !== 'Personal' && !found.is_private) {
-          toast.error("Ini bukan Private/Wedding Event. Gunakan menu Edit Public Event.");
+          toast.error("This is not a Private/Wedding Event. Please use the Edit Public Event menu.");
           navigate('/manage');
           return;
         }
@@ -140,12 +149,15 @@ export default function EditWeddingEvent() {
         setExistingGallery(details.galleryImages || []);
         
         setIsLoading(false);
-      })
-      .catch(err => {
+      } catch (err) {
         console.error(err);
-        toast.error("Gagal memuat data edit");
+        toast.error("Failed to load event details");
+        setIsLoading(false);
         navigate('/manage');
-      });
+      }
+    };
+
+    fetchEventData();
   }, [id, navigate, userId]);
 
   const handleChange = (e) => {
@@ -167,7 +179,7 @@ export default function EditWeddingEvent() {
 
   const handleGallerySelect = (e) => {
     const files = Array.from(e.target.files);
-    if (existingGallery.length + newGalleryFiles.length + files.length > 5) return toast.error("Maksimal hanya 5 foto galeri!");
+    if (existingGallery.length + newGalleryFiles.length + files.length > 5) return toast.error("Maximum of 5 gallery photos allowed!");
     const newFiles = files.map(file => ({ file, preview: URL.createObjectURL(file) }));
     setNewGalleryFiles(prev => [...prev, ...newFiles]);
     e.target.value = null; 
@@ -193,7 +205,7 @@ export default function EditWeddingEvent() {
       if (cropTarget === 'cover') { setImagePreview(croppedBase64); setNewCoverBase64(croppedBase64); } 
       else { setProfiles(prev => prev.map(p => p.id === cropTarget ? { ...p, photoUrl: croppedBase64 } : p)); }
       setShowCropModal(false); setCropTarget(null);
-    } catch (e) { toast.error('Gagal memotong gambar!'); }
+    } catch (e) { toast.error('Failed to crop image!'); }
   };
 
   const handleSessionLocationChange = (sIndex, field, value) => {
@@ -219,7 +231,7 @@ export default function EditWeddingEvent() {
 
   const removeSession = (indexToRemove) => {
     setFormData(prev => {
-      if (prev.sessions.length <= 1) { toast.error("Minimal harus ada 1 session untuk event ini!"); return prev; }
+      if (prev.sessions.length <= 1) { toast.error("There must be at least 1 session for this event!"); return prev; }
       return { ...prev, sessions: prev.sessions.filter((_, index) => index !== indexToRemove) };
     });
   };
@@ -286,15 +298,19 @@ export default function EditWeddingEvent() {
     const fileExt = fileToUpload.type === 'image/webp' ? 'webp' : fileToUpload.name ? fileToUpload.name.split('.').pop() : 'jpg';
     const fileName = `${folderPath}-${Date.now()}-${Math.floor(Math.random()*1000)}.${fileExt}`;
     const { error } = await supabase.storage.from('event-posters').upload(fileName, fileToUpload, { contentType: fileToUpload.type || 'image/jpeg' });
-    if (error) throw new Error("Gagal upload gambar.");
+    if (error) throw new Error("Failed to upload image.");
     const { data } = supabase.storage.from('event-posters').getPublicUrl(fileName); return data.publicUrl;
   };
 
+  // 🔥 SUBMIT UPDATE EVENT (DITAMBAHIN KTP TOKEN JUGA)
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSaving(true);
     
     try {
+      const token = localStorage.getItem('supabase_token');
+      if (!token) throw new Error("Authentication failed. Please login again.");
+
       const finalCoverUrl = newCoverBase64 ? await uploadToSupabase(newCoverBase64, 'cover') : formData.oldImgUrl;
       const uploadedProfiles = await Promise.all(profiles.map(async (prof) => {
          if (prof.photoUrl && prof.photoUrl.startsWith('data:image')) { const url = await uploadToSupabase(prof.photoUrl, `profile-${prof.id}`); return { ...prof, photoUrl: url }; }
@@ -325,15 +341,22 @@ export default function EditWeddingEvent() {
         isPrivate: true      
       };
 
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}?userId=${userId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}?userId=${userId}`, { 
+        method: 'PUT', 
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` // 👈 Jangan lupa KTP bro!
+        }, 
+        body: JSON.stringify(payload) 
+      });
 
       if (res.ok) { 
         setShowSuccessModal(true);
         setTimeout(() => { navigate('/manage'); }, 1500); 
       } else { 
-        toast.error("Gagal update. Pastikan kamu pembuat event ini.");
+        toast.error("Failed to update. Make sure you are the creator of this event.");
       }
-    } catch (err) { console.error(err); toast.error(err.message || "Terjadi kesalahan."); }
+    } catch (err) { console.error(err); toast.error(err.message || "An error occurred."); }
     finally { setIsSaving(false); }
   };
 
@@ -343,9 +366,9 @@ export default function EditWeddingEvent() {
   const labelStyle = `text-xs font-bold mb-1.5 block uppercase tracking-wider text-gray-300`;
 
   const TEMPLATES = [
-    { id: 'elegant-gold', name: 'Elegant Gold', desc: 'Mewah, Hitam & Emas', style: 'bg-slate-950 border-slate-700 text-[#D4AF37]' },
-    { id: 'floral-white', name: 'Floral White', desc: 'Bersih, Putih & Estetik', style: 'bg-gray-100 border-gray-300 text-gray-800' },
-    { id: 'dark-romantic', name: 'Dark Romantic', desc: 'Elegan, Merah Maroon', style: 'bg-rose-950 border-rose-900 text-rose-300' }
+    { id: 'elegant-gold', name: 'Elegant Gold', desc: 'Luxury, Black & Gold', style: 'bg-slate-950 border-slate-700 text-[#D4AF37]' },
+    { id: 'floral-white', name: 'Floral White', desc: 'Clean, White & Aesthetic', style: 'bg-gray-100 border-gray-300 text-gray-800' },
+    { id: 'dark-romantic', name: 'Dark Romantic', desc: 'Elegant, Maroon Red', style: 'bg-rose-950 border-rose-900 text-rose-300' }
   ];
 
   return (
@@ -355,8 +378,8 @@ export default function EditWeddingEvent() {
         <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-slate-900 border border-slate-800 rounded-[24px] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col">
             <div className="p-5 border-b border-slate-800 flex justify-between items-center">
-              <h3 className="text-lg font-black uppercase tracking-widest text-white">Sesuaikan Gambar</h3>
-              <button onClick={() => setShowCropModal(false)} className="text-gray-400 hover:text-red-500 font-bold">✕ Batal</button>
+              <h3 className="text-lg font-black uppercase tracking-widest text-white">Adjust Image</h3>
+              <button onClick={() => setShowCropModal(false)} className="text-gray-400 hover:text-red-500 font-bold">✕ Cancel</button>
             </div>
             <div className="relative w-full h-[50vh] bg-black">
               <Cropper image={rawImageSrc} crop={crop} zoom={zoom} aspect={cropTarget === 'cover' ? 736 / 436 : 1 / 1} onCropChange={setCrop} onCropComplete={onCropComplete} onZoomChange={setZoom} />
@@ -366,7 +389,7 @@ export default function EditWeddingEvent() {
                 <span className="text-xs font-bold text-gray-400 uppercase">Zoom:</span>
                 <input type="range" min={1} max={3} step={0.1} value={zoom} onChange={(e) => setZoom(e.target.value)} className="w-full accent-[#D4AF37]" />
               </div>
-              <button onClick={handleSaveCrop} className="px-8 py-3 bg-[#D4AF37] text-slate-900 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-[#FFDF73]">✔ Simpan</button>
+              <button onClick={handleSaveCrop} className="px-8 py-3 bg-[#D4AF37] text-slate-900 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-[#FFDF73]">✔ Save</button>
             </div>
           </div>
         </div>
@@ -374,15 +397,15 @@ export default function EditWeddingEvent() {
 
       <div className="pt-8 px-6 max-w-4xl mx-auto flex items-center justify-between mb-8">
         <h1 className="text-3xl font-black uppercase tracking-tight text-white">Edit Wedding</h1>
-        <button onClick={() => navigate('/manage')} className="text-gray-400 hover:text-red-500 font-bold text-xs uppercase tracking-widest">Batal</button>
+        <button onClick={() => navigate('/manage')} className="text-gray-400 hover:text-red-500 font-bold text-xs uppercase tracking-widest">Cancel</button>
       </div>
 
       <main className="max-w-4xl mx-auto px-6">
 
         <form onSubmit={handleSubmit}>
 
-          <SectionAccordion title="1. Ubah Tema Undangan" isOpen={openSection === 'template'} onToggle={() => toggleSection('template')}>
-            <p className="text-sm text-gray-400 mb-6">Pilih tema desain untuk halaman undangan digital Anda.</p>
+          <SectionAccordion title="1. Change Invitation Theme" isOpen={openSection === 'template'} onToggle={() => toggleSection('template')}>
+            <p className="text-sm text-gray-400 mb-6">Choose your favorite theme</p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {TEMPLATES.map(theme => (
                 <div 
@@ -401,105 +424,105 @@ export default function EditWeddingEvent() {
             </div>
           </SectionAccordion>
           
-          <SectionAccordion title="2. Cover & Teks Pembuka" isOpen={openSection === 'basic'} onToggle={() => toggleSection('basic')}>
+          <SectionAccordion title="2. Cover & Opening Text" isOpen={openSection === 'basic'} onToggle={() => toggleSection('basic')}>
             <div className="space-y-5">
               <div>
-                <label className={labelStyle}>Foto Cover Undangan</label>
+                <label className={labelStyle}>Invitation Cover Photo</label>
                 <label className="flex flex-col items-center justify-center w-full h-56 border-2 border-dashed rounded-xl cursor-pointer transition-all overflow-hidden border-slate-700 bg-slate-800/50 hover:bg-slate-800">
-                  {imagePreview ? <img src={imagePreview} alt="Cover" className="w-full h-full object-cover" /> : <span className="text-[#D4AF37]">Upload Cover Baru</span>}
+                  {imagePreview ? <img src={imagePreview} alt="Cover" className="w-full h-full object-cover" /> : <span className="text-[#D4AF37]">Upload New Cover</span>}
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageChange(e, 'cover')} />
                 </label>
               </div>
-              <div><label className={labelStyle}>Judul Undangan</label><input type="text" name="title" value={formData.title} onChange={handleChange} className={inputStyle} required /></div>
+              <div><label className={labelStyle}>Invitation Title</label><input type="text" name="title" value={formData.title} onChange={handleChange} className={inputStyle} required /></div>
               
               <div>
-                <label className={labelStyle}>Link Lagu Backsound (Opsional)</label>
+                <label className={labelStyle}>Background Music Link (Optional)</label>
                 <input 
                   type="url" 
                   name="bgMusicUrl" 
-                  placeholder="Link file MP3 (Ex: https://site.com/lagu.mp3)" 
+                  placeholder="MP3 file link (E.g., https://site.com/song.mp3)" 
                   value={formData.bgMusicUrl} 
                   onChange={handleChange} 
                   className={inputStyle} 
                 />
-                <p className="text-[10px] text-slate-500 mt-1.5 font-bold tracking-wide">Kosongkan jika ingin menggunakan lagu romantis default dari kami.</p>
+                <p className="text-[10px] text-slate-500 mt-1.5 font-bold tracking-wide">Leave blank to use our default romantic song.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className={labelStyle}>Tanggal Mulai Acara</label>
+                  <label className={labelStyle}>Event Start Date</label>
                   <CustomDatePicker 
                     theme="wedding"
                     value={formData.eventStart} 
                     onChange={(val) => handleChange({ name: 'eventStart', value: val })} 
-                    placeholder="Pilih Tanggal Mulai"
+                    placeholder="Select Start Date"
                   />
                 </div>
                 <div>
-                  <label className={labelStyle}>Tanggal Selesai Acara</label>
+                  <label className={labelStyle}>Event End Date</label>
                   <CustomDatePicker 
                     theme="wedding"
                     value={formData.eventEnd} 
                     onChange={(val) => handleChange({ name: 'eventEnd', value: val })} 
-                    placeholder="Pilih Tanggal Selesai"
+                    placeholder="Select End Date"
                   />
                 </div>
               </div>
 
-              <div><label className={labelStyle}>Kata Pengantar (Cover)</label><textarea name="openingMessage" value={formData.openingMessage} onChange={handleChange} rows="3" className={inputStyle} /></div>
-              <div><label className={labelStyle}>Kata Penutup</label><textarea name="closingMessage" value={formData.closingMessage} onChange={handleChange} rows="3" className={inputStyle} /></div>
-              <div><label className={labelStyle}>Quotes Romantis</label><textarea name="quote" value={formData.quote} onChange={handleChange} rows="2" className={inputStyle} /></div>
+              <div><label className={labelStyle}>Opening Message (Cover)</label><textarea name="openingMessage" value={formData.openingMessage} onChange={handleChange} rows="3" className={inputStyle} /></div>
+              <div><label className={labelStyle}>Closing Message</label><textarea name="closingMessage" value={formData.closingMessage} onChange={handleChange} rows="3" className={inputStyle} /></div>
+              <div><label className={labelStyle}>Romantic Quotes</label><textarea name="quote" value={formData.quote} onChange={handleChange} rows="2" className={inputStyle} /></div>
             </div>
           </SectionAccordion>
 
-          <SectionAccordion title="3. Profil Mempelai" isOpen={openSection === 'profiles'} onToggle={() => toggleSection('profiles')}>
+          <SectionAccordion title="3. Couple Profiles" isOpen={openSection === 'profiles'} onToggle={() => toggleSection('profiles')}>
             {profiles.map((prof, index) => (
                <div key={prof.id} className="p-6 border border-slate-700 bg-slate-800/30 rounded-xl mb-6">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-[#D4AF37] font-bold uppercase text-sm">Profil {index + 1}</h3>
-                    {profiles.length > 1 && <button type="button" onClick={() => removeProfile(prof.id)} className="text-red-400 text-xs font-bold uppercase">Hapus</button>}
+                    <h3 className="text-[#D4AF37] font-bold uppercase text-sm">Profile {index + 1}</h3>
+                    {profiles.length > 1 && <button type="button" onClick={() => removeProfile(prof.id)} className="text-red-400 text-xs font-bold uppercase">Remove</button>}
                   </div>
                   <div className="flex flex-col md:flex-row gap-6">
                      <div className="w-full md:w-1/3">
-                        <label className={labelStyle}>Foto Mempelai</label>
+                        <label className={labelStyle}>Couple Photo</label>
                         <label className="flex flex-col items-center justify-center w-full aspect-square border-2 border-dashed rounded-full cursor-pointer overflow-hidden border-slate-600 bg-slate-800 hover:border-[#D4AF37]">
                           {prof.photoUrl ? <img src={prof.photoUrl} alt="Profil" className="w-full h-full object-cover" /> : <span className="text-2xl">📸</span>}
                           <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageChange(e, prof.id)} />
                         </label>
                      </div>
                      <div className="w-full md:w-2/3 space-y-4">
-                        <div><label className={labelStyle}>Peran</label><input type="text" value={prof.role} onChange={(e) => handleProfileChange(prof.id, 'role', e.target.value)} className={inputStyle} /></div>
-                        <div><label className={labelStyle}>Nama Lengkap</label><input type="text" value={prof.fullName} onChange={(e) => handleProfileChange(prof.id, 'fullName', e.target.value)} className={inputStyle} /></div>
-                        <div><label className={labelStyle}>Informasi Orang Tua</label><textarea value={prof.parentsInfo} onChange={(e) => handleProfileChange(prof.id, 'parentsInfo', e.target.value)} rows="2" className={inputStyle} /></div>
+                        <div><label className={labelStyle}>Role</label><input type="text" value={prof.role} onChange={(e) => handleProfileChange(prof.id, 'role', e.target.value)} className={inputStyle} /></div>
+                        <div><label className={labelStyle}>Full Name</label><input type="text" value={prof.fullName} onChange={(e) => handleProfileChange(prof.id, 'fullName', e.target.value)} className={inputStyle} /></div>
+                        <div><label className={labelStyle}>Parents Information</label><textarea value={prof.parentsInfo} onChange={(e) => handleProfileChange(prof.id, 'parentsInfo', e.target.value)} rows="2" className={inputStyle} /></div>
                      </div>
                   </div>
                </div>
             ))}
-            <button type="button" onClick={addProfile} className="w-full py-3 border border-dashed border-[#D4AF37] text-[#D4AF37] rounded-xl font-bold uppercase text-xs hover:bg-[#D4AF37]/10">+ Tambah Profil Lainnya</button>
+            <button type="button" onClick={addProfile} className="w-full py-3 border border-dashed border-[#D4AF37] text-[#D4AF37] rounded-xl font-bold uppercase text-xs hover:bg-[#D4AF37]/10">+ Add Another Profile</button>
           </SectionAccordion>
 
-          <SectionAccordion title="4. Rangkaian Acara (Sesi)" isOpen={openSection === 'sessions'} onToggle={() => toggleSection('sessions')}>
+          <SectionAccordion title="4. Event Series (Sessions)" isOpen={openSection === 'sessions'} onToggle={() => toggleSection('sessions')}>
              {formData.sessions.map((session, sIndex) => (
               <div key={session.id || sIndex} className="p-6 border border-slate-700 bg-slate-800/30 rounded-xl mb-6 relative">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-[#D4AF37] font-bold uppercase tracking-widest text-sm">Sesi {sIndex + 1}</h3>
-                  {formData.sessions.length > 1 && <button type="button" onClick={() => removeSession(sIndex)} className="text-red-400 text-xs font-bold uppercase">Hapus Sesi</button>}
+                  <h3 className="text-[#D4AF37] font-bold uppercase tracking-widest text-sm">Session {sIndex + 1}</h3>
+                  {formData.sessions.length > 1 && <button type="button" onClick={() => removeSession(sIndex)} className="text-red-400 text-xs font-bold uppercase">Remove Session</button>}
                 </div>
                 <div className="space-y-4">
-                  <div><label className={labelStyle}>Nama Acara</label><input type="text" value={session.name} onChange={(e) => handleSessionChange(sIndex, 'name', e.target.value)} className={inputStyle} required /></div>
+                  <div><label className={labelStyle}>Event Name</label><input type="text" value={session.name} onChange={(e) => handleSessionChange(sIndex, 'name', e.target.value)} className={inputStyle} required /></div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className={labelStyle}>Tanggal</label>
+                      <label className={labelStyle}>Date</label>
                       <CustomDatePicker 
                         theme="wedding"
                         value={session.date} 
                         onChange={(val) => handleSessionChange(sIndex, 'date', val)} 
-                        placeholder="Pilih Tanggal Sesi"
+                        placeholder="Select Session Date"
                       />
                     </div>
                     <div>
-                      <label className={labelStyle}>Jam Mulai</label>
+                      <label className={labelStyle}>Start Time</label>
                       <CustomTimePicker 
                         theme="wedding"
                         value={session.startTime} 
@@ -508,7 +531,7 @@ export default function EditWeddingEvent() {
                       />
                     </div>
                     <div>
-                      <label className={labelStyle}>Jam Selesai</label>
+                      <label className={labelStyle}>End Time</label>
                       <CustomTimePicker 
                         theme="wedding"
                         value={session.endTime} 
@@ -518,28 +541,28 @@ export default function EditWeddingEvent() {
                     </div>
                   </div>
 
-                  <div><label className={labelStyle}>Batas Maksimal Tamu</label><input type="text" value={session.stock} onChange={(e) => { const val = e.target.value; if (val === '' || /^\d+$/.test(val)) handleSessionChange(sIndex, 'stock', val); }} className={inputStyle} required /></div>
+                  <div><label className={labelStyle}>Maximum Guest Limit</label><input type="text" value={session.stock} onChange={(e) => { const val = e.target.value; if (val === '' || /^\d+$/.test(val)) handleSessionChange(sIndex, 'stock', val); }} className={inputStyle} required /></div>
                   <div className="mt-4 pt-4 border-t border-slate-700">
-                    <p className="text-xs text-[#D4AF37] font-bold mb-3 uppercase">Lokasi Sesi Ini</p>
+                    <p className="text-xs text-[#D4AF37] font-bold mb-3 uppercase">Session Location</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                       <div><label className={labelStyle}>Nama Gedung</label><input type="text" value={session.location?.namePlace || ''} onChange={(e) => handleSessionLocationChange(sIndex, 'namePlace', e.target.value)} className={inputStyle} required /></div>
-                       <div><label className={labelStyle}>Kota</label><input type="text" value={session.location?.city || ''} onChange={(e) => handleSessionLocationChange(sIndex, 'city', e.target.value)} className={inputStyle} required /></div>
+                       <div><label className={labelStyle}>Venue Name</label><input type="text" value={session.location?.namePlace || ''} onChange={(e) => handleSessionLocationChange(sIndex, 'namePlace', e.target.value)} className={inputStyle} required /></div>
+                       <div><label className={labelStyle}>City</label><input type="text" value={session.location?.city || ''} onChange={(e) => handleSessionLocationChange(sIndex, 'city', e.target.value)} className={inputStyle} required /></div>
                     </div>
-                    <div className="mt-3"><label className={labelStyle}>Full Alamat</label><textarea value={session.location?.place || ''} onChange={(e) => handleSessionLocationChange(sIndex, 'place', e.target.value)} rows="2" className={inputStyle} required /></div>
+                    <div className="mt-3"><label className={labelStyle}>Full Address</label><textarea value={session.location?.place || ''} onChange={(e) => handleSessionLocationChange(sIndex, 'place', e.target.value)} rows="2" className={inputStyle} required /></div>
                     
-                    <div className="mt-3"><label className={labelStyle}>URL Google Maps</label><input type="url" value={session.location?.mapUrl || ''} onChange={(e) => handleSessionLocationChange(sIndex, 'mapUrl', e.target.value)} className={inputStyle} /></div>
+                    <div className="mt-3"><label className={labelStyle}>Google Maps URL</label><input type="url" value={session.location?.mapUrl || ''} onChange={(e) => handleSessionLocationChange(sIndex, 'mapUrl', e.target.value)} className={inputStyle} /></div>
                   </div>
                   <div className="mt-6 pt-4 border-t border-slate-700">
-                     <p className="text-[10px] font-black uppercase tracking-widest mb-1 text-[#D4AF37]">Pertanyaan Custom (Opsional)</p>
+                     <p className="text-[10px] font-black uppercase tracking-widest mb-1 text-[#D4AF37]">Custom Questions (Optional)</p>
                      {session.questions?.map((q, qIndex) => (
                         <div key={q.id || qIndex} className="border rounded-xl p-5 mb-4 shadow-sm border-l-4 border-slate-700 border-l-[#D4AF37] bg-slate-800/30">
                           <div className="flex flex-col md:flex-row gap-4 mb-3 w-full">
                             <div className="flex-1 min-w-0">
-                              <input type="text" placeholder="Ketik pertanyaan tambahan" value={q.text} onChange={(e) => handleQuestionChange(sIndex, qIndex, 'text', e.target.value)} className={`${inputStyle} w-full`} required />
+                              <input type="text" placeholder="Type additional question" value={q.text} onChange={(e) => handleQuestionChange(sIndex, qIndex, 'text', e.target.value)} className={`${inputStyle} w-full`} required />
                             </div>
                             <div className="w-full md:w-48 shrink-0">
                               <select value={q.type} onChange={(e) => handleQuestionChange(sIndex, qIndex, 'type', e.target.value)} className={`${inputStyle} w-full cursor-pointer`}>
-                                <option value="Text">Teks Singkat</option>
+                                <option value="Text">Short Text</option>
                                 <option value="Dropdown">Dropdown</option>
                                 <option value="Checkbox">Checkbox</option>
                               </select>
@@ -553,36 +576,36 @@ export default function EditWeddingEvent() {
                                   {q.options.length > 1 && <button type="button" onClick={() => removeQuestionOption(sIndex, qIndex, optIndex)} className="text-gray-400 hover:text-red-500 font-bold">✕</button>}
                                 </div>
                               ))}
-                              <button type="button" onClick={() => addQuestionOption(sIndex, qIndex)} className="text-xs text-[#D4AF37]">+ Tambah Opsi</button>
+                              <button type="button" onClick={() => addQuestionOption(sIndex, qIndex)} className="text-xs text-[#D4AF37]">+ Add Option</button>
                             </div>
                           )}
                           <div className="flex justify-end gap-4 mt-4 pt-4 border-t border-slate-700">
-                            <button type="button" onClick={() => removeQuestion(sIndex, qIndex)} className="text-xs text-red-400">Hapus</button>
+                            <button type="button" onClick={() => removeQuestion(sIndex, qIndex)} className="text-xs text-red-400">Remove Field</button>
                           </div>
                         </div>
                      ))}
-                     <button type="button" onClick={() => addQuestion(sIndex)} className="text-sm font-bold text-[#D4AF37]">⊕ Tambah Pertanyaan</button>
+                     <button type="button" onClick={() => addQuestion(sIndex)} className="text-sm font-bold text-[#D4AF37]">⊕ Add Question</button>
                   </div>
                 </div>
               </div>
             ))}
             <button type="button" onClick={addSession} className="w-full py-3 border border-dashed border-[#D4AF37] text-[#D4AF37] rounded-xl font-bold uppercase text-xs hover:bg-[#D4AF37]/10 transition">
-              + Tambah Rangkaian Acara
+              + Add Event Series
             </button>
           </SectionAccordion>
 
-          <SectionAccordion title={`5. Galeri Foto (${existingGallery.length + newGalleryFiles.length}/5)`} isOpen={openSection === 'gallery'} onToggle={() => toggleSection('gallery')}>
+          <SectionAccordion title={`5. Photo Gallery (${existingGallery.length + newGalleryFiles.length}/5)`} isOpen={openSection === 'gallery'} onToggle={() => toggleSection('gallery')}>
              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 {existingGallery.map((url, i) => (
                    <div key={`old-${i}`} className="relative aspect-[3/4] rounded-xl overflow-hidden group border border-slate-700">
                       <img src={url} alt="Old Gallery" className="w-full h-full object-cover" />
-                      <button type="button" onClick={() => removeExistingGallery(i)} className="absolute inset-0 bg-black/60 flex items-center justify-center text-white font-bold opacity-0 group-hover:opacity-100">Hapus</button>
+                      <button type="button" onClick={() => removeExistingGallery(i)} className="absolute inset-0 bg-black/60 flex items-center justify-center text-white font-bold opacity-0 group-hover:opacity-100">Delete</button>
                    </div>
                 ))}
                 {newGalleryFiles.map((gf, i) => (
                    <div key={`new-${i}`} className="relative aspect-[3/4] rounded-xl overflow-hidden group border border-green-500/50">
                       <img src={gf.preview} alt="New Gallery" className="w-full h-full object-cover" />
-                      <button type="button" onClick={() => removeNewGallery(i)} className="absolute inset-0 bg-black/60 flex items-center justify-center text-white font-bold opacity-0 group-hover:opacity-100">Batal</button>
+                      <button type="button" onClick={() => removeNewGallery(i)} className="absolute inset-0 bg-black/60 flex items-center justify-center text-white font-bold opacity-0 group-hover:opacity-100">Cancel</button>
                    </div>
                 ))}
                 {(existingGallery.length + newGalleryFiles.length) < 5 && (
@@ -594,21 +617,21 @@ export default function EditWeddingEvent() {
              </div>
           </SectionAccordion>
 
-          <SectionAccordion title="6. Amplop Digital / Rekening" isOpen={openSection === 'gifts'} onToggle={() => toggleSection('gifts')}>
+          <SectionAccordion title="6. Digital Envelope / Bank Account" isOpen={openSection === 'gifts'} onToggle={() => toggleSection('gifts')}>
             {digitalGifts.map((gift) => (
               <div key={gift.id} className="p-5 border border-slate-700 bg-slate-800/30 rounded-xl mb-4 relative flex flex-col md:flex-row gap-4 items-end">
                 <div className="w-full md:w-1/4"><label className={labelStyle}>Bank / E-Wallet</label><input type="text" value={gift.bankName} onChange={(e) => handleGiftChange(gift.id, 'bankName', e.target.value)} className={inputStyle} /></div>
-                <div className="w-full md:w-1/3"><label className={labelStyle}>Nomor Rekening</label><input type="text" value={gift.accountNumber} onChange={(e) => handleGiftChange(gift.id, 'accountNumber', e.target.value)} className={inputStyle} /></div>
-                <div className="w-full md:w-1/3"><label className={labelStyle}>Atas Nama</label><input type="text" value={gift.accountName} onChange={(e) => handleGiftChange(gift.id, 'accountName', e.target.value)} className={inputStyle} /></div>
+                <div className="w-full md:w-1/3"><label className={labelStyle}>Account Number</label><input type="text" value={gift.accountNumber} onChange={(e) => handleGiftChange(gift.id, 'accountNumber', e.target.value)} className={inputStyle} /></div>
+                <div className="w-full md:w-1/3"><label className={labelStyle}>Account Name</label><input type="text" value={gift.accountName} onChange={(e) => handleGiftChange(gift.id, 'accountName', e.target.value)} className={inputStyle} /></div>
                 <button type="button" onClick={() => removeGift(gift.id)} className="px-4 py-3 bg-red-900/30 text-red-400 rounded-xl hover:bg-red-900/50">✕</button>
               </div>
             ))}
-            <button type="button" onClick={addGift} className="w-full py-3 border border-dashed border-[#D4AF37] text-[#D4AF37] rounded-xl font-bold uppercase text-xs">+ Tambah Rekening Lain</button>
+            <button type="button" onClick={addGift} className="w-full py-3 border border-dashed border-[#D4AF37] text-[#D4AF37] rounded-xl font-bold uppercase text-xs">+ Add Another Account</button>
           </SectionAccordion>
 
           <div className="pt-6 mt-8 mb-10 flex gap-4">
             <button type="submit" disabled={isSaving} className="w-full py-4 rounded-xl text-slate-900 font-bold uppercase tracking-widest text-sm shadow-xl transition-all active:scale-95 disabled:opacity-50 bg-[#D4AF37] hover:bg-[#FFDF73]">
-              {isSaving ? '⏳ Menyimpan Perubahan...' : '✨ Update Wedding Event'}
+              {isSaving ? '⏳ Saving Changes...' : '✨ Update Wedding Event'}
             </button>
           </div>
 
@@ -624,9 +647,9 @@ export default function EditWeddingEvent() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Sukses!</h3>
+            <h3 className="text-2xl font-black text-white mb-2 uppercase tracking-tight">Success!</h3>
             <p className="text-gray-400 text-sm font-medium mb-2">
-              Wedding Event berhasil diperbarui ✨
+              Wedding Event successfully updated ✨
             </p>
           </div>
         </div>

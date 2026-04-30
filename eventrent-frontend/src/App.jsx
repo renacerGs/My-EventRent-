@@ -19,7 +19,7 @@ import Scanner from './pages/Scanner';
 import TrackTicket from './pages/TrackTicket'; 
 import Notifications from './pages/Notifications';
 import AgentWallet from './components/AgentWallet';
-import MyOrders from './pages/MyOrders'; // Pastiin path foldernya bener ya
+import MyOrders from './pages/MyOrders'; 
 
 // 👇 IMPORT HALAMAN JOB BOARD BARU 👇
 import JobBoard from './pages/JobBoard';
@@ -57,6 +57,32 @@ export default function App() {
   });
 
   const location = useLocation();
+
+  // 🔥 DETEKSI & HANDLE ERROR URL DARI SUPABASE GOOGLE AUTH 🔥
+  useEffect(() => {
+    // Supabase bisa menaruh error di search (?) atau hash (#)
+    const queryParams = new URLSearchParams(location.search);
+    const hashParams = new URLSearchParams(location.hash.replace('#', '?'));
+    
+    const errorDesc = queryParams.get('error_description') || hashParams.get('error_description');
+
+    if (errorDesc) {
+      // 1. Tampilkan Pop-up Modern
+      toast.error(errorDesc.replace(/\+/g, ' '), {
+        duration: 6000,
+        style: {
+          background: '#fee2e2', // red-100
+          color: '#991b1b', // red-800
+          border: '1px solid #f87171', // red-400
+          fontWeight: 'bold'
+        },
+      });
+
+      // 2. Bersihkan URL (Hapus error parameters) tanpa reload halaman
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location, navigate]);
+
   // Sembunyikan Navbar/Footer di Halaman Undangan DAN Form RSVP
   const isInvitationPage = 
     location.pathname.startsWith('/invitation') || 
@@ -119,12 +145,10 @@ export default function App() {
           onSearchSelect={(title) => setSearchQuery(title)}
           onOpenLogin={() => setIsLoginOpen(true)}
           onLogout={() => {
-            // Cukup bersihin state lokal aja, urusan token Supabase udah diberesin sama Navbar lu
             setUser(null);
             localStorage.removeItem('user');
             toast.success('Berhasil logout bro!'); 
           }}
-          // 🔥 TAMBAHAN UTAMA: Biar Navbar bisa ngabarin App.jsx kalau ada deteksi login dari Google
           onLoginSuccess={handleLoginSuccess}
         />
       )}
@@ -190,7 +214,7 @@ export default function App() {
         isOpen={isLoginOpen} 
         onClose={() => setIsLoginOpen(false)} 
         onLoginSuccess={(userData) => {
-          handleLoginSuccess(userData); // Pakai fungsi global yang udah dibikin
+          handleLoginSuccess(userData); 
           
           if (userData.role === 'agent') {
             toast.success(`Berhasil masuk portal agen, ${userData.name}!`);
