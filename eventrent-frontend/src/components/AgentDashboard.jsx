@@ -39,20 +39,20 @@ export default function AgentDashboard() {
     fetchAssignedEvents();
   }, [user?.id, user?.role, navigate]); 
 
-  // // 🔥 BEST PRACTICE: AUTO-REFRESH SAAT KEMBALI KE TAB INI 🔥
-  // useEffect(() => {
-  //   const handleFocus = () => {
-  //     // Tarik data secara "senyap" (silent) saat user kembali ke tab web ini
-  //     if (viewMode === 'events') {
-  //       fetchAssignedEvents(true);
-  //     } else if (viewMode === 'guests' && selectedEvent) {
-  //       fetchGuestList(selectedEvent.id, true);
-  //     }
-  //   };
+  // 🔥 BEST PRACTICE: AUTO-REFRESH SAAT KEMBALI KE TAB INI 🔥
+  useEffect(() => {
+    const handleFocus = () => {
+      // Tarik data secara "senyap" (silent) saat user kembali ke tab web ini
+      if (viewMode === 'events') {
+        fetchAssignedEvents(true);
+      } else if (viewMode === 'guests' && selectedEvent) {
+        fetchGuestList(selectedEvent.id, true);
+      }
+    };
 
-  //   window.addEventListener('focus', handleFocus);
-  //   return () => window.removeEventListener('focus', handleFocus);
-  // }, [viewMode, selectedEvent]);
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [viewMode, selectedEvent]);
 
   // Tambah parameter "silent" biar gak kedip-kedip pas auto-refresh
   const fetchAssignedEvents = async (silent = false) => {
