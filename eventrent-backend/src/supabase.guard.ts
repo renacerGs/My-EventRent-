@@ -12,13 +12,11 @@ export class SupabaseGuard implements CanActivate {
   private pool: Pool;
 
   constructor() {
-    // 1. Koneksi ke Supabase (TAMBAHIN as string)
     this.supabase = createClient(
       process.env.SUPABASE_URL as string,
       process.env.SUPABASE_KEY as string
     );
 
-    // 2. Koneksi ke Database PostgreSQL lu (TAMBAHIN as string juga)
     this.pool = new Pool({
       connectionString: process.env.DATABASE_URL as string,
       ssl: {
@@ -47,22 +45,48 @@ export class SupabaseGuard implements CanActivate {
 
     const email = user.email;
 
-    // 3. CARI ID ANGKA DI DATABASE LOKAL LU BERDASARKAN EMAIL
     try {
+      // 3. CARI DATA DI DATABASE LOKAL
       const { rows } = await this.pool.query(
         'SELECT id, email, name, role, picture, phone, bank_name, bank_account, bank_account_name FROM users WHERE email = $1', 
         [email]
       );
 
+      // 🔥 4. JURUS AUTO-HEAL: JIKA GHOST USER (TIDAK ADA DI TABEL LOKAL), INSERT OTOMATIS! 🔥
       if (rows.length === 0) {
-        throw new UnauthorizedException('User belum terdaftar di database utama!');
+        console.warn(`[Auto-Heal] User ${email} tidak ditemukan di tabel public.users. Membuat profil otomatis...`);
+        
+        const meta = user.user_metadata || {};
+        const fullName = meta.custom_full_name || meta.full_name || meta.name || 'User Baru';
+        // Ambil foto dari metadata Google
+        const avatarUrl = meta.custom_avatar_url || meta.picture || meta.avatar_url || '';
+
+        try {
+          // Bikin record baru & langsung kembalikan datanya pakai RETURNING
+          // Note: Pastikan nama kolom gambar kamu 'picture' sesuai query select di atas
+          const insertRes = await this.pool.query(
+            `INSERT INTO users (id, email, name, picture) 
+             VALUES ($1, $2, $3, $4) 
+             RETURNING id, email, name, role, picture, phone, bank_name, bank_account, bank_account_name`,
+            [user.id, email, fullName, avatarUrl]
+          );
+
+          request.user = insertRes.rows[0]; 
+          return true; // Pintu dibuka, user berhasil di-ruqyah!
+        } catch (insertError) {
+          console.error('Gagal melakukan auto-heal pada user:', insertError);
+          throw new UnauthorizedException('Gagal sinkronisasi data akun. Hubungi Admin.');
+        }
       }
 
-      // 4. Titipin data user (termasuk ID Angka) ke dalam request
+      // 5. Titipin data user ke dalam request jika sudah ada
       request.user = rows[0]; 
 
       return true; // Pintu dibuka, silakan masuk ke Controller!
     } catch (dbError) {
+      // Abaikan UnauthorizedException agar tetap terlempar ke frontend dengan benar
+      if (dbError instanceof UnauthorizedException) throw dbError;
+      
       console.error('Database Error di Guard:', dbError);
       throw new UnauthorizedException('Gagal memverifikasi user di database.');
     }
