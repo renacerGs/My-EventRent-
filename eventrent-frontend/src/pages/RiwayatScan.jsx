@@ -112,7 +112,6 @@ export default function RiwayatScan() {
 
   return (
     <div className="bg-[#0f172a] min-h-screen font-sans pb-20 relative text-left">
-      <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-blue-500/10 to-transparent pointer-events-none z-0"></div>
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 pt-8 md:pt-12 relative z-10">
         

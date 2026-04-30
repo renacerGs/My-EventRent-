@@ -123,7 +123,6 @@ export default function MyOrders() {
 
   return (
     <div className="bg-slate-50 min-h-screen font-sans pb-20 relative text-left">
-      <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-[#FF6B35]/10 to-transparent pointer-events-none z-0"></div>
 
       <div className="max-w-5xl mx-auto px-4 md:px-8 pt-8 md:pt-12 relative z-10">
         

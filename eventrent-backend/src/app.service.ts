@@ -960,6 +960,28 @@ export class AppService implements OnModuleInit {
     return { success: true };
   }
 
+  // 🔥 FUNGSI BARU: HAPUS BANYAK NOTIF SEKALIGUS 🔥
+  async deleteNotifications(notifIds: number[], userId: number) {
+    try {
+      const query = 'DELETE FROM notifications WHERE id = ANY($1) AND user_id = $2';
+      await this.pool.query(query, [notifIds, userId]);
+      return { message: 'Notifikasi berhasil dihapus!' };
+    } catch (error) {
+      throw new InternalServerErrorException('Gagal menghapus notifikasi');
+    }
+  }
+
+  // 🔥 FUNGSI BARU: HAPUS SEMUA NOTIFIKASI 🔥
+  async deleteAllNotifications(userId: number) {
+    try {
+      const query = 'DELETE FROM notifications WHERE user_id = $1';
+      await this.pool.query(query, [userId]);
+      return { message: 'Semua notifikasi berhasil dibersihkan!' };
+    } catch (error) {
+      throw new InternalServerErrorException('Gagal membersihkan notifikasi');
+    }
+  }
+
   // ==========================================
   // FITUR EVENT REPORTS SYSTEM
   // ==========================================

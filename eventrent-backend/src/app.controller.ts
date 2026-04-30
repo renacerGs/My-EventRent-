@@ -287,6 +287,25 @@ export class AppController {
     return await this.appService.markNotificationRead(notifId, req.user.id);
   }
 
+  // 🔥 ENDPOINT BARU: HAPUS SPESIFIK NOTIFIKASI 🔥
+  @ApiTags('Notifications')
+  @ApiOperation({ summary: 'Menghapus banyak notifikasi berdasarkan ID' })
+  @UseGuards(SupabaseGuard)
+  @Delete('notifications')
+  async deleteNotifications(@Req() req, @Body() body: { notifIds: number[] }) {
+    return await this.appService.deleteNotifications(body.notifIds, req.user.id);
+  }
+
+  // 🔥 ENDPOINT BARU: HAPUS SEMUA NOTIFIKASI 🔥
+  @ApiTags('Notifications')
+  @ApiOperation({ summary: 'Menghapus SEMUA notifikasi milik user yang login' })
+  @UseGuards(SupabaseGuard)
+  @Delete('notifications/all')
+  async deleteAllNotifications(@Req() req) {
+    return await this.appService.deleteAllNotifications(req.user.id);
+  }
+
+
   // ==========================================
   // --- FITUR REPORTS / KENDALA ---
   // ==========================================
