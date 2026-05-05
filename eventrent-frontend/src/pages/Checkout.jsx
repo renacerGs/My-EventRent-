@@ -69,8 +69,8 @@ export default function Checkout() {
   const [formAnswers, setFormAnswers] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // State untuk metode pembayaran
-  const [paymentMethod, setPaymentMethod] = useState('QRIS'); 
+  // 🔥 PERUBAHAN: Set default kosong (belum ada metode yang terpilih)
+  const [paymentMethod, setPaymentMethod] = useState(''); 
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('idle'); 
@@ -176,6 +176,11 @@ export default function Checkout() {
 
     const totalAmount = calculateTotal();
 
+    // 🔥 PERUBAHAN: Validasi metode pembayaran belum dipilih
+    if (totalAmount > 0 && !paymentMethod) {
+      return showPopup("Silakan pilih Metode Pembayaran terlebih dahulu!", "error");
+    }
+
     if (totalAmount === 0) {
       setShowPaymentModal(true);
       executeRealPayment();
@@ -218,9 +223,6 @@ export default function Checkout() {
       // Logika Navigasi Baru
       if (paymentMethod === 'MANUAL_TRANSFER') {
         showPopup("Pesanan Berhasil! Silakan upload bukti pembayaran.", "success");
-        
-        // 🔥 PERUBAHAN DI SINI: Navigasi langsung ke halaman upload proof menggunakan Order ID
-        // Kita kasih delay 2 detik biar user sempat baca popup suksesnya
         setTimeout(() => navigate(`/upload-proof/${data.orderId}`), 2000);
       } 
       else {
@@ -504,7 +506,7 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* 🔥 PINDAH KE SINI: CARD METODE PEMBAYARAN */}
+              {/* CARD METODE PEMBAYARAN */}
               {calculateTotal() > 0 && (
                 <div className="bg-white border-gray-200 rounded-[32px] p-8 md:p-10 shadow-sm border space-y-6">
                    <h2 className="text-2xl font-bold border-b pb-4 text-gray-900 border-gray-100">
@@ -594,7 +596,7 @@ export default function Checkout() {
         </div>
       )}
 
-      {/* MODAL QR CODE PEMBAYARAN (CAHAYA PAY)[cite: 1] */}
+      {/* MODAL QR CODE PEMBAYARAN (CAHAYA PAY) */}
       <AnimatePresence>
         {showQrModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
