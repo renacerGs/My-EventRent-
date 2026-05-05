@@ -1473,36 +1473,48 @@ export class AppService implements OnModuleInit {
   }
 
   async handleCahayaWebhook(payload: any) {
-    if (payload.req_params) {
-      const params = JSON.parse(payload.req_params);
-      
-      if (params.order_state === 'PAYSUCCESS') {
-        const orderId = params.merchant_order_no;
+    try {
+      if (payload.req_params) {
+        // Cahaya mengirim dalam bentuk string, kita harus parse ke objek
+        const params = typeof payload.req_params === 'string' ? JSON.parse(payload.req_params) : payload.req_params;
         
-        const orderRes = await this.pool.query('SELECT * FROM orders WHERE order_id = $1', [orderId]);
-        if (orderRes.rows.length === 0) return { return_code: "02", return_msg: "Order not found" };
-        
-        const order = orderRes.rows[0];
+        // Cek jika status sukses dari Cahaya[cite: 2]
+        if (params.order_state === 'PAYSUCCESS') {
+          const orderId = params.merchant_order_no;
 
-        if (order.payment_status === 'SUCCESS') return { return_code: "01", return_msg: "success" };
+          const orderRes = await this.pool.query('SELECT * FROM orders WHERE order_id = $1', [orderId]);
+          if (orderRes.rows.length === 0) return { return_code: "02", return_msg: "Order not found" }; //[cite: 2]
 
-        await this.pool.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [orderId]);
+          const order = orderRes.rows[0];
 
-        const details = order.ticket_details;
-        await this.buyTicket(
-          order.user_id, 
-          order.event_id, 
-          details.cart, 
-          details.formAnswers, 
-          undefined, 
-          orderId
-        ).catch(err => console.error("Gagal auto-generate tiket via Webhook:", err));
-        
-      } else if (params.order_state === 'PAYERROR') {
-        await this.pool.query(`UPDATE orders SET payment_status = 'FAILED' WHERE order_id = $1`, [params.merchant_order_no]);
+          if (order.payment_status === 'SUCCESS') return { return_code: "01", return_msg: "success" }; //[cite: 2]
+
+          // Ubah status di database
+          await this.pool.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [orderId]);
+
+          // 🔥 PERBAIKAN 1: Pastikan data parsing dari string ke JSON
+          const details = typeof order.ticket_details === 'string' ? JSON.parse(order.ticket_details) : order.ticket_details;
+
+          // 🔥 PERBAIKAN 2: Masukkan buyerEmail secara eksplisit
+          await this.buyTicket(
+            order.user_id, 
+            order.event_id, 
+            details.cart, 
+            details.formAnswers, 
+            details.buyerEmail, // <--- Ini kunci utamanya biar email kekirim!
+            orderId
+          ).catch(err => console.error("Gagal auto-generate tiket via Webhook:", err));
+          
+        } else if (params.order_state === 'PAYERROR') {
+          await this.pool.query(`UPDATE orders SET payment_status = 'FAILED' WHERE order_id = $1`, [params.merchant_order_no]);
+        }
       }
+      // Kembalikan kode "01" (sukses) ke Cahaya agar mereka tahu notifikasi sudah kita terima[cite: 2]
+      return { return_code: "01", return_msg: "success" };
+    } catch (error) {
+      console.error("Webhook Cahaya Error:", error);
+      return { return_code: "02", return_msg: "failed" }; //[cite: 2]
     }
-    return { return_code: "01", return_msg: "success" };
   }
 
   // ========================================================
