@@ -794,13 +794,11 @@ export class AppService implements OnModuleInit {
 
   async updateAgent(eventId: number, eoId: number, agentId: number, data: { role?: string, rating_given?: number }) {
     try {
-      // 1. Cek dulu apakah lu EO asli dari event ini (Plus ambil title event buat text notif)
       const eventCheck = await this.pool.query('SELECT id, title FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
       if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
       
       const eventTitle = eventCheck.rows[0].title;
 
-      // 2. Lakukan update data (Role / Rating) ke database
       const updateRes = await this.pool.query(
         `UPDATE event_agents SET role = COALESCE($1, role), rating_given = COALESCE($2, rating_given) 
          WHERE event_id = $3 AND user_id = $4 RETURNING *`,
@@ -809,7 +807,6 @@ export class AppService implements OnModuleInit {
 
       if (updateRes.rowCount === 0) throw new BadRequestException('Agen tidak ditemukan');
 
-      // 🔥 3. INJEKSI: KALAU ADA RATING YANG DIKASIH, KIRIM NOTIF KE AGEN 🔥
       if (data.rating_given !== undefined && data.rating_given !== null) {
         try {
           await this.pool.query(
@@ -818,7 +815,6 @@ export class AppService implements OnModuleInit {
             [
               agentId, 
               'New Rating Received! 🌟', 
-              // 👇 PERBAIKAN: Ditambah backtick (`) di awal dan akhir kalimat ini
               `Asik! Kamu dapat rating ${data.rating_given}.0 Bintang atas kerjamu di event ${eventTitle}. Terus pertahankan!`, 
               eventId
             ]
@@ -828,7 +824,6 @@ export class AppService implements OnModuleInit {
         }
       }
 
-      // 4. Selesai
       return { message: 'Data agen diperbarui', data: updateRes.rows[0] };
     } catch (err) {
       if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
@@ -836,21 +831,39 @@ export class AppService implements OnModuleInit {
     }
   }
 
+  // 🔥 QUERY INI UDAH DIROMBAK BRO BIAR EVENT SENDIRI MASUK JUGA
   async getAssignedEvents(agentId: number) {
     try {
       const query = `
-        SELECT e.id, e.title, e.image_url as img, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start, 
-               e.place as location, ea.role, ea.rating_given, u.name as organizer_name,
-               (
-                 SELECT TO_CHAR(MIN(start_time), 'HH24:MI') 
-                 FROM event_sessions 
-                 WHERE event_id = e.id
-               ) as time_start
-        FROM event_agents ea
-        JOIN events e ON ea.event_id = e.id
-        JOIN users u ON e.created_by = u.id
-        WHERE ea.user_id = $1 AND ea.is_accepted = TRUE 
-        ORDER BY e.event_start ASC
+        SELECT * FROM (
+          SELECT e.id, e.title, e.image_url as img, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start, 
+                 e.event_start as raw_date,
+                 e.place as location, ea.role, ea.rating_given, u.name as organizer_name,
+                 (
+                   SELECT TO_CHAR(MIN(start_time), 'HH24:MI') 
+                   FROM event_sessions 
+                   WHERE event_id = e.id
+                 ) as time_start
+          FROM event_agents ea
+          JOIN events e ON ea.event_id = e.id
+          JOIN users u ON e.created_by = u.id
+          WHERE ea.user_id = $1 AND ea.is_accepted = TRUE 
+
+          UNION
+
+          SELECT e.id, e.title, e.image_url as img, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start, 
+                 e.event_start as raw_date,
+                 e.place as location, 'Pemilik Event' as role, NULL as rating_given, u.name as organizer_name,
+                 (
+                   SELECT TO_CHAR(MIN(start_time), 'HH24:MI') 
+                   FROM event_sessions 
+                   WHERE event_id = e.id
+                 ) as time_start
+          FROM events e
+          JOIN users u ON e.created_by = u.id
+          WHERE e.created_by = $1
+        ) as combined_events
+        ORDER BY raw_date ASC
       `;
       const { rows } = await this.pool.query(query, [agentId]);
       return rows;

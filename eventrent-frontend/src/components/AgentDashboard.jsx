@@ -9,7 +9,7 @@ export default function AgentDashboard() {
   
   const [assignedEvents, setAssignedEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false); // 🔥 STATE UNTUK MANUAL REFRESH
+  const [isRefreshing, setIsRefreshing] = useState(false); 
 
   const [viewMode, setViewMode] = useState('events');
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -32,6 +32,7 @@ export default function AgentDashboard() {
   const [confirmCheckIn, setConfirmCheckIn] = useState({ isOpen: false, ticketId: null, eventId: null });
 
   useEffect(() => {
+    // Pastikan hanya user yang sedang dalam mode agent yang bisa akses
     if (!user || user.role !== 'agent') {
       navigate('/');
       return;
@@ -39,10 +40,9 @@ export default function AgentDashboard() {
     fetchAssignedEvents();
   }, [user?.id, user?.role, navigate]); 
 
-  // 🔥 BEST PRACTICE: AUTO-REFRESH SAAT KEMBALI KE TAB INI 🔥
+  // 🔥 AUTO-REFRESH SAAT KEMBALI KE TAB INI
   useEffect(() => {
     const handleFocus = () => {
-      // Tarik data secara "senyap" (silent) saat user kembali ke tab web ini
       if (viewMode === 'events') {
         fetchAssignedEvents(true);
       } else if (viewMode === 'guests' && selectedEvent) {
@@ -54,7 +54,6 @@ export default function AgentDashboard() {
     return () => window.removeEventListener('focus', handleFocus);
   }, [viewMode, selectedEvent]);
 
-  // Tambah parameter "silent" biar gak kedip-kedip pas auto-refresh
   const fetchAssignedEvents = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
@@ -109,7 +108,6 @@ export default function AgentDashboard() {
     fetchGuestList(selectedEvent.id);
   };
 
-  // Tambah parameter "silent" untuk refresh data tamu
   const fetchGuestList = async (eventId, silent = false) => {
     try {
       if (!silent) setLoadingAttendees(true);
@@ -165,7 +163,7 @@ export default function AgentDashboard() {
       
       if (res.ok && data.valid) {
         toast.success("Manual Check-In Successful!", { id: toastId });
-        fetchGuestList(eventId, true); // Silent refresh biar UX smooth
+        fetchGuestList(eventId, true); 
       } else {
         toast.error(`Failed: ${data.message}`, { id: toastId });
       }
@@ -234,21 +232,22 @@ export default function AgentDashboard() {
   const currentItems = filteredAttendees.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredAttendees.length / itemsPerPage) || 1;
 
+  // 🔥 PERBAIKAN: Gunakan raw_date dari backend agar tidak Invalid Date di Safari/Mobile Browser 🔥
   const now = new Date();
   const activeEvents = assignedEvents.filter(ev => {
-    const eventDate = new Date(ev.date_start);
+    const eventDate = new Date(ev.raw_date || ev.date_start);
     eventDate.setHours(23, 59, 59, 999);
     return eventDate >= now;
   });
+  
   const historyEvents = assignedEvents.filter(ev => {
-    const eventDate = new Date(ev.date_start);
+    const eventDate = new Date(ev.raw_date || ev.date_start);
     eventDate.setHours(23, 59, 59, 999); 
     return eventDate < now;
   });
 
   const displayedEvents = activeTab === 'active' ? activeEvents : historyEvents;
 
-  // 🔥 FIX LOGIC PROGRESS BAR (Dinamis Sesuai Session Filter) 🔥
   const sessionAttendees = selectedSessionFilter === 'All Sessions' 
     ? attendees 
     : attendees.filter(t => t.session_name === selectedSessionFilter);
@@ -382,7 +381,7 @@ export default function AgentDashboard() {
                         <div>
                           <h3 className="font-black text-white text-lg md:text-lg line-clamp-1 group-hover:text-blue-400 transition-colors">{ev.title}</h3>
                           
-                          {/* 🔥 INJEKSI VISUAL RATING BINTANG EMAS 🔥 */}
+                          {/* VISUAL RATING BINTANG EMAS (KHUSUS AGEN, PEMILIK EVENT TIDAK ADA RATING) */}
                           {ev.rating_given > 0 && (
                             <div className="flex items-center gap-1 mt-0.5 mb-1 bg-yellow-500/10 w-max px-2 py-0.5 rounded-md border border-yellow-500/20 shadow-lg shadow-yellow-500/5">
                               <div className="flex gap-0.5">
@@ -403,9 +402,15 @@ export default function AgentDashboard() {
 
                       <div className="w-full md:w-[30%] flex flex-row items-center justify-start md:justify-between gap-2 border-t md:border-none border-[#1E2D4A] pt-3 md:pt-0">
                         <div className="flex flex-row md:flex-col items-center justify-start md:justify-center gap-2 md:w-[60%]">
-                          <span className="bg-[#0B1426] border border-[#1E2D4A] text-blue-400 px-2.5 md:px-3 py-1 md:py-1.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest truncate max-w-[150px] md:max-w-full text-center group-hover:border-blue-500/50 transition-colors">
-                            {ev.role || 'Agen'}
+                          {/* 🔥 INJEKSI UI UNTUK MENANDAI PEMILIK EVENT 🔥 */}
+                          <span className={`px-2.5 md:px-3 py-1 md:py-1.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest truncate max-w-[150px] md:max-w-full text-center transition-colors border ${
+                            ev.role === 'Pemilik Event' 
+                              ? 'bg-purple-500/10 text-purple-400 border-purple-500/30 group-hover:border-purple-500/50' 
+                              : 'bg-[#0B1426] text-blue-400 border-[#1E2D4A] group-hover:border-blue-500/50'
+                          }`}>
+                            {ev.role === 'Pemilik Event' ? '👑 Pemilik Event' : (ev.role || 'Agen')}
                           </span>
+                          
                           <span className="flex items-center gap-1 text-amber-500 text-[9px] md:text-[10px] font-black bg-amber-500/10 px-2 py-1 md:py-0.5 rounded-md border border-amber-500/20">
                             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                             {ev.time_start || 'TBA'} 
