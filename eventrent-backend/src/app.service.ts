@@ -1047,6 +1047,18 @@ export class AppService implements OnModuleInit {
     return { success: true };
   }
 
+  async markAllNotificationsRead(userId: number) {
+    try {
+      await this.pool.query(
+        'UPDATE notifications SET is_read = TRUE WHERE user_id = $1 AND is_read = FALSE', 
+        [userId]
+      );
+      return { success: true, message: 'Semua notifikasi berhasil ditandai sudah dibaca!' };
+    } catch (error) {
+      throw new InternalServerErrorException('Gagal mengubah status notifikasi');
+    }
+  }
+
   async deleteNotifications(notifIds: number[], userId: number) {
     try {
       const query = 'DELETE FROM notifications WHERE id = ANY($1) AND user_id = $2';

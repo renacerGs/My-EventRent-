@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, Delete, Param, Put, Patch, UseGuards, Req, Ip } from '@nestjs/common'; 
+import { Controller, Get, Post, Body, Query, Delete, Param, Put, Patch, UseGuards, Req, Ip, BadRequestException } from '@nestjs/common'; 
 import { AppService } from './app.service';
 import { ApiTags, ApiOperation, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
 import { SupabaseGuard } from './supabase.guard'; 
@@ -343,6 +343,34 @@ export class AppController {
   @Delete('notifications/all')
   async deleteAllNotifications(@Req() req) {
     return await this.appService.deleteAllNotifications(req.user.id);
+  }
+
+  // ==========================================
+  // API BARU UNTUK MOBILE APP (NOTIFIKASI)
+  // ==========================================
+
+  // 1. API Mark All As Read
+  @UseGuards(SupabaseGuard) // Sesuaikan dengan nama Guard otentikasi kamu
+  @Put('notifications/read')
+  async markAllNotificationsRead(@Req() req: any) {
+    // req.user biasanya didapat dari hasil decode token oleh Guard
+    const userId = req.user.id; 
+    return await this.appService.markAllNotificationsRead(userId);
+  }
+
+  // 2. API Delete Selected Notifications
+  @UseGuards(SupabaseGuard) // Sesuaikan dengan nama Guard otentikasi kamu
+  @Delete('notifications')
+  async deleteSelectedNotifications(
+    @Req() req: any,
+    @Body() body: { ids: number[] }
+  ) {
+    const userId = req.user.id;
+    if (!body.ids || !Array.isArray(body.ids) || body.ids.length === 0) {
+      throw new BadRequestException('List ID notifikasi (ids) tidak boleh kosong');
+    }
+    // Fungsi ini udah ada di app.service.ts kamu
+    return await this.appService.deleteNotifications(body.ids, userId);
   }
 
   // ==========================================
