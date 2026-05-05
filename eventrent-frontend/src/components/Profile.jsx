@@ -27,6 +27,9 @@ export default function Profile() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
+  // 🔥 STATE BARU UNTUK CEK PROVIDER GOOGLE ASLI 🔥
+  const [isGoogleProvider, setIsGoogleProvider] = useState(false);
+
   const showPopup = (message, type = 'info', action = null) => {
     setPopup({ isOpen: true, message, type, action });
   };
@@ -53,6 +56,16 @@ export default function Profile() {
         bank_account_name: user.bank_account_name || ''
       });
     }
+
+    // 🔥 CEK KE SUPABASE APAKAH BENERAN LOGIN PAKE TOMBOL GOOGLE 🔥
+    const checkProvider = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (data?.session?.user?.app_metadata?.provider === 'google') {
+        setIsGoogleProvider(true);
+      }
+    };
+    checkProvider();
+
   }, [navigate, user]);
 
   const handleImageChange = (e) => {
@@ -232,9 +245,6 @@ export default function Profile() {
       });
 
       if (res.ok) {
-        // 🔥 FIX 403 FORBIDDEN: 
-        // Karena backend udah hapus akun lu di server Supabase, 
-        // proses signOut ini pasti ditolak (403). Kita try-catch aja biar silent.
         try {
           await supabase.auth.signOut();
         } catch (e) {
@@ -250,7 +260,6 @@ export default function Profile() {
         navigate('/');
       } else {
         const data = await res.json();
-        // Munculin pop up error dari backend (misal: "Akun masih dipakai di Event")
         showPopup(data.message || "Gagal menghapus akun, coba lagi nanti.", "error");
         setShowDeleteModal(false);
       }
@@ -265,13 +274,14 @@ export default function Profile() {
   
   if (!user) return null;
   
-  const isGoogleUser = !!user.googleId || user.email?.includes('gmail'); // deteksi fallback
+  // 🔥 MENGGUNAKAN STATE ASLI DARI SUPABASE 🔥
+  const isGoogleUser = isGoogleProvider;
   const isAgentMode = user.role === 'agent';
 
-  // 🔥 UPDATE: Ubah warna focus menyesuaikan Agent Mode dengan biru #2596be
+  // 🔥 UPDATE: Ubah warna focus menyesuaikan Agent Mode dengan biru blue-500
   const inputStyle = `w-full border rounded-xl px-5 py-4 text-sm font-bold focus:outline-none transition-all ${
     isAgentMode 
-      ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-[#2596be] focus:ring-1 focus:ring-[#2596be]' 
+      ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-blue-500 focus:ring-1 focus:ring-blue-500' 
       : 'bg-gray-50 border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#FF6B35] focus:ring-1 focus:ring-[#FF6B35]'
   }`;
   
@@ -284,8 +294,6 @@ export default function Profile() {
   return (
     <div className={`min-h-screen pt-10 pb-20 font-sans relative ${isAgentMode ? 'bg-[#0f172a]' : 'bg-[#F8F9FA]'}`}>
       
-      {/* 🔴 Gradasi oren sudah dihapus dari sini */}
-
       {/* MODAL POPUP STANDAR (INFO/SUCCESS/ERROR) */}
       <AnimatePresence>
         {popup.isOpen && (
@@ -367,10 +375,9 @@ export default function Profile() {
 
       <div className="max-w-5xl mx-auto px-4 md:px-8 relative z-10">
         
-        <div className="flex items-center gap-4 mb-8">
-          {/* 🔥 UPDATE: Ubah warna hover back button Agent Mode ke biru #2596be */}
-          <button onClick={() => navigate(-1)} className={`w-12 h-12 flex items-center justify-center rounded-full border shadow-sm transition-all active:scale-95 ${isAgentMode ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-[#2596be] hover:border-[#2596be]' : 'bg-white border-gray-200 text-gray-500 hover:text-[#FF6B35] hover:border-[#FF6B35]'}`}>
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+        <div className="flex items-center gap-3 md:gap-4 mb-8">
+          <button onClick={() => navigate(-1)} className={`w-10 h-10 md:w-11 md:h-11 flex items-center justify-center shrink-0 rounded-full border shadow-sm transition-all active:scale-95 ${isAgentMode ? 'bg-[#0f172a] border-slate-700 text-slate-400 hover:text-blue-500 hover:border-blue-500' : 'bg-white border-gray-200 text-gray-500 hover:text-[#FF6B35] hover:border-[#FF6B35]'}`}>
+            <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
           </button>
           <h1 className={`text-3xl md:text-4xl font-black uppercase tracking-tight m-0 ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>My Account</h1>
         </div>
@@ -424,8 +431,7 @@ export default function Profile() {
                   </div>
 
                   <div className={`pt-4 mt-6 border-t ${isAgentMode ? 'border-slate-700' : 'border-gray-100'}`}>
-                    {/* 🔥 UPDATE: Label header account data ke biru #2596be */}
-                    <h3 className={`text-[10px] font-black mb-4 uppercase tracking-widest w-max px-3 py-1.5 rounded-lg border ${isAgentMode ? 'bg-[#2596be]/10 text-[#2596be] border-[#2596be]/20' : 'bg-orange-50 text-[#FF6B35] border-orange-100'}`}>🏦 ACCOUNT DATA (FOR AGENTS)</h3>
+                    <h3 className={`text-[10px] font-black mb-4 uppercase tracking-widest w-max px-3 py-1.5 rounded-lg border ${isAgentMode ? 'bg-blue-500/10 text-blue-500 border-blue-500/20' : 'bg-orange-50 text-[#FF6B35] border-orange-100'}`}>🏦 ACCOUNT DATA (FOR AGENTS)</h3>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
@@ -445,11 +451,10 @@ export default function Profile() {
                   </div>
 
                   <div className="pt-6">
-                    {/* 🔥 UPDATE: Button Save Changes dinamis Agent = #2596be, User = #FF6B35 */}
                     <button 
                       type="submit" 
                       disabled={isLoadingProfile}
-                      className={`w-full sm:w-auto text-white px-10 py-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 shadow-xl ${isAgentMode ? 'bg-[#2596be] hover:bg-[#1f7ca0] shadow-[#2596be]/20' : 'bg-[#FF6B35] hover:bg-[#E85526] shadow-orange-100/50'}`}
+                      className={`w-full sm:w-auto text-white px-10 py-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 shadow-xl ${isAgentMode ? 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/20' : 'bg-[#FF6B35] hover:bg-[#E85526] shadow-orange-100/50'}`}
                     >
                       {isLoadingProfile ? 'SAVING...' : 'SAVE CHANGES'}
                     </button>
@@ -488,7 +493,7 @@ export default function Profile() {
                     <input type="password" value={passData.confirmPass} onChange={e => setPassData({...passData, confirmPass: e.target.value})} className={inputStyle} placeholder="••••••••" required />
                   </div>
                   <div className="pt-2">
-                     <button type="submit" disabled={isLoadingPass} className={`w-full text-white py-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 ${isAgentMode ? 'bg-[#2596be] hover:bg-[#1f7ca0]' : 'bg-gray-900 hover:bg-black'}`}>
+                     <button type="submit" disabled={isLoadingPass} className={`w-full text-white py-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 ${isAgentMode ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-900 hover:bg-black'}`}>
                       {isLoadingPass ? 'PROCESSING...' : 'CHANGE PASSWORD'}
                     </button>
                   </div>
@@ -500,7 +505,7 @@ export default function Profile() {
             <div className={`p-8 rounded-[32px] shadow-sm border ${isAgentMode ? 'bg-red-900/10 border-red-900/50 backdrop-blur-sm' : 'bg-red-50 border-red-100'}`}>
               <h2 className={`text-xl font-black mb-2 uppercase tracking-wide ${isAgentMode ? 'text-red-500' : 'text-red-600'}`}>Danger Zone</h2>
               <p className={`text-xs font-bold leading-relaxed mb-6 ${isAgentMode ? 'text-red-400/80' : 'text-red-500/80'}`}>
-                Hati-hati! Menghapus akun bersifat permanen. Seluruh data tiket dan riwayat event lu bakal hilang.
+                Be careful! Deleting your account is permanent. All your ticket data and event history will be lost.
               </p>
               
               <button 

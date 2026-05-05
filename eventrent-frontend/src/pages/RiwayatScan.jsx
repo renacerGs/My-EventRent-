@@ -116,20 +116,23 @@ export default function RiwayatScan() {
       <div className="max-w-7xl mx-auto px-4 md:px-8 pt-8 md:pt-12 relative z-10">
         
         {/* HEADER */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 relative z-20">
-          <div>
-            <button onClick={() => navigate(-1)} className="text-slate-400 hover:text-blue-500 font-bold text-[10px] uppercase tracking-widest mb-4 flex items-center gap-1.5 transition-colors w-max relative z-30">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7"></path></svg> 
-              Back
-            </button>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-500/20 text-blue-500 rounded-2xl flex items-center justify-center border border-blue-500/30 shrink-0">
-                <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-              </div>
-              <div>
-                <h1 className="text-xl md:text-3xl font-black text-white uppercase tracking-tight">Scan History</h1>
-                <p className="text-[10px] md:text-sm font-medium text-slate-400 mt-1">Guest check-in activity log by {user?.name || 'Agent'}.</p>
-              </div>
+        <div className="flex items-center gap-3 md:gap-4 mb-8 relative z-20">
+          <button 
+            type="button" 
+            onClick={() => navigate(-1)} 
+            className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center shrink-0 bg-[#0f172a] rounded-full border border-slate-700 text-slate-400 transition-all hover:border-blue-500 hover:text-blue-500 shadow-sm active:scale-95"
+          >
+            <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg> 
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-500/20 text-blue-500 rounded-2xl flex items-center justify-center border border-blue-500/30 shrink-0 hidden md:flex">
+              <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+            <div>
+              <h1 className="text-xl md:text-3xl font-black text-white uppercase tracking-tight">Scan History</h1>
+              <p className="text-[10px] md:text-sm font-medium text-slate-400 mt-1">Guest check-in activity log by {user?.name || 'Agent'}.</p>
             </div>
           </div>
         </div>
