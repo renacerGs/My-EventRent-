@@ -3,7 +3,6 @@ import { Pool } from 'pg';
 import * as nodemailer from 'nodemailer';
 import * as dotenv from 'dotenv'; 
 import * as QRCode from 'qrcode';
-import * as midtransClient from 'midtrans-client';
 import * as crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 
@@ -12,7 +11,6 @@ dotenv.config();
 @Injectable()
 export class AppService implements OnModuleInit {
   private pool: Pool;
-  private snap: any;
   private transporter: nodemailer.Transporter;
 
   constructor() {
@@ -30,12 +28,6 @@ export class AppService implements OnModuleInit {
         user: process.env.EMAIL_USER, 
         pass: process.env.EMAIL_PASS  
       }
-    });
-
-    this.snap = new midtransClient.Snap({
-      isProduction: false,
-      serverKey: process.env.MIDTRANS_SERVER_KEY,
-      clientKey: process.env.MIDTRANS_CLIENT_KEY
     });
   }
 
@@ -802,9 +794,13 @@ export class AppService implements OnModuleInit {
 
   async updateAgent(eventId: number, eoId: number, agentId: number, data: { role?: string, rating_given?: number }) {
     try {
-      const eventCheck = await this.pool.query('SELECT id FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
+      // 1. Cek dulu apakah lu EO asli dari event ini (Plus ambil title event buat text notif)
+      const eventCheck = await this.pool.query('SELECT id, title FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
       if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
+      
+      const eventTitle = eventCheck.rows[0].title;
 
+      // 2. Lakukan update data (Role / Rating) ke database
       const updateRes = await this.pool.query(
         `UPDATE event_agents SET role = COALESCE($1, role), rating_given = COALESCE($2, rating_given) 
          WHERE event_id = $3 AND user_id = $4 RETURNING *`,
@@ -812,6 +808,27 @@ export class AppService implements OnModuleInit {
       );
 
       if (updateRes.rowCount === 0) throw new BadRequestException('Agen tidak ditemukan');
+
+      // 🔥 3. INJEKSI: KALAU ADA RATING YANG DIKASIH, KIRIM NOTIF KE AGEN 🔥
+      if (data.rating_given !== undefined && data.rating_given !== null) {
+        try {
+          await this.pool.query(
+            `INSERT INTO notifications (user_id, title, message, type, related_event_id)
+             VALUES ($1, $2, $3, 'NEW_RATING', $4)`,
+            [
+              agentId, 
+              'New Rating Received! 🌟', 
+              // 👇 PERBAIKAN: Ditambah backtick (`) di awal dan akhir kalimat ini
+              `Asik! Kamu dapat rating ${data.rating_given}.0 Bintang atas kerjamu di event ${eventTitle}. Terus pertahankan!`, 
+              eventId
+            ]
+          );
+        } catch (error) {
+          console.error("Gagal mengirim notifikasi rating ke agen:", error);
+        }
+      }
+
+      // 4. Selesai
       return { message: 'Data agen diperbarui', data: updateRes.rows[0] };
     } catch (err) {
       if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
@@ -965,7 +982,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 🔥 UPDATE: FUNGSI UNTUK MERESPON INVITASI DAN MENGUBAH TIPE NOTIFIKASI SECARA PERMANEN 🔥
   async respondAgentInvitation(notifId: number, userId: number, action: 'accept' | 'reject') {
     const client = await this.pool.connect();
     try {
@@ -999,7 +1015,6 @@ export class AppService implements OnModuleInit {
         );
       }
 
-      // 🔥 BAGIAN KRUSIAL: Update tipe notifikasi di DB berdasarkan action 🔥
       const newType = action === 'accept' ? 'INVITATION_ACCEPTED' : 'INVITATION_REJECTED';
       await client.query('UPDATE notifications SET is_read = TRUE, type = $1 WHERE id = $2', [newType, notifId]);
 
@@ -1337,78 +1352,244 @@ export class AppService implements OnModuleInit {
       throw new InternalServerErrorException('Gagal mengambil pendapatan agen');
     }
   }
-
+  
   // ==========================================
-  // FITUR PEMBAYARAN MIDTRANS & ORDERS
+  // FITUR PEMBAYARAN LOKAL (CAHAYA) & ORDERS
   // ==========================================
 
-  async createMidtransTransaction(orderId: string, grossAmount: number, customer: { name: string, email: string }, enabledPayments?: string[]) {
+  private generateCahayaSignature(payload: Record<string, any>): string {
+    const sortedKeys = Object.keys(payload)
+      .filter((key) => payload[key] !== null && payload[key] !== '' && key !== 'key_sign')
+      .sort();
+
+    const stringToSign = sortedKeys
+      .map((key) => `${key}=${payload[key]}`)
+      .join('&');
+
+    const rawKey = process.env.CAHAYA_PRIVATE_KEY || '';
+    if (!rawKey) throw new InternalServerErrorException('Private key Cahaya belum diset di .env');
+
     try {
-      const parameter: any = {
-        transaction_details: { order_id: orderId, gross_amount: grossAmount },
-        customer_details: { first_name: customer.name, email: customer.email }
-      };
-      if (enabledPayments && enabledPayments.length > 0) parameter.enabled_payments = enabledPayments;
+      const keyBuffer = Buffer.from(rawKey.replace(/\s+/g, ''), 'base64');
+      const privateKey = crypto.createPrivateKey({
+        key: keyBuffer,
+        format: 'der',
+        type: 'pkcs8' 
+      });
 
-      const transaction = await this.snap.createTransaction(parameter);
-      return { token: transaction.token, redirect_url: transaction.redirect_url };
+      const sign = crypto.createSign('RSA-SHA256');
+      sign.update(stringToSign);
+      return sign.sign(privateKey, 'base64');
+
     } catch (err) {
-      throw new InternalServerErrorException('Gagal membuat tagihan pembayaran Midtrans');
+      console.error('Crypto Parsing Error:', err);
+      throw new InternalServerErrorException('Format Private Key di .env rusak atau tidak kompatibel dengan OpenSSL.');
     }
   }
 
-  async handleMidtransWebhook(payload: any) {
-    const { order_id, status_code, gross_amount, signature_key, transaction_status } = payload;
-    const serverKey = process.env.MIDTRANS_SERVER_KEY;
-    const stringToHash = order_id + status_code + gross_amount + serverKey;
-    const hashed = crypto.createHash('sha512').update(stringToHash).digest('hex');
+  async createCahayaTransaction(orderId: string, amount: number, ip: string) {
+    try {
+      const CAHAYA_URL = process.env.CAHAYA_URL || 'https://api-pay.cahayatech.com';
+      const APP_ID = process.env.CAHAYA_APP_ID || '';
+      const MERCHANT_NO = process.env.CAHAYA_MERCHANT_NO || '';
+      const TERMINAL_NO = process.env.CAHAYA_TERMINAL_NO || '';
 
-    if (hashed !== signature_key) throw new BadRequestException('Invalid Signature');
+      const reqTime = Date.now().toString();
+      const reqId = crypto.randomBytes(16).toString('hex'); 
 
-    if (transaction_status === 'settlement' || transaction_status === 'capture') {
-      await this.pool.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [order_id]);
-    } else if (transaction_status === 'expire' || transaction_status === 'cancel' || transaction_status === 'deny') {
-      await this.pool.query(`UPDATE orders SET payment_status = 'FAILED' WHERE order_id = $1`, [order_id]);
+      const reqParamsObj = {
+        pay_ver: "100",
+        merchant_order_no: orderId,
+        merchant_no: MERCHANT_NO,
+        terminal_no: TERMINAL_NO,
+        terminal_time: Math.floor(Date.now() / 1000).toString(),
+        pay_type: "2", 
+        total_fee: amount.toString(), 
+        terminal_ip: ip || "127.0.0.1", 
+        notify_url: "https://my-event-rent.vercel.app/api/payment/webhook"
+      };
+
+      const payload = {
+        req_ver: "1.0",
+        req_mode: "0",
+        app_id: APP_ID,
+        sign_type: "RSA2",
+        req_time: reqTime,
+        req_id: reqId,
+        req_params: JSON.stringify(reqParamsObj)
+      };
+
+      const signature = this.generateCahayaSignature(payload);
+      const finalPayload = { ...payload, key_sign: signature };
+
+      const response = await fetch(`${CAHAYA_URL}/open/payment/prepay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finalPayload)
+      });
+
+      const rawResponse = await response.text();
+      const resData = JSON.parse(rawResponse);
+      
+      if (resData.resp_code === '10000') {
+        const responseParams = JSON.parse(resData.resp_params);
+        return { 
+          checkout_url: responseParams.qr_code, 
+          out_trade_no: responseParams.out_trade_no
+        };
+      } else {
+        throw new BadRequestException(`Cahaya Pay Error: ${resData.resp_msg} (Code: ${resData.resp_code})`);
+      }
+    } catch (err) {
+      console.error("Payment API Error Detail:", err);
+      const errorMessage = err instanceof Error ? err.message : 'Gagal terhubung ke API Cahaya Pay';
+      throw new InternalServerErrorException(errorMessage);
     }
-    return { status: 'OK' };
   }
 
-  async createCheckoutOrder(userId: number, data: any) {
+  async handleCahayaWebhook(payload: any) {
+    if (payload.req_params) {
+      const params = JSON.parse(payload.req_params);
+      
+      if (params.order_state === 'PAYSUCCESS') {
+        const orderId = params.merchant_order_no;
+        
+        const orderRes = await this.pool.query('SELECT * FROM orders WHERE order_id = $1', [orderId]);
+        if (orderRes.rows.length === 0) return { return_code: "02", return_msg: "Order not found" };
+        
+        const order = orderRes.rows[0];
+
+        if (order.payment_status === 'SUCCESS') return { return_code: "01", return_msg: "success" };
+
+        await this.pool.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [orderId]);
+
+        const details = order.ticket_details;
+        await this.buyTicket(
+          order.user_id, 
+          order.event_id, 
+          details.cart, 
+          details.formAnswers, 
+          undefined, 
+          orderId
+        ).catch(err => console.error("Gagal auto-generate tiket via Webhook:", err));
+        
+      } else if (params.order_state === 'PAYERROR') {
+        await this.pool.query(`UPDATE orders SET payment_status = 'FAILED' WHERE order_id = $1`, [params.merchant_order_no]);
+      }
+    }
+    return { return_code: "01", return_msg: "success" };
+  }
+
+  // ========================================================
+  // 1. FUNGSI UTAMA CHECKOUT (HYBRID: CAHAYA PAY & MANUAL)
+  // ========================================================
+  async createCheckoutOrder(userId: number, data: any, ip: string = '127.0.0.1') {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
-      const orderId = `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-      let totalPrice = 0;
       
+      const orderId = `ORD${Date.now()}${Math.floor(100 + Math.random() * 900)}`;
+      
+      let totalPrice = 0;
       if (data.cart && data.cart.length > 0) {
         for (const item of data.cart) {
           const sessionRes = await client.query('SELECT price FROM event_sessions WHERE id = $1', [item.sessionId]);
-          totalPrice += (sessionRes.rows.length > 0 ? Number(sessionRes.rows[0].price) : 0) * Number(item.qty || item.quantity || 1);
+          const itemPrice = sessionRes.rows.length > 0 ? Number(sessionRes.rows[0].price) : 0;
+          totalPrice += itemPrice * Number(item.qty || 1);
         }
       }
 
-      let snapToken = null; let redirectUrl = null;
+      let checkoutUrl: string | null = null;
+      let paymentStatus = 'PENDING';
 
       if (totalPrice > 0) {
-        const userRes = await client.query('SELECT name, email FROM users WHERE id = $1', [userId]);
-        const user = userRes.rows[0] || { name: 'Guest', email: 'guest@eventrent.com' };
-        const midtrans = await this.createMidtransTransaction(orderId, totalPrice, { name: user.name, email: user.email }, data.enabledPayments);
-        snapToken = midtrans.token; redirectUrl = midtrans.redirect_url;
+        if (data.paymentMethod === 'MANUAL_TRANSFER') {
+          checkoutUrl = 'MANUAL_TRANSFER'; 
+          
+          const targetEmail = data.buyerEmail || 'customer@example.com';
+          
+          if (targetEmail && targetEmail !== 'customer@example.com') {
+            await this.sendManualTransferEmail(targetEmail, orderId, totalPrice);
+          } else {
+            console.warn(`Peringatan: Email pembeli kosong untuk Order ID ${orderId}`);
+          }
+        } else {
+          const pgData = await this.createCahayaTransaction(orderId, totalPrice, ip);
+          checkoutUrl = pgData.checkout_url; 
+        }
       }
 
-      const res = await client.query(
+      await client.query(
         `INSERT INTO orders (order_id, user_id, event_id, total_price, snap_token, payment_status, ticket_details)
-         VALUES ($1, $2, $3, $4, $5, 'PENDING', $6) RETURNING *`,
-        [orderId, userId, data.eventId, totalPrice, snapToken, JSON.stringify({ cart: data.cart, formAnswers: data.formAnswers })]
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          orderId, 
+          userId, 
+          data.eventId, 
+          totalPrice, 
+          checkoutUrl, 
+          paymentStatus, 
+          JSON.stringify({ 
+            cart: data.cart, 
+            formAnswers: data.formAnswers, 
+            paymentMethod: data.paymentMethod,
+            buyerEmail: data.buyerEmail // 🔥 PENTING: Disimpan agar tidak lupa saat cetak tiket
+          })
+        ]
       );
       
       await client.query('COMMIT');
-      return { message: 'Pesanan berhasil dibuat', order: res.rows[0], snapToken: snapToken, redirectUrl: redirectUrl };
+      return { 
+        message: 'Pesanan berhasil dibuat', 
+        orderId: orderId, 
+        checkoutUrl: checkoutUrl 
+      };
     } catch (err) {
       await client.query('ROLLBACK');
-      throw new InternalServerErrorException('Gagal membuat pesanan');
+      console.error("Checkout Error:", err);
+      throw new InternalServerErrorException(err instanceof Error ? err.message : 'Gagal membuat pesanan');
     } finally {
       client.release();
+    }
+  }
+
+  // ========================================================
+  // 2. FUNGSI KIRIM EMAIL INSTRUKSI TRANSFER MANUAL
+  // ========================================================
+  private async sendManualTransferEmail(email: string, orderId: string, amount: number) {
+    try {
+      // Pastikan FRONTEND_URL di .env sudah benar (contoh: http://localhost:5173)
+      const uploadLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/upload-proof/${orderId}`; 
+
+      const mailOptions = {
+        from: `"${process.env.EMAIL_NAME || 'EventRent'}" <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: `[Instruksi Pembayaran] Pesanan ${orderId}`,
+        html: `
+          <div style="font-family: sans-serif; color: #333; max-size: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 15px;">
+            <h2 style="color: #0f172a;">Halo! Terimakasih telah memesan tiket.</h2>
+            <p>Pesanan Anda <b>${orderId}</b> telah kami terima. Silakan lakukan transfer bank:</p>
+            
+            <div style="background: #f8fafc; padding: 25px; border-radius: 12px; border: 2px dashed #cbd5e1; text-align: center; margin: 20px 0;">
+              <p style="margin: 0; font-size: 14px; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Total Tagihan</p>
+              <h1 style="color: #FF6B35; margin: 10px 0; font-size: 32px;">Rp ${amount.toLocaleString('id-ID')}</h1>
+              <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 15px 0;">
+              <p style="margin: 0; font-weight: bold; color: #1e293b;">BANK BCA (123-456-7890)</p>
+              <p style="margin: 5px 0 0 0; font-size: 13px; color: #64748b;">a.n. Admin EventRent</p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 30px;">
+              <p style="font-size: 14px; color: #475569;">Sudah transfer? Klik tombol di bawah untuk kirim bukti:</p>
+              <a href="${uploadLink}" style="background-color: #FF6B35; color: white; padding: 16px 30px; text-decoration: none; border-radius: 12px; font-weight: 900; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);">Upload Bukti Sekarang</a>
+            </div>
+
+            <p style="margin-top: 40px; font-size: 12px; color: #94a3b8; text-align: center;">Jika tombol tidak bisa diklik, buka link berikut:<br>${uploadLink}</p>
+          </div>
+        `
+      };
+      return await this.transporter.sendMail(mailOptions);
+    } catch (error) {
+      console.error("Gagal mengirim email instruksi:", error);
     }
   }
 
@@ -1426,6 +1607,20 @@ export class AppService implements OnModuleInit {
     }
   }
 
+  async getOrderPaymentInfo(orderId: string) {
+    try {
+      const res = await this.pool.query(
+        `SELECT order_id, total_price, payment_status, proof_url 
+         FROM orders WHERE order_id = $1`, 
+        [orderId]
+      );
+      if (res.rowCount === 0) throw new NotFoundException('Pesanan tidak ditemukan');
+      return res.rows[0];
+    } catch (err) {
+      throw new InternalServerErrorException('Gagal mengambil info tagihan');
+    }
+  }
+
   async getEventTickets(eventId: number) {
     try {
       const res = await this.pool.query(
@@ -1435,6 +1630,132 @@ export class AppService implements OnModuleInit {
       return res.rows;
     } catch (error) {
       throw new InternalServerErrorException('Gagal mengambil data peserta');
+    }
+  }
+
+  // ========================================================
+  // FUNGSI UPDATE BUKTI TRANSFER MANUAL
+  // ========================================================
+  async updateOrderProof(orderId: string, proofUrl: string) {
+    const client = await this.pool.connect();
+    try {
+      const res = await client.query(
+        `UPDATE orders 
+         SET payment_status = 'WAITING_VERIFICATION', proof_url = $1 
+         WHERE order_id = $2 RETURNING *`,
+        [proofUrl, orderId]
+      );
+
+      if (res.rowCount === 0) {
+        throw new NotFoundException('Pesanan tidak ditemukan');
+      }
+
+      return { 
+        message: 'Bukti transfer berhasil diunggah. Menunggu verifikasi admin.', 
+        order: res.rows[0] 
+      };
+    } catch (err) {
+      console.error("Update Proof Error:", err);
+      throw new InternalServerErrorException('Gagal mengunggah bukti transfer');
+    } finally {
+      client.release();
+    }
+  }
+
+  // ========================================================
+  // FUNGSI VERIFIKASI PEMBAYARAN MANUAL OLEH EO/ADMIN
+  // ========================================================
+  async verifyManualPayment(orderId: string, isApproved: boolean) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const orderRes = await client.query('SELECT * FROM orders WHERE order_id = $1', [orderId]);
+      if (orderRes.rowCount === 0) throw new NotFoundException('Pesanan tidak ditemukan');
+      const order = orderRes.rows[0];
+
+      if (order.payment_status === 'SUCCESS') {
+        throw new BadRequestException('Pesanan ini sudah lunas sebelumnya.');
+      }
+
+      // JIKA DITOLAK
+      if (!isApproved) {
+        await client.query(
+          `UPDATE orders SET payment_status = 'PENDING', proof_url = NULL WHERE order_id = $1`,
+          [orderId]
+        );
+        await client.query('COMMIT');
+        return { message: 'Bukti transfer ditolak. Status kembali menjadi PENDING.' };
+      }
+
+      // JIKA DITERIMA -> UBAH JADI SUCCESS
+      await client.query(
+        `UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`,
+        [orderId]
+      );
+
+      // GENERATE TIKET OTOMATIS & KIRIM EMAIL BARCODE
+      if (order.ticket_details) {
+        const details = typeof order.ticket_details === 'string' ? JSON.parse(order.ticket_details) : order.ticket_details;
+        const cart = details.cart || [];
+        const formAnswers = details.formAnswers || {};
+        const buyerEmail = details.buyerEmail || null; 
+
+        const boughtTickets: string[] = [];
+        let totalTransactionPrice = 0;
+
+        const evRes = await client.query('SELECT title FROM events WHERE id = $1', [order.event_id]);
+        const eventTitle = evRes.rows.length > 0 ? evRes.rows[0].title : 'Event';
+
+        // Tentukan email tujuan pengiriman
+        let targetEmail = buyerEmail;
+        if (!targetEmail && order.user_id) {
+          const uRes = await client.query('SELECT email FROM users WHERE id = $1', [order.user_id]);
+          if (uRes.rows.length > 0) targetEmail = uRes.rows[0].email;
+        }
+        
+        for (const item of cart) {
+          // Ambil harga tiket untuk dihitung ke struk email
+          const sessionRes = await client.query('SELECT price FROM event_sessions WHERE id = $1 FOR UPDATE', [item.sessionId]);
+          const singlePrice = sessionRes.rows.length > 0 ? Number(sessionRes.rows[0].price) : 0;
+
+          for (let i = 0; i < item.qty; i++) {
+            const formKeyPrefix = `cart-${item.id}-ticket-${i}`;
+            const attendeeName = formAnswers[`${formKeyPrefix}-nama`] || 'Guest';
+            const attendeeEmail = formAnswers[`${formKeyPrefix}-email`] || '';
+            
+            // 🔥 TICKET CODE DIGENERATE BERUPA HURUF
+            const ticketCode = this.generateTicketCode();
+            totalTransactionPrice += singlePrice;
+
+            // 🔥 KOLOM ID DIHILANGKAN AGAR DATABASE MEMBUAT ANGKA OTOMATIS
+            const ticketRes = await client.query(
+              `INSERT INTO tickets (order_id, event_id, session_id, user_id, attendee_name, attendee_email, is_scanned, ticket_code, guest_email, price, is_attending)
+               VALUES ($1, $2, $3, $4, $5, $6, false, $7, $8, $9, true) RETURNING ticket_code`,
+              [orderId, order.event_id, item.sessionId, order.user_id, attendeeName, attendeeEmail, ticketCode, targetEmail || null, singlePrice]
+            );
+
+            boughtTickets.push(ticketRes.rows[0].ticket_code);
+
+            await client.query(`UPDATE event_sessions SET stock = stock - 1 WHERE id = $1`, [item.sessionId]);
+          }
+        }
+        
+        // PANGGIL FUNGSI KIRIM EMAIL
+        if (targetEmail && boughtTickets.length > 0) {
+          this.sendEmailReceipt(targetEmail, eventTitle, boughtTickets, totalTransactionPrice, order.event_id)
+            .catch(e => console.error("Gagal mengirim email struk untuk verifikasi manual:", e)); 
+        }
+      }
+
+      await client.query('COMMIT');
+      return { message: 'Pembayaran diterima. Tiket berhasil diterbitkan & email terkirim!' };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error("Verify Payment Error:", err);
+      throw new InternalServerErrorException(err instanceof Error ? err.message : 'Gagal memverifikasi pembayaran');
+    } finally {
+      client.release();
     }
   }
 }

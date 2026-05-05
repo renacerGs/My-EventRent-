@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { supabase } from '../supabase';
+import { motion } from 'framer-motion';
 
 export default function EventDashboard() {
   const { id } = useParams();
@@ -49,7 +50,6 @@ export default function EventDashboard() {
   const [isCreatingJob, setIsCreatingJob] = useState(false);
   const [showRecruitmentModal, setShowRecruitmentModal] = useState(false); 
 
-  // STATE BUAT EDIT LOWONGAN
   const [showEditJobModal, setShowEditJobModal] = useState(false);
   const [isUpdatingJob, setIsUpdatingJob] = useState(false);
   const [editJobData, setEditJobData] = useState({ id: null, role: '', sessionName: 'All Sessions', quota: '', fee: '', description: '' });
@@ -61,6 +61,10 @@ export default function EventDashboard() {
   const [payoutAmountInput, setPayoutAmountInput] = useState('');
   const [payoutProcessStatus, setPayoutProcessStatus] = useState('idle'); 
   const [proofFile, setProofFile] = useState(null);
+
+  // 🔥 STATE LIST BUKTI PEMBAYARAN MANUAL
+  const [paymentVerifications, setPaymentVerifications] = useState([]);
+  const [showProofModal, setShowProofModal] = useState({ show: false, url: null });
 
   // FETCH DATA
   const fetchData = async (isBackground = false) => {
@@ -77,7 +81,7 @@ export default function EventDashboard() {
       const eventData = await resEvent.json();
 
       const resAttendees = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/attendees`, {
-        headers: { 'Authorization': `Bearer ${token}` } // Token added here
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       const dataAttendees = await resAttendees.json();
 
@@ -116,18 +120,27 @@ export default function EventDashboard() {
       setEvent(prev => JSON.stringify(prev) === JSON.stringify(eventData) ? prev : eventData);
       setGroupedAttendees(prev => JSON.stringify(prev) === JSON.stringify(finalAttendees) ? prev : finalAttendees);
       
+      // 🔥 FETCH ORDER MANUAL YANG BUTUH VERIFIKASI
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('event_id', id)
+        .eq('payment_status', 'WAITING_VERIFICATION')
+        .not('proof_url', 'is', null);
+      
+      if (!verifyError) setPaymentVerifications(verifyData);
+
     } catch (err) { console.error(err); } 
     finally { setLoading(false); setIsRefreshing(false); }
   };
 
-  // 🔥 FETCH AGENTS (UDAH DITAMBAHIN TOKEN)
   const fetchAgents = async () => {
     const sessionData = await supabase.auth.getSession();
     const token = sessionData.data.session?.access_token;
     if (!token) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/agents`, {
-        headers: { 'Authorization': `Bearer ${token}` } // Token added here
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
@@ -138,14 +151,13 @@ export default function EventDashboard() {
     }
   };
 
-  // 🔥 FETCH REPORTS (UDAH DITAMBAHIN TOKEN)
   const fetchReports = async () => {
     const sessionData = await supabase.auth.getSession();
     const token = sessionData.data.session?.access_token;
     if (!token) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/reports`, {
-        headers: { 'Authorization': `Bearer ${token}` } // Token added here! Ini yg bikin 401 kemaren!
+        headers: { 'Authorization': `Bearer ${token}` } 
       });
       if (res.ok) {
         const data = await res.json();
@@ -156,14 +168,13 @@ export default function EventDashboard() {
     }
   };
 
-  // 🔥 FETCH RECRUITMENT DATA (UDAH DITAMBAHIN TOKEN)
   const fetchRecruitmentData = async () => {
     const sessionData = await supabase.auth.getSession();
     const token = sessionData.data.session?.access_token;
     if (!token) return;
     try {
       const resJobs = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/jobs`, {
-        headers: { 'Authorization': `Bearer ${token}` } // Token added here! Ini yg bikin 401 kemaren!
+        headers: { 'Authorization': `Bearer ${token}` } 
       });
       if (resJobs.ok) setJobs(await resJobs.json());
 
@@ -176,18 +187,46 @@ export default function EventDashboard() {
     }
   };
 
-  // 🔥 FETCH PAYOUTS (UDAH DITAMBAHIN TOKEN)
   const fetchPayouts = async () => {
     const sessionData = await supabase.auth.getSession();
     const token = sessionData.data.session?.access_token;
     if (!token) return;
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/payouts`, {
-        headers: { 'Authorization': `Bearer ${token}` } // Token added here
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) setPayouts(await res.json());
     } catch (err) {
       console.error("Failed to fetch payouts", err);
+    }
+  };
+
+  // 🔥 FUNGSI APPROVE / REJECT BUKTI TRANSFER MANUAL
+  const handleVerifyPayment = async (orderId, isApproved) => {
+    const toastId = toast.loading('Memproses verifikasi...');
+    try {
+      const authKey = Object.keys(localStorage).find(key => key.endsWith('-auth-token'));
+      const sessionStr = authKey ? localStorage.getItem(authKey) : null;
+      const token = sessionStr ? JSON.parse(sessionStr).access_token : '';
+
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/${orderId}/verify`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ isApproved })
+      });
+
+      if (res.ok) {
+        toast.success(isApproved ? 'Pembayaran diterima, tiket dicetak!' : 'Pembayaran ditolak!', { id: toastId });
+        fetchData(); 
+      } else {
+        const errorData = await res.json();
+        throw new Error(errorData.message);
+      }
+    } catch (err) {
+       toast.error(err.message || 'Gagal memproses verifikasi. Pastikan Backend menyala.', { id: toastId });
     }
   };
 
@@ -795,6 +834,53 @@ export default function EventDashboard() {
         </div>
       )}
 
+      {/* ======================= MODAL VIEW & VERIFY BUKTI TRANSFER ======================= */}
+      {showProofModal.show && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4 animate-fadeIn">
+          <div className="bg-white rounded-[24px] max-w-2xl w-full shadow-2xl relative overflow-hidden flex flex-col md:flex-row">
+            
+            <button onClick={() => setShowProofModal({ show: false, url: null })} className="absolute top-4 right-4 z-10 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70 transition-colors">
+              ✕
+            </button>
+            
+            <div className="md:w-1/2 bg-gray-100 flex items-center justify-center p-4 min-h-[300px]">
+              <img src={showProofModal.url} alt="Bukti Transfer" className="max-w-full max-h-[60vh] object-contain rounded-xl shadow-sm" />
+            </div>
+            
+            <div className="md:w-1/2 p-6 md:p-8 flex flex-col justify-center">
+               <h3 className="text-xl font-black text-gray-900 mb-2">Verifikasi Pembayaran</h3>
+               <p className="text-sm text-gray-500 mb-6">Pastikan dana sudah benar-benar masuk ke rekening Anda sebelum menyetujui transaksi ini.</p>
+               
+               <div className="bg-orange-50 border border-orange-100 p-4 rounded-xl mb-6">
+                 <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-1">Aksi ini tidak dapat dibatalkan</p>
+                 <p className="text-xs text-orange-800">Menyetujui pembayaran akan otomatis mengirimkan e-ticket ke email pembeli.</p>
+               </div>
+
+               <div className="flex flex-col gap-3">
+                 <button 
+                   onClick={() => {
+                     setShowProofModal({ show: false, url: null });
+                     handleVerifyPayment(showProofModal.orderId, true);
+                   }}
+                   className="w-full bg-[#27AE60] text-white font-black py-4 rounded-xl hover:bg-green-700 transition-colors uppercase tracking-widest text-xs shadow-lg shadow-green-200"
+                 >
+                   Terima & Cetak Tiket
+                 </button>
+                 <button 
+                   onClick={() => {
+                     setShowProofModal({ show: false, url: null });
+                     handleVerifyPayment(showProofModal.orderId, false);
+                   }}
+                   className="w-full bg-red-50 text-red-600 font-black py-4 rounded-xl hover:bg-red-100 transition-colors uppercase tracking-widest text-xs"
+                 >
+                   Tolak Bukti Palsu
+                 </button>
+               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ======================= MODAL PAYOUT ======================= */}
       {showPayoutModal && selectedAgentPayout && (
         <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
@@ -1081,7 +1167,7 @@ export default function EventDashboard() {
             <div className="mb-8">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 flex justify-between items-center">
                 <span>Give Star / Rating</span>
-                {!isEventEnded && <span className="bg-red-50 text-red-500 px-2 py-0.5 rounded text-[8px] flex items-center gap-1"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg> LOCKED</span>}
+                {!isEventEnded && <span className="bg-red-50 text-red-500 px-2 py-0.5 rounded text-[8px] flex items-center gap-1"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m0 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg> LOCKED</span>}
               </label>
               
               <div className={`flex gap-2 justify-center bg-gray-50 p-3 rounded-xl border border-gray-200 ${!isEventEnded ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}>
@@ -1117,6 +1203,25 @@ export default function EventDashboard() {
         {isRefreshing && (
           <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[100] bg-gray-900 text-white px-4 py-1.5 rounded-full text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-2xl flex items-center gap-2 animate-bounce">
             <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-green-500 rounded-full animate-pulse"></span> Syncing Data...
+          </div>
+        )}
+
+        {/* 🔥 BLOK ALERT VERIFIKASI PEMBAYARAN MANUAL */}
+        {paymentVerifications.length > 0 && (
+          <div className="mb-6 bg-orange-50 border-2 border-orange-200 rounded-2xl p-4 md:p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm animate-pulse">
+             <div>
+                <h3 className="text-sm font-black text-orange-600 uppercase tracking-widest flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                  Need Action: Payment Verification
+                </h3>
+                <p className="text-xs text-orange-800 font-medium mt-1">There are {paymentVerifications.length} manual transfer orders waiting for your verification.</p>
+             </div>
+             <button 
+                onClick={() => setActiveTab('attendees')} 
+                className="bg-[#FF6B35] text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-orange-600 transition-colors shadow-sm whitespace-nowrap"
+             >
+                Review Now
+             </button>
           </div>
         )}
 
@@ -1167,38 +1272,84 @@ export default function EventDashboard() {
           </div>
         </div>
 
-        {/* TAB NAVIGATION */}
+        {/* TAB NAVIGATION (SMOOTH SLIDING ANIMATION) */}
         <div className="bg-white p-2 rounded-2xl md:rounded-full shadow-sm border border-gray-100 mb-8 overflow-x-auto hide-scrollbar flex items-center gap-2 relative z-10 w-full sm:w-max">
-          <button onClick={() => setActiveTab('attendees')} className={`flex items-center gap-2 px-6 py-3 rounded-xl md:rounded-full font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-all duration-300 ${activeTab === 'attendees' ? 'bg-[#FF6B35] text-white shadow-md shadow-orange-200 scale-100' : 'text-gray-500 hover:bg-gray-50 scale-95'}`}>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-            {isWed ? 'Guest Data' : 'Event Attendees'}
-          </button>
-          <button onClick={() => setActiveTab('agents')} className={`flex items-center gap-2 px-6 py-3 rounded-xl md:rounded-full font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-all duration-300 ${activeTab === 'agents' ? 'bg-purple-600 text-white shadow-md shadow-purple-200 scale-100' : 'text-gray-500 hover:bg-gray-50 scale-95'}`}>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-            Agent Team
-          </button>
-          <button onClick={() => setActiveTab('recruitment')} className={`flex items-center gap-2 px-6 py-3 rounded-xl md:rounded-full font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-all duration-300 relative ${activeTab === 'recruitment' ? 'bg-blue-600 text-white shadow-md shadow-blue-200 scale-100' : 'text-gray-500 hover:bg-gray-50 scale-95'}`}>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-            Recruitment
-            {pendingApplicantsCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-blue-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-[9px] shadow-sm animate-bounce">{pendingApplicantsCount}</span>}
-          </button>
-          <button onClick={() => setActiveTab('payouts')} className={`flex items-center gap-2 px-6 py-3 rounded-xl md:rounded-full font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-all duration-300 relative ${activeTab === 'payouts' ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200 scale-100' : 'text-gray-500 hover:bg-gray-50 scale-95'}`}>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
-            Payouts
-            {payouts.filter(p => p.status === 'PENDING').length > 0 && <span className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-[9px] shadow-sm animate-pulse border-2 border-white">{payouts.filter(p => p.status === 'PENDING').length}</span>}
-          </button>
-          <button onClick={() => setActiveTab('reports')} className={`flex items-center gap-2 px-6 py-3 rounded-xl md:rounded-full font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-all duration-300 relative ${activeTab === 'reports' ? 'bg-rose-500 text-white shadow-md shadow-rose-200 scale-100' : 'text-gray-500 hover:bg-gray-50 scale-95'}`}>
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-            Issues
-            {pendingReportsCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white w-5 h-5 flex items-center justify-center rounded-full text-[9px] shadow-sm border-2 border-white">{pendingReportsCount}</span>}
-          </button>
+          
+          {[
+            { id: 'attendees', label: isWed ? 'Guest Data' : 'Orders & Attendees', badge: paymentVerifications.length, badgeColor: 'bg-orange-500', pulse: false, icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>, colorClass: 'bg-[#FF6B35] shadow-orange-200' },
+            { id: 'agents', label: 'Agent Team', badge: 0, icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>, colorClass: 'bg-purple-600 shadow-purple-200' },
+            { id: 'recruitment', label: 'Recruitment', badge: pendingApplicantsCount, badgeColor: 'bg-blue-500', icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>, colorClass: 'bg-blue-600 shadow-blue-200' },
+            { id: 'payouts', label: 'Payouts', badge: payouts.filter(p => p.status === 'PENDING').length, badgeColor: 'bg-emerald-500', pulse: true, icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>, colorClass: 'bg-emerald-500 shadow-emerald-200' },
+            { id: 'reports', label: 'Issues', badge: pendingReportsCount, badgeColor: 'bg-rose-500', icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>, colorClass: 'bg-rose-500 shadow-rose-200' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`relative flex items-center gap-2 px-6 py-3 rounded-xl md:rounded-full font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-colors duration-300 z-10 ${
+                activeTab === tab.id ? 'text-white' : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              {activeTab === tab.id && (
+                <motion.div
+                  layoutId="activeTabBackground"
+                  className={`absolute inset-0 rounded-xl md:rounded-full shadow-md -z-10 ${tab.colorClass}`}
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                />
+              )}
+              
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {tab.icon}
+              </svg>
+              {tab.label}
+              
+              {tab.badge > 0 && (
+                <span className={`absolute -top-1.5 -right-1.5 ${tab.badgeColor} text-white w-5 h-5 flex items-center justify-center rounded-full text-[9px] shadow-sm ${tab.pulse ? 'animate-pulse border-2 border-white' : 'animate-bounce border-2 border-white'}`}>
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          ))}
+
         </div>
 
-        {/* TAB 1: DATA PESERTA */}
+        {/* TAB 1: DATA PESERTA / ORDERS */}
         {activeTab === 'attendees' && (
           <div className="bg-white rounded-[24px] md:rounded-[32px] shadow-sm border border-gray-200 overflow-hidden mb-10 animate-fadeIn">
+            
+            {/* 🔥 BLOK VERIFIKASI PEMBAYARAN MANUAL DI DALAM TAB */}
+            {paymentVerifications.length > 0 && (
+              <div className="border-b border-gray-200 bg-orange-50/30">
+                <div className="px-5 py-4 border-b border-gray-100">
+                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">Verifikasi Transfer Manual</h3>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {paymentVerifications.map((vOrder) => (
+                    <div key={vOrder.order_id} className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center text-orange-500">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm text-gray-900">Order #{vOrder.order_id}</p>
+                          <p className="text-xs text-gray-500">Total: <span className="font-bold text-gray-900">Rp {Number(vOrder.total_price).toLocaleString('id-ID')}</span></p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 w-full md:w-auto">
+                        <button 
+                          onClick={() => setShowProofModal({ show: true, url: vOrder.proof_url, orderId: vOrder.order_id })}
+                          className="flex-1 md:flex-none px-4 py-2 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors shadow-sm"
+                        >
+                          Lihat Bukti
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="px-5 py-5 md:px-8 md:py-6 border-b border-gray-100 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-              <h3 className="text-lg md:text-xl font-bold text-gray-900 whitespace-nowrap">{isWed ? 'Guestbook & RSVP' : 'Event Attendees'}</h3>
+              <h3 className="text-lg md:text-xl font-bold text-gray-900 whitespace-nowrap">{isWed ? 'Guestbook & RSVP' : 'All Orders & Attendees'}</h3>
               
               <div className="flex flex-col gap-3 w-full lg:w-auto">
                 <div className="relative w-full">
@@ -1226,71 +1377,88 @@ export default function EventDashboard() {
               <table className="hidden md:table w-full text-left border-collapse min-w-[900px]">
                 <thead>
                   <tr className="bg-gray-50/50 border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                    <th className="px-8 py-5">ID</th><th className="px-8 py-5">{isWed ? 'Guest Name (Buyer)' : 'Buyer Account'}</th><th className="px-8 py-5 max-w-[200px]">Session(s)</th><th className="px-8 py-5 text-center">{isWed ? 'Total Pax' : 'Ticket Qty'}</th><th className="px-8 py-5 text-right">Action</th>
+                    <th className="px-8 py-5">Order ID</th><th className="px-8 py-5">{isWed ? 'Guest Name (Buyer)' : 'Buyer Account'}</th><th className="px-8 py-5 max-w-[200px]">Session(s)</th><th className="px-8 py-5 text-center">{isWed ? 'Total Pax' : 'Ticket Qty'}</th><th className="px-8 py-5 text-right">Action</th>
                   </tr>
                 </thead>
-                {currentItems.length > 0 ? currentItems.map((order) => (
-                  <tbody key={`desktop-${order.order_id}`} className="border-b border-gray-50 last:border-none">
-                    <tr className="hover:bg-gray-50/30 transition-colors">
-                      <td className="px-8 py-5 text-xs font-bold text-gray-400">#{order.order_id}</td>
-                      <td className="px-8 py-5 font-bold text-sm">{order.buyer_name} <br/><span className="text-xs font-normal text-gray-400">{order.buyer_email}</span></td>
-                      <td className="px-8 py-5 max-w-[200px] truncate" title={order.session_name}><span className="px-3 py-1 bg-gray-100 rounded-lg text-[10px] font-bold uppercase truncate inline-block max-w-full">{order.session_name}</span></td>
-                      <td className="px-8 py-5 text-center font-black">{isWed ? order.tickets.reduce((sum, t) => sum + (t.pax || 1), 0) : order.tickets.length}</td>
-                      <td className="px-8 py-5 text-right"><button onClick={() => toggleExpand(order.order_id)} className="text-[10px] font-bold text-gray-500 hover:text-[#FF6B35] uppercase tracking-wider underline">{expandedRow === order.order_id ? 'Close Details' : 'View Data Details'}</button></td>
-                    </tr>
-                    {expandedRow === order.order_id && (
-                      <tr className="bg-gray-50/50">
-                        <td colSpan="6" className="px-8 py-6 border-l-4 border-[#FF6B35]">
-                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">{isWed ? 'Invitation & Greeting Details' : 'Individual Ticket List'}</p>
-                          <div className="overflow-x-auto bg-white rounded-xl border border-gray-200 shadow-sm">
-                            <table className="w-full text-left border-collapse min-w-[700px]">
-                              <thead>
-                                <tr className="bg-gray-50 border-b border-gray-200 text-[9px] font-black text-gray-500 uppercase tracking-widest">
-                                  <th className="px-4 py-3 w-1/4">ID & Attendee Profile</th><th className="px-4 py-3">Attendance Status</th><th className="px-4 py-3">Scanned By (Agent)</th>{isWed && <th className="px-4 py-3 w-1/3">RSVP & Greeting Details</th>}<th className="px-4 py-3 text-right">Action</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {order.tickets.map((t, idx) => (
-                                  <tr key={t.ticket_id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50">
-                                    <td className="px-4 py-3"><p className="font-bold text-sm text-gray-900">{t.attendee_name || `Attendee ${idx + 1}`}</p><p className="text-[10px] text-gray-500">{t.attendee_email || '-'}</p><span className="bg-gray-100 text-gray-600 text-[8px] px-2 py-0.5 rounded uppercase font-bold tracking-wider inline-block mt-1">{t.session_name}</span></td>
-                                    <td className="px-4 py-3">{t.is_attending === false ? (<span className="text-[9px] font-black bg-red-100 text-red-600 px-2 py-1 rounded-md uppercase">Absent</span>) : t.is_scanned ? (<span className="text-[9px] font-black bg-green-100 text-green-600 px-2 py-1 rounded-md uppercase">Present</span>) : (<span className="text-[9px] font-black bg-gray-100 text-gray-500 px-2 py-1 rounded-md uppercase">Not Attended</span>)}</td>
-                                    <td className="px-4 py-3">{t.is_scanned ? (<span className="text-xs font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded-md">{t.scanned_by_name || 'Agent/EO'}</span>) : '-'}</td>
-                                    {isWed && (<td className="px-4 py-3"><p className="text-xs text-gray-600"><span className="font-bold">Pax:</span> {t.pax || 1} People</p><p className="text-[10px] text-gray-500 italic line-clamp-2 mt-1">"{t.greeting || '-'}"</p></td>)}
-                                    <td className="px-4 py-3 text-right">{!t.is_scanned && t.is_attending !== false && (<button onClick={() => initiateManualCheckIn(t.ticket_id)} className={`text-[10px] font-black text-white px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-sm transition-colors ${isWed ? 'bg-slate-900 hover:bg-black' : 'bg-[#FF6B35] hover:bg-orange-600'}`}>Manual Check-In</button>)}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                {currentItems.length > 0 ? currentItems.map((order) => {
+                  const rawOrder = event?.orders?.find(o => o.order_id === order.order_id);
+                  const isPending = rawOrder?.payment_status === 'PENDING';
+                  
+                  return (
+                    <tbody key={`desktop-${order.order_id}`} className="border-b border-gray-50 last:border-none">
+                      <tr className={`hover:bg-gray-50/30 transition-colors ${isPending ? 'opacity-50 grayscale' : ''}`}>
+                        <td className="px-8 py-5">
+                          <p className="text-xs font-bold text-gray-400">#{order.order_id}</p>
+                          {isPending && <span className="bg-red-50 text-red-500 px-1.5 py-0.5 rounded text-[8px] font-black uppercase mt-1 inline-block">Unpaid</span>}
                         </td>
+                        <td className="px-8 py-5 font-bold text-sm">{order.buyer_name} <br/><span className="text-xs font-normal text-gray-400">{order.buyer_email}</span></td>
+                        <td className="px-8 py-5 max-w-[200px] truncate" title={order.session_name}><span className="px-3 py-1 bg-gray-100 rounded-lg text-[10px] font-bold uppercase truncate inline-block max-w-full">{order.session_name}</span></td>
+                        <td className="px-8 py-5 text-center font-black">{isWed ? order.tickets.reduce((sum, t) => sum + (t.pax || 1), 0) : order.tickets.length}</td>
+                        <td className="px-8 py-5 text-right"><button onClick={() => toggleExpand(order.order_id)} className="text-[10px] font-bold text-gray-500 hover:text-[#FF6B35] uppercase tracking-wider underline">{expandedRow === order.order_id ? 'Close Details' : 'View Data Details'}</button></td>
                       </tr>
-                    )}
-                  </tbody>
-                )) : <tbody><tr><td colSpan="6" className="px-8 py-10 text-center text-gray-400 font-bold text-sm"><div className="flex flex-col items-center justify-center"><svg className="w-12 h-12 mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>No data matches the filter.</div></td></tr></tbody>}
+                      {expandedRow === order.order_id && (
+                        <tr className="bg-gray-50/50">
+                          <td colSpan="6" className="px-8 py-6 border-l-4 border-[#FF6B35]">
+                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">{isWed ? 'Invitation & Greeting Details' : 'Individual Ticket List'}</p>
+                            <div className="overflow-x-auto bg-white rounded-xl border border-gray-200 shadow-sm">
+                              <table className="w-full text-left border-collapse min-w-[700px]">
+                                <thead>
+                                  <tr className="bg-gray-50 border-b border-gray-200 text-[9px] font-black text-gray-500 uppercase tracking-widest">
+                                    <th className="px-4 py-3 w-1/4">ID & Attendee Profile</th><th className="px-4 py-3">Attendance Status</th><th className="px-4 py-3">Scanned By (Agent)</th>{isWed && <th className="px-4 py-3 w-1/3">RSVP & Greeting Details</th>}<th className="px-4 py-3 text-right">Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {order.tickets.map((t, idx) => (
+                                    <tr key={t.ticket_id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50">
+                                      <td className="px-4 py-3"><p className="font-bold text-sm text-gray-900">{t.attendee_name || `Attendee ${idx + 1}`}</p><p className="text-[10px] text-gray-500">{t.attendee_email || '-'}</p><span className="bg-gray-100 text-gray-600 text-[8px] px-2 py-0.5 rounded uppercase font-bold tracking-wider inline-block mt-1">{t.session_name}</span></td>
+                                      <td className="px-4 py-3">{t.is_attending === false ? (<span className="text-[9px] font-black bg-red-100 text-red-600 px-2 py-1 rounded-md uppercase">Absent</span>) : t.is_scanned ? (<span className="text-[9px] font-black bg-green-100 text-green-600 px-2 py-1 rounded-md uppercase">Present</span>) : (<span className="text-[9px] font-black bg-gray-100 text-gray-500 px-2 py-1 rounded-md uppercase">Not Attended</span>)}</td>
+                                      <td className="px-4 py-3">{t.is_scanned ? (<span className="text-xs font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded-md">{t.scanned_by_name || 'Agent/EO'}</span>) : '-'}</td>
+                                      {isWed && (<td className="px-4 py-3"><p className="text-xs text-gray-600"><span className="font-bold">Pax:</span> {t.pax || 1} People</p><p className="text-[10px] text-gray-500 italic line-clamp-2 mt-1">"{t.greeting || '-'}"</p></td>)}
+                                      <td className="px-4 py-3 text-right">{!t.is_scanned && !isPending && t.is_attending !== false && (<button onClick={() => initiateManualCheckIn(t.ticket_id)} className={`text-[10px] font-black text-white px-3 py-1.5 rounded-lg uppercase tracking-widest shadow-sm transition-colors ${isWed ? 'bg-slate-900 hover:bg-black' : 'bg-[#FF6B35] hover:bg-orange-600'}`}>Manual Check-In</button>)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  )
+                }) : <tbody><tr><td colSpan="6" className="px-8 py-10 text-center text-gray-400 font-bold text-sm"><div className="flex flex-col items-center justify-center"><svg className="w-12 h-12 mb-3 text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>No data matches the filter.</div></td></tr></tbody>}
               </table>
 
               <div className="md:hidden flex flex-col gap-3">
-                {currentItems.length > 0 ? currentItems.map((order) => (
-                  <div key={`mobile-${order.order_id}`} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-                    <div className="flex justify-between items-start mb-3 border-b border-gray-50 pb-3">
-                      <div className="max-w-[60%]"><p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">#{order.order_id}</p><p className="text-sm font-bold text-gray-900 leading-tight">{order.buyer_name}</p><p className="text-[10px] text-gray-500 truncate w-40">{order.buyer_email}</p></div>
-                      <div className="text-right max-w-[40%]"><span className="px-2 py-0.5 bg-gray-100 rounded-md text-[8px] font-bold uppercase mb-1.5 inline-block truncate max-w-full">{order.session_name}</span><div className="text-[10px] font-bold">{isWed ? 'Pax' : 'Ticket Qty'}: <span className="font-black text-[#FF6B35]">{isWed ? order.tickets.reduce((sum, t) => sum + (t.pax || 1), 0) : order.tickets.length}</span></div></div>
-                    </div>
-                    <div className="flex justify-between items-center mt-3"><button onClick={() => toggleExpand(order.order_id)} className="text-[10px] font-black text-[#FF6B35] uppercase tracking-wider flex items-center gap-1 bg-orange-50 px-3 py-1.5 rounded-lg w-full justify-center active:scale-95 transition-all">{expandedRow === order.order_id ? 'Close Details' : 'View Data Details'}</button></div>
-                    {expandedRow === order.order_id && (
-                      <div className="mt-4 pt-4 border-t-2 border-dashed border-gray-100 flex flex-col gap-3">
-                        {order.tickets.map((t, idx) => (
-                          <div key={t.ticket_id} className={`p-4 rounded-xl border shadow-sm ${t.is_attending === false ? 'bg-red-50/20 border-red-100' : t.is_scanned ? 'bg-green-50/30 border-green-100' : 'bg-white border-gray-200'}`}>
-                            <div className="flex justify-between items-start mb-2"><div><p className={`text-[9px] font-black uppercase mb-1 ${isWed ? 'text-[#D4AF37]' : 'text-gray-500'}`}>{isWed ? 'Guest Data' : `TICKET #${t.ticket_id.toString().slice(-5)}`}</p></div>{t.is_attending === false ? (<span className="text-[8px] font-black bg-red-100 text-red-600 px-2 py-0.5 rounded-md uppercase">Absent</span>) : t.is_scanned ? (<span className="text-[8px] font-black bg-green-100 text-green-600 px-2 py-0.5 rounded-md uppercase">Present</span>) : (<span className="text-[8px] font-black bg-gray-100 text-gray-500 px-2 py-0.5 rounded-md uppercase">Not Attended</span>)}</div>
-                            <p className="font-black text-gray-900 text-base truncate">{t.attendee_name || `Attendee ${idx + 1}`}</p><p className={`text-[10px] text-gray-500 truncate ${isWed ? 'mb-1' : 'mb-2'}`}>{t.attendee_email || '-'}</p>
-                            {t.is_scanned && <p className="text-[9px] text-gray-600 mt-1 mb-2 font-bold">Scanned by: <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-800">{t.scanned_by_name || 'Agent/EO'}</span></p>}
-                            {!t.is_scanned && t.is_attending !== false && (<button onClick={() => initiateManualCheckIn(t.ticket_id)} className={`w-full mt-3 text-[10px] font-black text-white py-2.5 rounded-lg uppercase tracking-widest shadow-sm active:scale-95 transition-all ${isWed ? 'bg-slate-900' : 'bg-[#FF6B35]'}`}>Manual Check-In</button>)}
-                          </div>
-                        ))}
+                {currentItems.length > 0 ? currentItems.map((order) => {
+                  const rawOrder = event?.orders?.find(o => o.order_id === order.order_id);
+                  const isPending = rawOrder?.payment_status === 'PENDING';
+                  return (
+                    <div key={`mobile-${order.order_id}`} className={`bg-white rounded-2xl border border-gray-100 p-4 shadow-sm ${isPending ? 'opacity-50 grayscale' : ''}`}>
+                      <div className="flex justify-between items-start mb-3 border-b border-gray-50 pb-3">
+                        <div className="max-w-[60%]">
+                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-0.5">#{order.order_id}</p>
+                          {isPending && <span className="bg-red-50 text-red-500 px-1.5 py-0.5 rounded text-[8px] font-black uppercase mb-1 inline-block">Unpaid</span>}
+                          <p className="text-sm font-bold text-gray-900 leading-tight">{order.buyer_name}</p>
+                          <p className="text-[10px] text-gray-500 truncate w-40">{order.buyer_email}</p>
+                        </div>
+                        <div className="text-right max-w-[40%]"><span className="px-2 py-0.5 bg-gray-100 rounded-md text-[8px] font-bold uppercase mb-1.5 inline-block truncate max-w-full">{order.session_name}</span><div className="text-[10px] font-bold">{isWed ? 'Pax' : 'Ticket Qty'}: <span className="font-black text-[#FF6B35]">{isWed ? order.tickets.reduce((sum, t) => sum + (t.pax || 1), 0) : order.tickets.length}</span></div></div>
                       </div>
-                    )}
-                  </div>
-                )) : <div className="bg-white rounded-2xl p-8 text-center border border-gray-100 shadow-sm"><p className="text-xs font-bold text-gray-500 uppercase tracking-widest">No data matches the filter.</p></div>}
+                      <div className="flex justify-between items-center mt-3"><button onClick={() => toggleExpand(order.order_id)} className="text-[10px] font-black text-[#FF6B35] uppercase tracking-wider flex items-center gap-1 bg-orange-50 px-3 py-1.5 rounded-lg w-full justify-center active:scale-95 transition-all">{expandedRow === order.order_id ? 'Close Details' : 'View Data Details'}</button></div>
+                      {expandedRow === order.order_id && (
+                        <div className="mt-4 pt-4 border-t-2 border-dashed border-gray-100 flex flex-col gap-3">
+                          {order.tickets.map((t, idx) => (
+                            <div key={t.ticket_id} className={`p-4 rounded-xl border shadow-sm ${t.is_attending === false ? 'bg-red-50/20 border-red-100' : t.is_scanned ? 'bg-green-50/30 border-green-100' : 'bg-white border-gray-200'}`}>
+                              <div className="flex justify-between items-start mb-2"><div><p className={`text-[9px] font-black uppercase mb-1 ${isWed ? 'text-[#D4AF37]' : 'text-gray-500'}`}>{isWed ? 'Guest Data' : `TICKET #${t.ticket_id.toString().slice(-5)}`}</p></div>{t.is_attending === false ? (<span className="text-[8px] font-black bg-red-100 text-red-600 px-2 py-0.5 rounded-md uppercase">Absent</span>) : t.is_scanned ? (<span className="text-[8px] font-black bg-green-100 text-green-600 px-2 py-0.5 rounded-md uppercase">Present</span>) : (<span className="text-[8px] font-black bg-gray-100 text-gray-500 px-2 py-0.5 rounded-md uppercase">Not Attended</span>)}</div>
+                              <p className="font-black text-gray-900 text-base truncate">{t.attendee_name || `Attendee ${idx + 1}`}</p><p className={`text-[10px] text-gray-500 truncate ${isWed ? 'mb-1' : 'mb-2'}`}>{t.attendee_email || '-'}</p>
+                              {t.is_scanned && <p className="text-[9px] text-gray-600 mt-1 mb-2 font-bold">Scanned by: <span className="bg-gray-100 px-1.5 py-0.5 rounded text-gray-800">{t.scanned_by_name || 'Agent/EO'}</span></p>}
+                              {!t.is_scanned && !isPending && t.is_attending !== false && (<button onClick={() => initiateManualCheckIn(t.ticket_id)} className={`w-full mt-3 text-[10px] font-black text-white py-2.5 rounded-lg uppercase tracking-widest shadow-sm active:scale-95 transition-all ${isWed ? 'bg-slate-900' : 'bg-[#FF6B35]'}`}>Manual Check-In</button>)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                }) : <div className="bg-white rounded-2xl p-8 text-center border border-gray-100 shadow-sm"><p className="text-xs font-bold text-gray-500 uppercase tracking-widest">No data matches the filter.</p></div>}
               </div>
             </div>
             

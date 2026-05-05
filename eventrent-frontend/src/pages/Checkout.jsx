@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { QRCodeSVG } from 'qrcode.react';
 
 // --- KOMPONEN CUSTOM DROPDOWN ALA GOOGLE FORMS ---
 function CustomDropdown({ options, value, onChange, placeholder }) {
@@ -56,22 +57,27 @@ function CustomDropdown({ options, value, onChange, placeholder }) {
 export default function Checkout() {
   const { id } = useParams();
   const navigate = useNavigate();
-  
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const preferredSessionId = queryParams.get('session'); 
 
   const [user] = useState(() => JSON.parse(localStorage.getItem('user')));
-
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
   
   const [cart, setCart] = useState([]);
   const [formAnswers, setFormAnswers] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // State untuk metode pembayaran
+  const [paymentMethod, setPaymentMethod] = useState('QRIS'); 
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('idle'); 
+
+  // State untuk Cahaya Pay QR Code Modal
+  const [qrData, setQrData] = useState(null);
+  const [showQrModal, setShowQrModal] = useState(false);
 
   const [popup, setPopup] = useState({ isOpen: false, message: '', type: 'info' });
 
@@ -160,9 +166,9 @@ export default function Checkout() {
   const canAddNewSession = event?.sessions?.some(s => s.stock > 0 && !cart.some(item => String(item.sessionId) === String(s.id)));
 
   // ========================================================
-  // 🔥 FUNGSI BARU: TRIGGER MIDTRANS PAYMENT
+  // 🔥 FUNGSI PEMBAYARAN HYBRID
   // ========================================================
-  const handlePayWithMidtrans = async (e) => {
+  const handlePayment = async (e) => {
     e.preventDefault(); 
 
     if (cart.length === 0) return showPopup("Cart is empty!", "error");
@@ -178,89 +184,57 @@ export default function Checkout() {
 
     setIsSubmitting(true);
     try {
-      let emailTamu = user?.email || ''; 
-      let namaTamu = user?.name || 'EventRent Guest'; 
+      const authKey = Object.keys(localStorage).find(key => key.endsWith('-auth-token'));
+      const sessionStr = authKey ? localStorage.getItem(authKey) : null;
+      const token = sessionStr ? JSON.parse(sessionStr).access_token : '';
       
-      if (!emailTamu && cart.length > 0) {
+      // Ambil email pembeli (bisa dari akun atau dari form tiket pertama)
+      let buyerEmail = user?.email || ''; 
+      if (!buyerEmail && cart.length > 0) {
         const firstCartItem = cart[0];
-        emailTamu = formAnswers[`cart-${firstCartItem.id}-ticket-0-email`] || 'guest@email.com';
-        namaTamu = formAnswers[`cart-${firstCartItem.id}-ticket-0-nama`] || 'Guest';
+        const emailKey = `cart-${firstCartItem.id}-ticket-0-email`;
+        buyerEmail = formAnswers[emailKey] || '';
       }
 
-      const orderId = `TKT-${event.id}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/checkout`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` }) 
+        },
+        body: JSON.stringify({
+          userId: user ? user.id : null,
+          buyerEmail: buyerEmail, 
+          eventId: event.id, 
+          cart: cart, 
+          formAnswers: formAnswers, 
+          paymentMethod: paymentMethod 
+        })
+      });
 
-      let activePayments = event?.paymentMethods || { qris: true, va: true, transferBank: false };
-      
-      if (typeof activePayments === 'string') {
-        try { activePayments = JSON.parse(activePayments); } catch(e) {}
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Gagal membuat pesanan");
 
-      let allowedInMidtrans = [];
-      if (activePayments.qris) allowedInMidtrans.push("gopay", "shopeepay", "other_qris");
-      if (activePayments.va || activePayments.transferBank) allowedInMidtrans.push("bca_va", "bni_va", "bri_va", "permata_va", "echannel", "other_va");
-      if (allowedInMidtrans.length === 0) allowedInMidtrans.push("other_qris");
-
-      let tokenMidtrans = null;
-      const isGuest = !user;
-
-      if (isGuest) {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/payment/test-midtrans`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            orderId: orderId, amount: totalAmount, name: namaTamu, email: emailTamu, enabledPayments: allowedInMidtrans 
-          })
-        });
-        const data = await res.json();
-        tokenMidtrans = data.token;
-      } else {
-        const supabaseToken = localStorage.getItem('supabase_token');
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/checkout`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseToken}`
-          },
-          body: JSON.stringify({
-            eventId: event.id, cart: cart, formAnswers: formAnswers, enabledPayments: allowedInMidtrans
-          })
-        });
-        const data = await res.json();
-        tokenMidtrans = data.snapToken;
-      }
-
-      if (tokenMidtrans) {
-        window.snap.pay(tokenMidtrans, {
-          onSuccess: function(result) {
-            setShowPaymentModal(true); 
-            executeRealPayment(); 
-          },
-          onPending: function(result) {
-            if (!isGuest) {
-               showPopup("Payment pending. You can complete the payment in the My Orders menu!", "info");
-               setTimeout(() => navigate('/my-orders'), 3000);
-            } else {
-               showPopup("Pending status! Please complete your VA/Transfer payment.", "info");
-            }
-          },
-          onError: function(result) {
-            showPopup("Payment failed. Please try again.", "error");
-          },
-          onClose: function() {
-            if (!isGuest) {
-               showPopup("Pop-up closed! Don't worry, your order is safely saved in the My Orders menu.", "info");
-               setTimeout(() => navigate('/my-orders'), 3000);
-            } else {
-               showPopup("You closed the pop-up before completing the payment.", "error");
-            }
-          }
-        });
-      } else {
-        showPopup("Failed to retrieve payment token from the server.", "error");
+      // Logika Navigasi Baru
+      if (paymentMethod === 'MANUAL_TRANSFER') {
+        showPopup("Pesanan Berhasil! Silakan upload bukti pembayaran.", "success");
+        
+        // 🔥 PERUBAHAN DI SINI: Navigasi langsung ke halaman upload proof menggunakan Order ID
+        // Kita kasih delay 2 detik biar user sempat baca popup suksesnya
+        setTimeout(() => navigate(`/upload-proof/${data.orderId}`), 2000);
+      } 
+      else {
+        // Jalur Otomatis (QRIS)
+        if (data.checkoutUrl) {
+          setQrData(data.checkoutUrl);
+          setShowQrModal(true);
+        } else {
+          showPopup("Terjadi kesalahan, URL QR pembayaran tidak ditemukan.", "error");
+        }
       }
     } catch (err) {
       console.error(err);
-      showPopup("Network error occurred.", "error");
+      showPopup(err.message || "Network error occurred.", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -268,8 +242,9 @@ export default function Checkout() {
 
   const executeRealPayment = async () => {
     setPaymentStatus('processing');
-    
-    const token = localStorage.getItem('supabase_token');
+    const authKey = Object.keys(localStorage).find(key => key.endsWith('-auth-token'));
+    const sessionStr = authKey ? localStorage.getItem(authKey) : null;
+    const token = sessionStr ? JSON.parse(sessionStr).access_token : '';
 
     try {
       let emailTamu = user?.email || ''; 
@@ -288,9 +263,7 @@ export default function Checkout() {
       };
       
       const headers = { 'Content-Type': 'application/json' };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
+      if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tickets/buy`, {
         method: 'POST',
@@ -301,16 +274,14 @@ export default function Checkout() {
 
       if (res.ok) {
         setPaymentStatus('success');
-        setTimeout(() => {
-          navigate(`/event/${id}`); 
-        }, 2000);
+        setTimeout(() => { navigate(`/event/${id}`); }, 2000);
       } else {
-        showPopup("Failed to process ticket: " + (data.message || 'Server error'), "error");
+        showPopup("Failed: " + (data.message || 'Server error'), "error");
         setShowPaymentModal(false);
       }
     } catch (err) {
       console.error(err);
-      showPopup("System error occurred while generating the ticket.", "error");
+      showPopup("System error occurred.", "error");
       setShowPaymentModal(false);
     }
   };
@@ -325,12 +296,11 @@ export default function Checkout() {
       
       <AnimatePresence>
         {popup.isOpen && (
-          <div className="fixed inset-0 z-[110] flex flex-col items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[210] flex flex-col items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
             <motion.div 
               initial={{ opacity: 0, scale: 0.8, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.8, y: -20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
               className={`w-full max-w-sm rounded-[32px] p-8 text-center shadow-2xl relative overflow-hidden ${popup.type === 'error' ? 'bg-[#E24A29]' : popup.type === 'success' ? 'bg-[#27AE60]' : 'bg-gray-800'}`}
             >
               <div className={`w-24 h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner ${popup.type === 'error' ? 'text-[#E24A29]' : popup.type === 'success' ? 'text-[#27AE60]' : 'text-gray-800'}`}>
@@ -347,6 +317,7 @@ export default function Checkout() {
               </h2>
               <p className="text-white/90 font-medium mb-8">{popup.message}</p>
               <button 
+                type="button"
                 onClick={closePopup} 
                 className={`w-full bg-white py-4 rounded-xl font-bold uppercase tracking-widest shadow-lg transition-all active:scale-95 ${popup.type === 'error' ? 'text-[#E24A29] hover:bg-red-50' : popup.type === 'success' ? 'text-[#27AE60] hover:bg-green-50' : 'text-gray-900 hover:bg-gray-50'}`}
               >
@@ -357,8 +328,7 @@ export default function Checkout() {
         )}
       </AnimatePresence>
 
-      <form onSubmit={handlePayWithMidtrans}>
-        
+      <form onSubmit={handlePayment}>
         <div className="max-w-7xl mx-auto px-4 md:px-8">
           <div className="flex items-center gap-4 mb-8">
             <button 
@@ -377,7 +347,6 @@ export default function Checkout() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
             <div className="lg:col-span-4 space-y-4">
               {cart.map((item, index) => {
                 const selectedSession = event.sessions.find(s => String(s.id) === String(item.sessionId));
@@ -429,111 +398,154 @@ export default function Checkout() {
               )}
             </div>
 
-            <div className={`lg:col-span-8 bg-white border-gray-200 rounded-[32px] p-8 md:p-10 shadow-sm border`}>
-              <h2 className={`text-2xl font-bold mb-6 border-b pb-4 text-gray-900 border-gray-100`}>
-                Ticket Holder Data
-              </h2>
-              
-              <div className="space-y-4">
-                {cart.map((item, cartIndex) => {
-                  const session = event.sessions.find(s => String(s.id) === String(item.sessionId));
-                  if (!session) return null;
+            <div className={`lg:col-span-8 space-y-8`}>
+              {/* CARD FORM DATA PEMEGANG TIKET */}
+              <div className="bg-white border-gray-200 rounded-[32px] p-8 md:p-10 shadow-sm border">
+                <h2 className={`text-2xl font-bold mb-6 border-b pb-4 text-gray-900 border-gray-100`}>
+                  Ticket Holder Data
+                </h2>
+                
+                <div className="space-y-4">
+                  {cart.map((item) => {
+                    const session = event.sessions.find(s => String(s.id) === String(item.sessionId));
+                    if (!session) return null;
 
-                  return Array.from({ length: item.qty }).map((_, qtyIndex) => {
-                    const formKeyPrefix = `cart-${item.id}-ticket-${qtyIndex}`;
+                    return Array.from({ length: item.qty }).map((_, qtyIndex) => {
+                      const formKeyPrefix = `cart-${item.id}-ticket-${qtyIndex}`;
 
-                    return (
-                      <div key={formKeyPrefix} className="mb-10 last:mb-0">
-                        <div className={`px-4 py-2 rounded-lg font-bold text-sm mb-5 inline-block border bg-orange-50 text-[#FF6B35] border-orange-100`}>
-                          Ticket {qtyIndex + 1} - <span className="uppercase">{session.name}</span>
-                        </div>
-                        
-                        <div className={`space-y-5 pl-2 md:pl-4 border-l-2 border-gray-100`}>
-                          <div>
-                            <label className={labelStyle}>Full Name <span className="text-red-500">*</span></label>
-                            <input type="text" required value={formAnswers[`${formKeyPrefix}-nama`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-nama`]: e.target.value}))} className={inputStyle} placeholder="Enter your full name" />
-                          </div>
-                          <div>
-                            <label className={labelStyle}>Email <span className="text-red-500">*</span></label>
-                            <input type="email" required value={formAnswers[`${formKeyPrefix}-email`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-email`]: e.target.value}))} className={inputStyle} placeholder="Enter an active email" />
+                      return (
+                        <div key={formKeyPrefix} className="mb-10 last:mb-0">
+                          <div className={`px-4 py-2 rounded-lg font-bold text-sm mb-5 inline-block border bg-orange-50 text-[#FF6B35] border-orange-100`}>
+                            Ticket {qtyIndex + 1} - <span className="uppercase">{session.name}</span>
                           </div>
                           
-                          {/* --- RENDER CUSTOM QUESTIONS --- */}
-                          {session.questions && session.questions.map((q) => {
-                            const formKey = `${formKeyPrefix}-q${q.id}`;
-                            return (
-                              <div key={q.id} className={`pt-4 border-t border-gray-100`}>
-                                <label className={labelStyle}>
-                                  {q.question_text} {q.is_required && <span className="text-red-500">*</span>}
-                                </label>
+                          <div className={`space-y-5 pl-2 md:pl-4 border-l-2 border-gray-100`}>
+                            <div>
+                              <label className={labelStyle}>Full Name <span className="text-red-500">*</span></label>
+                              <input type="text" required value={formAnswers[`${formKeyPrefix}-nama`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-nama`]: e.target.value}))} className={inputStyle} placeholder="Enter your full name" />
+                            </div>
+                            <div>
+                              <label className={labelStyle}>Email <span className="text-red-500">*</span></label>
+                              <input type="email" required value={formAnswers[`${formKeyPrefix}-email`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-email`]: e.target.value}))} className={inputStyle} placeholder="Enter an active email" />
+                            </div>
+                            
+                            {/* --- RENDER CUSTOM QUESTIONS --- */}
+                            {session.questions && session.questions.map((q) => {
+                              const formKey = `${formKeyPrefix}-q${q.id}`;
+                              return (
+                                <div key={q.id} className={`pt-4 border-t border-gray-100`}>
+                                  <label className={labelStyle}>
+                                    {q.question_text} {q.is_required && <span className="text-red-500">*</span>}
+                                  </label>
 
-                                {(!q.answer_type || q.answer_type === 'Text') && (
-                                  <input 
-                                    type="text" 
-                                    required={q.is_required} 
-                                    value={formAnswers[formKey] || ''} 
-                                    onChange={(e) => setFormAnswers(prev => ({...prev, [formKey]: e.target.value}))} 
-                                    className={inputStyle} 
-                                    placeholder="Type your answer..." 
-                                  />
-                                )}
+                                  {(!q.answer_type || q.answer_type === 'Text') && (
+                                    <input 
+                                      type="text" 
+                                      required={q.is_required} 
+                                      value={formAnswers[formKey] || ''} 
+                                      onChange={(e) => setFormAnswers(prev => ({...prev, [formKey]: e.target.value}))} 
+                                      className={inputStyle} 
+                                      placeholder="Type your answer..." 
+                                    />
+                                  )}
 
-                                {/* --- CUSTOM DROPDOWN --- */}
-                                {q.answer_type === 'Dropdown' && (
-                                  <CustomDropdown 
-                                    options={q.options} 
-                                    value={formAnswers[formKey] || ''} 
-                                    onChange={(val) => setFormAnswers(prev => ({...prev, [formKey]: val}))} 
-                                    placeholder="Select Answer..." 
-                                    required={q.is_required}
-                                  />
-                                )}
+                                  {q.answer_type === 'Dropdown' && (
+                                    <CustomDropdown 
+                                      options={q.options} 
+                                      value={formAnswers[formKey] || ''} 
+                                      onChange={(val) => setFormAnswers(prev => ({...prev, [formKey]: val}))} 
+                                      placeholder="Select Answer..." 
+                                      required={q.is_required}
+                                    />
+                                  )}
 
-                                {/* --- CUSTOM CHECKBOX --- */}
-                                {q.answer_type === 'Checkbox' && (
-                                  <div className={`space-y-3 mt-3 p-4 rounded-xl border bg-gray-50 border-gray-200`}>
-                                    {q.options && q.options.map((opt, idx) => {
-                                       const currentStr = formAnswers[formKey] || '';
-                                       const isChecked = currentStr.split(', ').includes(opt);
-                                       
-                                       return (
-                                         <label key={idx} className="flex items-start gap-3 cursor-pointer group">
-                                           <div className="relative flex items-center justify-center w-5 h-5 shrink-0 mt-0.5">
-                                             <input 
-                                               type="checkbox" 
-                                               checked={isChecked}
-                                               onChange={(e) => {
-                                                  const checked = e.target.checked;
-                                                  setFormAnswers(prev => {
-                                                     const prevStr = prev[formKey] || '';
-                                                     let arr = prevStr ? prevStr.split(', ') : [];
-                                                     if (checked) arr.push(opt);
-                                                     else arr = arr.filter(x => x !== opt);
-                                                     return { ...prev, [formKey]: arr.join(', ') };
-                                                  });
-                                               }} 
-                                               className="peer w-full h-full absolute opacity-0 cursor-pointer" 
-                                             />
-                                             <div className={`w-5 h-5 border-2 rounded-[3px] flex items-center justify-center transition-all border-gray-400 group-hover:border-gray-600 peer-checked:bg-[#FF6B35] peer-checked:border-[#FF6B35]`}>
-                                                <svg className={`w-3.5 h-3.5 opacity-0 peer-checked:opacity-100 transition-opacity text-white`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
-                                             </div>
-                                           </div>
-                                           <span className={`text-sm font-medium transition-colors text-gray-700 group-hover:text-gray-900`}>{opt}</span>
-                                         </label>
-                                       )
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
+                                  {q.answer_type === 'Checkbox' && (
+                                    <div className={`space-y-3 mt-3 p-4 rounded-xl border bg-gray-50 border-gray-200`}>
+                                      {q.options && q.options.map((opt, idx) => {
+                                        const currentStr = formAnswers[formKey] || '';
+                                        const isChecked = currentStr.split(', ').includes(opt);
+                                        
+                                        return (
+                                          <label key={idx} className="flex items-start gap-3 cursor-pointer group">
+                                            <div className="relative flex items-center justify-center w-5 h-5 shrink-0 mt-0.5">
+                                              <input 
+                                                type="checkbox" 
+                                                checked={isChecked}
+                                                onChange={(e) => {
+                                                    const checked = e.target.checked;
+                                                    setFormAnswers(prev => {
+                                                      const prevStr = prev[formKey] || '';
+                                                      let arr = prevStr ? prevStr.split(', ') : [];
+                                                      if (checked) arr.push(opt);
+                                                      else arr = arr.filter(x => x !== opt);
+                                                      return { ...prev, [formKey]: arr.join(', ') };
+                                                    });
+                                                }} 
+                                                className="peer w-full h-full absolute opacity-0 cursor-pointer" 
+                                              />
+                                              <div className={`w-5 h-5 border-2 rounded-[3px] flex items-center justify-center transition-all border-gray-400 group-hover:border-gray-600 peer-checked:bg-[#FF6B35] peer-checked:border-[#FF6B35]`}>
+                                                  <svg className={`w-3.5 h-3.5 opacity-0 peer-checked:opacity-100 transition-opacity text-white`} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                                              </div>
+                                            </div>
+                                            <span className={`text-sm font-medium transition-colors text-gray-700 group-hover:text-gray-900`}>{opt}</span>
+                                          </label>
+                                        )
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  });
-                })}
+                      );
+                    });
+                  })}
+                </div>
               </div>
 
+              {/* 🔥 PINDAH KE SINI: CARD METODE PEMBAYARAN */}
+              {calculateTotal() > 0 && (
+                <div className="bg-white border-gray-200 rounded-[32px] p-8 md:p-10 shadow-sm border space-y-6">
+                   <h2 className="text-2xl font-bold border-b pb-4 text-gray-900 border-gray-100">
+                      Payment Method
+                   </h2>
+                   
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Opsi QRIS */}
+                      <div 
+                        onClick={() => setPaymentMethod('QRIS')}
+                        className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${paymentMethod === 'QRIS' ? 'border-[#FF6B35] bg-orange-50' : 'border-gray-100 hover:border-gray-300'}`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-white rounded-xl border border-slate-200 flex items-center justify-center font-bold text-[#FF6B35] text-xs">QRIS</div>
+                          <div>
+                            <p className="text-sm font-black text-slate-900">QRIS / E-Wallet</p>
+                            <p className="text-[10px] text-slate-500 uppercase tracking-tighter">Automatic Confirmation</p>
+                          </div>
+                        </div>
+                        {paymentMethod === 'QRIS' && <div className="w-6 h-6 bg-[#FF6B35] rounded-full flex items-center justify-center"><svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg></div>}
+                      </div>
+
+                      {/* Opsi Transfer Bank */}
+                      <div 
+                        onClick={() => setPaymentMethod('MANUAL_TRANSFER')}
+                        className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${paymentMethod === 'MANUAL_TRANSFER' ? 'border-[#FF6B35] bg-orange-50' : 'border-gray-100 hover:border-gray-300'}`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-white rounded-xl border border-slate-200 flex items-center justify-center text-slate-400">
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                          </div>
+                          <div>
+                            <p className="text-sm font-black text-slate-900">Bank Transfer</p>
+                            <p className="text-[10px] text-slate-500 uppercase tracking-tighter">Manual Instruction</p>
+                          </div>
+                        </div>
+                        {paymentMethod === 'MANUAL_TRANSFER' && <div className="w-6 h-6 bg-[#FF6B35] rounded-full flex items-center justify-center"><svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg></div>}
+                      </div>
+                   </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -555,16 +567,12 @@ export default function Checkout() {
             </button>
           </div>
         </div>
-
       </form>
 
-      {/* ======================================================= */}
-      {/* ANIMASI LOADING & SUKSES SETELAH MIDTRANS               */}
-      {/* ======================================================= */}
+      {/* ANIMASI LOADING TIKET GRATIS */}
       {showPaymentModal && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className={`rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl relative bg-white`}>
-            
             <div className="p-12 text-center flex flex-col items-center justify-center min-h-[300px]">
               {paymentStatus === 'processing' ? (
                 <>
@@ -577,19 +585,65 @@ export default function Checkout() {
                   <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 border-[6px] animate-bounce bg-green-50 text-green-500 border-green-100`}>
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
                   </div>
-                  <h3 className={`text-2xl font-black uppercase tracking-tight text-gray-900`}>
-                    Tickets Generated!
-                  </h3>
-                  <p className={`text-sm mt-2 font-medium text-gray-500`}>
-                     Check your email to view your ticket barcodes.
-                  </p>
+                  <h3 className={`text-2xl font-black uppercase tracking-tight text-gray-900`}>Tickets Generated!</h3>
+                  <p className={`text-sm mt-2 font-medium text-gray-500`}>Check your email for barcode details.</p>
                 </>
               )}
             </div>
-
           </div>
         </div>
       )}
+
+      {/* MODAL QR CODE PEMBAYARAN (CAHAYA PAY)[cite: 1] */}
+      <AnimatePresence>
+        {showQrModal && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="w-full max-w-sm bg-white rounded-[32px] shadow-2xl p-8 text-center relative overflow-hidden"
+            >
+              <h2 className="text-2xl font-black text-gray-900 mb-1 uppercase tracking-tight">Scan QRIS</h2>
+              <p className="text-xs font-bold text-gray-500 mb-6 uppercase tracking-widest">Buka e-Wallet / M-Banking Anda</p>
+              
+              <div className="flex justify-center p-6 bg-gray-50 rounded-2xl mb-6 border border-gray-100 shadow-inner">
+                 {qrData ? (
+                   <QRCodeSVG value={qrData} size={220} level="H" />
+                 ) : (
+                   <div className="w-[220px] h-[220px] flex items-center justify-center animate-pulse bg-gray-200 rounded-xl">
+                      <span className="text-sm font-bold text-gray-400 uppercase">Memuat...</span>
+                   </div>
+                 )}
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowQrModal(false);
+                    navigate('/my-orders'); 
+                  }}
+                  className="w-full py-4 bg-[#FF6B35] text-white rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-[#e85b2a] transition-all active:scale-95 shadow-lg"
+                >
+                  Saya Sudah Bayar / Refresh
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowQrModal(false);
+                    navigate('/my-orders'); 
+                  }}
+                  className="w-full py-3 text-gray-500 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-gray-100 transition-colors"
+                >
+                  Tutup & Bayar Nanti
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

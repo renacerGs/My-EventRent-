@@ -1,29 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
+import { QRCodeSVG } from 'qrcode.react';
+import { createClient } from '@supabase/supabase-js';
+
+// Inisialisasi Supabase Client untuk akses Storage
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export default function MyOrders() {
   const navigate = useNavigate();
   const [user] = useState(() => JSON.parse(localStorage.getItem('user')) || null);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  
+  // State untuk mengontrol Modal QR Code Cahaya Pay
+  const [activeQrUrl, setActiveQrUrl] = useState(null);
+
+  // 🔥 STATE BARU UNTUK MODAL UPLOAD BUKTI TRANSFER
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [file, setFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (!user) {
-      toast.error('Please login first to view your orders!');
+      toast.error('Silakan login terlebih dahulu untuk melihat pesanan Anda!');
       navigate('/');
       return;
     }
     fetchOrders(); 
-
-    const scriptId = 'midtrans-script';
-    if (!document.getElementById(scriptId)) {
-      const script = document.createElement('script');
-      script.id = scriptId;
-      script.src = 'https://app.sandbox.midtrans.com/snap/snap.js'; 
-      script.setAttribute('data-client-key', import.meta.env.VITE_MIDTRANS_CLIENT_KEY);
-      document.body.appendChild(script);
-    }
   }, [user?.id, navigate]);
 
   const fetchOrders = async (isBackground = false) => {
@@ -50,68 +59,112 @@ export default function MyOrders() {
         const data = await res.json();
         setOrders(data);
       } else {
-        if (!isBackground) toast.error('Failed to fetch order history');
+        if (!isBackground) toast.error('Gagal mengambil riwayat pesanan');
       }
     } catch (err) {
       console.error(err);
-      if (!isBackground) toast.error('Network error occurred');
+      if (!isBackground) toast.error('Terjadi kesalahan jaringan');
     } finally {
       if (!isBackground) setLoading(false);
     }
   };
 
+  // ========================================================
+  // FUNGSI PEMBAYARAN & UPLOAD BUKTI
+  // ========================================================
+
   const handlePayNow = (order) => {
-    if (!window.snap) {
-      toast.error('Payment system is not ready yet, please wait.');
-      return;
+    if (order.snap_token === 'MANUAL_TRANSFER') {
+      // Arahkan ke halaman UploadProof yang baru!
+      navigate(`/upload-proof/${order.order_id}`);
+    } else if (order.snap_token) {
+      // Buka modal QR jika ini pakai Cahaya Pay
+      setActiveQrUrl(order.snap_token);
+    } else {
+      toast.error('Metode pembayaran tidak valid.');
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    if (!selectedFile) return;
+
+    // Validasi ukuran & tipe
+    if (selectedFile.size > 5 * 1024 * 1024) {
+      return toast.error('Ukuran file maksimal 5MB!');
+    }
+    if (!selectedFile.type.startsWith('image/')) {
+      return toast.error('Harap upload file berupa gambar (JPG/PNG).');
     }
 
-    window.snap.pay(order.snap_token, {
-      onSuccess: async function (result) {
-        toast.loading('Generating your ticket...', { id: 'process-ticket' });
-        try {
-          const authKey = Object.keys(localStorage).find(key => key.endsWith('-auth-token'));
-          const sessionStr = authKey ? localStorage.getItem(authKey) : null;
-          let token = '';
-          
-          if (sessionStr) {
-            token = JSON.parse(sessionStr).access_token;
-          }
+    setFile(selectedFile);
+    setPreviewUrl(URL.createObjectURL(selectedFile));
+  };
 
-          const details = typeof order.ticket_details === 'string' ? JSON.parse(order.ticket_details) : order.ticket_details;
-          
-          await fetch(`${import.meta.env.VITE_API_URL}/api/tickets/buy`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-            body: JSON.stringify({
-              userId: order.user_id, 
-              eventId: order.event_id, 
-              cart: details.cart, 
-              formAnswers: details.formAnswers,
-              orderId: order.order_id 
-            })
-          });
-          
-          toast.success('Payment Successful! Ticket generated.', { id: 'process-ticket' });
-          
-          setTimeout(() => fetchOrders(true), 2000); 
-        } catch (err) {
-          toast.error('Failed to generate ticket. Please contact admin.', { id: 'process-ticket' });
-        }
-      },
-      onPending: function (result) {
-        toast.success('Waiting for you to complete the payment...');
-        fetchOrders(true); 
-      },
-      onError: function (result) {
-        toast.error('Payment failed or expired.');
-        fetchOrders(true); 
-      },
-      onClose: function () {
-        toast.error('Pop-up closed before payment was completed.');
-        fetchOrders(true); 
+  const handleUploadSubmit = async (e) => {
+    e.preventDefault();
+    if (!file || !selectedOrder) return toast.error('Pilih gambar terlebih dahulu!');
+
+    setIsUploading(true);
+    try {
+      // 1. Upload ke Supabase Storage (Bucket: payment_proofs)
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${selectedOrder.order_id}-${Date.now()}.${fileExt}`;
+      const filePath = `transfers/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('payment_proofs')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      // 2. Dapatkan URL Publik Gambar
+      const { data: { publicUrl } } = supabase.storage
+        .from('payment_proofs')
+        .getPublicUrl(filePath);
+
+      // 3. Kirim URL Publik ke Backend NestJS kita
+      const authKey = Object.keys(localStorage).find(key => key.endsWith('-auth-token'));
+      const sessionStr = authKey ? localStorage.getItem(authKey) : null;
+      const token = sessionStr ? JSON.parse(sessionStr).access_token : '';
+
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/${selectedOrder.order_id}/proof`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ proofUrl: publicUrl })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || 'Gagal update status pesanan');
       }
-    });
+
+      // Bersihkan Modal & Refresh Order
+      toast.success('Bukti berhasil diunggah! Menunggu verifikasi admin.');
+      closeUploadModal();
+      fetchOrders(true);
+
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Gagal mengunggah bukti transfer.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const closeUploadModal = () => {
+    setUploadModalOpen(false);
+    setSelectedOrder(null);
+    setFile(null);
+    setPreviewUrl(null);
+  };
+
+  const closeQrModal = () => {
+    setActiveQrUrl(null);
+    fetchOrders(true); // Refresh data di background untuk cek webhook Cahaya
   };
 
   if (loading) return (
@@ -127,19 +180,18 @@ export default function MyOrders() {
       <div className="max-w-5xl mx-auto px-4 md:px-8 pt-8 md:pt-12 relative z-10">
         
         {/* HEADER */}
-        <div className="mb-8">
-          <button onClick={() => navigate('/')} className="text-slate-500 hover:text-[#FF6B35] font-bold text-[10px] uppercase tracking-widest mb-4 flex items-center gap-1.5 transition-colors w-max">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7"></path></svg> 
-            Back
+        <div className="flex items-center gap-3 md:gap-4 mb-8">
+          <button 
+            onClick={() => navigate('/')} 
+            className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center shrink-0 bg-white rounded-full border border-gray-200 text-gray-500 transition-all hover:border-[#FF6B35] hover:text-[#FF6B35] shadow-sm active:scale-95"
+          >
+            <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg> 
           </button>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 md:w-12 md:h-12 bg-orange-100 text-[#FF6B35] rounded-2xl flex items-center justify-center border border-orange-200 shrink-0">
-              <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
-            </div>
-            <div>
-              <h1 className="text-xl md:text-3xl font-black text-slate-900 uppercase tracking-tight">My Orders</h1>
-              <p className="text-[10px] md:text-sm font-medium text-slate-500 mt-1">Your transaction history and ticket bills, bro.</p>
-            </div>
+          <div>
+            <h1 className="text-xl md:text-3xl font-black text-slate-900 uppercase tracking-tight">My Orders</h1>
+            <p className="text-[10px] md:text-sm font-medium text-slate-500 mt-1">Your transaction history and ticket bills, bro.</p>
           </div>
         </div>
 
@@ -177,20 +229,25 @@ export default function MyOrders() {
                     <p className="font-black text-slate-900 text-lg">Rp {Number(order.total_price).toLocaleString('id-ID')}</p>
                   </div>
 
+                  {/* LOGIKA PERUBAHAN STATUS TAMPILAN */}
                   {order.payment_status === 'PENDING' ? (
                     <button 
                       onClick={() => handlePayNow(order)}
                       className="bg-[#FF6B35] hover:bg-orange-600 text-white px-5 py-2.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-all shadow-lg shadow-orange-500/20 whitespace-nowrap active:scale-95 border border-orange-400 animate-pulse"
                     >
-                      Pay Now
+                      {order.snap_token === 'MANUAL_TRANSFER' ? 'Upload Bukti Transfer' : 'Scan QRIS'}
                     </button>
+                  ) : order.payment_status === 'WAITING_VERIFICATION' ? (
+                    <span className="inline-flex items-center gap-1.5 bg-yellow-50 text-yellow-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-yellow-200 whitespace-nowrap">
+                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg> Menunggu Verifikasi
+                    </span>
                   ) : order.payment_status === 'SUCCESS' ? (
                     <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-emerald-200 whitespace-nowrap">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg> Paid
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg> Lunas
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1.5 bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-red-200 whitespace-nowrap">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg> Cancelled / Expired
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg> Dibatalkan / Expired
                     </span>
                   )}
                 </div>
@@ -201,6 +258,46 @@ export default function MyOrders() {
         )}
 
       </div>
+
+
+      {/* ======================================================= */}
+      {/* MODAL QR CODE PEMBAYARAN (CAHAYA PAY)                   */}
+      {/* ======================================================= */}
+      <AnimatePresence>
+        {activeQrUrl && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="w-full max-w-sm bg-white rounded-[32px] shadow-2xl p-8 text-center relative overflow-hidden"
+            >
+              <h2 className="text-2xl font-black text-gray-900 mb-1 uppercase tracking-tight">Scan QRIS</h2>
+              <p className="text-xs font-bold text-gray-500 mb-6 uppercase tracking-widest">Buka e-Wallet / M-Banking Anda</p>
+              
+              <div className="flex justify-center p-6 bg-gray-50 rounded-2xl mb-6 border border-gray-100 shadow-inner">
+                 <QRCodeSVG value={activeQrUrl} size={220} level="H" />
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={closeQrModal}
+                  className="w-full py-4 bg-[#FF6B35] text-white rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-[#e85b2a] transition-all active:scale-95 shadow-lg"
+                >
+                  Saya Sudah Bayar / Refresh
+                </button>
+                <button
+                  onClick={() => setActiveQrUrl(null)}
+                  className="w-full py-3 text-gray-500 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-gray-100 transition-colors"
+                >
+                  Tutup
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }

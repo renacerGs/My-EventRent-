@@ -20,6 +20,7 @@ import TrackTicket from './pages/TrackTicket';
 import Notifications from './pages/Notifications';
 import AgentWallet from './components/AgentWallet';
 import MyOrders from './pages/MyOrders'; 
+import UploadProof from './pages/UploadProof';
 
 // 👇 IMPORT HALAMAN JOB BOARD BARU 👇
 import JobBoard from './pages/JobBoard';
@@ -202,6 +203,7 @@ export default function App() {
           <Route path="/manage" element={<ProtectedRoute><ManageEvent /></ProtectedRoute>} />
           <Route path="/manage/event/:id" element={<ProtectedRoute><EventDashboard /></ProtectedRoute>} />
           <Route path="/scanner/:eventId" element={<ProtectedRoute><Scanner /></ProtectedRoute>} />
+          <Route path="/upload-proof/:orderId" element={<UploadProof />} />
           
           {/* --- PEMBUATAN EVENT --- */}
           <Route path="/create" element={<ProtectedRoute><ChooseEventType /></ProtectedRoute>} />
