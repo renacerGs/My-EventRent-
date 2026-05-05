@@ -127,19 +127,18 @@ export default function MyOrders() {
       <div className="max-w-5xl mx-auto px-4 md:px-8 pt-8 md:pt-12 relative z-10">
         
         {/* HEADER */}
-        <div className="mb-8">
-          <button onClick={() => navigate('/')} className="text-slate-500 hover:text-[#FF6B35] font-bold text-[10px] uppercase tracking-widest mb-4 flex items-center gap-1.5 transition-colors w-max">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7"></path></svg> 
-            Back
+        <div className="flex items-center gap-3 md:gap-4 mb-8">
+          <button 
+            onClick={() => navigate('/')} 
+            className="w-10 h-10 md:w-11 md:h-11 flex items-center justify-center shrink-0 bg-white rounded-full border border-gray-200 text-gray-500 transition-all hover:border-[#FF6B35] hover:text-[#FF6B35] shadow-sm active:scale-95"
+          >
+            <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg> 
           </button>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 md:w-12 md:h-12 bg-orange-100 text-[#FF6B35] rounded-2xl flex items-center justify-center border border-orange-200 shrink-0">
-              <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
-            </div>
-            <div>
-              <h1 className="text-xl md:text-3xl font-black text-slate-900 uppercase tracking-tight">My Orders</h1>
-              <p className="text-[10px] md:text-sm font-medium text-slate-500 mt-1">Your transaction history and ticket bills, bro.</p>
-            </div>
+          <div>
+            <h1 className="text-xl md:text-3xl font-black text-slate-900 uppercase tracking-tight">My Orders</h1>
+            <p className="text-[10px] md:text-sm font-medium text-slate-500 mt-1">Your transaction history and ticket bills, bro.</p>
           </div>
         </div>
 

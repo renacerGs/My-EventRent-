@@ -284,11 +284,6 @@ export default function Notifications() {
 
   return (
     <div className={`${isAgentMode ? 'bg-[#0f172a]' : 'bg-[#F8F9FA]'} min-h-screen font-sans pb-20 pt-8 md:pt-12 text-left relative overflow-hidden transition-colors duration-300`}>
-      
-      {/* Background Gradient for Agent Mode */}
-      {isAgentMode && (
-        <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-blue-500/10 to-transparent pointer-events-none z-0"></div>
-      )}
 
       {/* POP-UP CONFIRMATION DELETE */}
       {showDeleteModal && (
@@ -321,12 +316,19 @@ export default function Notifications() {
         
         {/* Header Area */}
         <div className="flex flex-col gap-4 mb-8">
-          <div>
-            <button type="button" onClick={() => navigate(-1)} className={`${isAgentMode ? 'text-slate-400 hover:text-orange-500' : 'text-gray-400 hover:text-[#FF6B35]'} font-bold text-[10px] uppercase tracking-widest mb-3 flex items-center gap-1.5 transition-colors w-max`}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7"></path></svg> 
-              Back
+          <div className="flex items-center gap-3 md:gap-4">
+            <button 
+              type="button" 
+              onClick={() => navigate(-1)} 
+              className={`w-10 h-10 md:w-11 md:h-11 flex items-center justify-center shrink-0 rounded-full border transition-all shadow-sm active:scale-95 ${isAgentMode ? 'bg-[#0f172a] border-slate-700 text-slate-400 hover:text-blue-500 hover:border-blue-500' : 'bg-white border-gray-200 text-gray-500 hover:text-[#FF6B35] hover:border-[#FF6B35]'}`}
+            >
+              <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg> 
             </button>
-            <h1 className={`text-2xl md:text-3xl font-black ${isAgentMode ? 'text-white' : 'text-gray-900'} uppercase tracking-tight`}>Notification Center</h1>
+            <h1 className={`text-2xl md:text-3xl font-black ${isAgentMode ? 'text-white' : 'text-gray-900'} uppercase tracking-tight`}>
+              Notification Center
+            </h1>
           </div>
           
           {/* Action Bar */}
