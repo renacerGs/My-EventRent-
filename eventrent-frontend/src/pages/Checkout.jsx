@@ -69,7 +69,6 @@ export default function Checkout() {
   const [formAnswers, setFormAnswers] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // 🔥 PERUBAHAN: Set default kosong (belum ada metode yang terpilih)
   const [paymentMethod, setPaymentMethod] = useState(''); 
 
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -176,9 +175,8 @@ export default function Checkout() {
 
     const totalAmount = calculateTotal();
 
-    // 🔥 PERUBAHAN: Validasi metode pembayaran belum dipilih
     if (totalAmount > 0 && !paymentMethod) {
-      return showPopup("Silakan pilih Metode Pembayaran terlebih dahulu!", "error");
+      return showPopup("Please select a Payment Method first!", "error");
     }
 
     if (totalAmount === 0) {
@@ -193,7 +191,6 @@ export default function Checkout() {
       const sessionStr = authKey ? localStorage.getItem(authKey) : null;
       const token = sessionStr ? JSON.parse(sessionStr).access_token : '';
       
-      // Ambil email pembeli (bisa dari akun atau dari form tiket pertama)
       let buyerEmail = user?.email || ''; 
       if (!buyerEmail && cart.length > 0) {
         const firstCartItem = cart[0];
@@ -218,20 +215,18 @@ export default function Checkout() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Gagal membuat pesanan");
+      if (!res.ok) throw new Error(data.message || "Failed to create order");
 
-      // Logika Navigasi Baru
       if (paymentMethod === 'MANUAL_TRANSFER') {
-        showPopup("Pesanan Berhasil! Silakan upload bukti pembayaran.", "success");
+        showPopup("Order Successful! Please upload your payment proof.", "success");
         setTimeout(() => navigate(`/upload-proof/${data.orderId}`), 2000);
       } 
       else {
-        // Jalur Otomatis (QRIS)
         if (data.checkoutUrl) {
           setQrData(data.checkoutUrl);
           setShowQrModal(true);
         } else {
-          showPopup("Terjadi kesalahan, URL QR pembayaran tidak ditemukan.", "error");
+          showPopup("An error occurred, the payment QR URL was not found.", "error");
         }
       }
     } catch (err) {
@@ -292,6 +287,10 @@ export default function Checkout() {
 
   const inputStyle = `w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-1 bg-white text-gray-900 border border-gray-300 placeholder-gray-400 focus:border-[#FF6B35] focus:ring-[#FF6B35]`;
   const labelStyle = `block text-xs font-bold mb-2 uppercase tracking-widest text-gray-700`;
+
+  // 🔥 Mengambil detail metode pembayaran dari database (jika ada)
+  const paymentOptions = event?.paymentMethods || { qris: true, transferBank: false };
+  const bankDetails = paymentOptions.bankDetails || { bankName: '', accountNumber: '', accountName: '' };
 
   return (
     <div className={`min-h-screen bg-gray-50 pb-32 font-sans pt-10 relative`}>
@@ -514,38 +513,67 @@ export default function Checkout() {
                    </h2>
                    
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Opsi QRIS */}
-                      <div 
-                        onClick={() => setPaymentMethod('QRIS')}
-                        className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${paymentMethod === 'QRIS' ? 'border-[#FF6B35] bg-orange-50' : 'border-gray-100 hover:border-gray-300'}`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-white rounded-xl border border-slate-200 flex items-center justify-center font-bold text-[#FF6B35] text-xs">QRIS</div>
-                          <div>
-                            <p className="text-sm font-black text-slate-900">QRIS / E-Wallet</p>
-                            <p className="text-[10px] text-slate-500 uppercase tracking-tighter">Automatic Confirmation</p>
+                      {/* Opsi QRIS (Hanya muncul jika EO mengaktifkannya) */}
+                      {paymentOptions.qris && (
+                        <div 
+                          onClick={() => setPaymentMethod('QRIS')}
+                          className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${paymentMethod === 'QRIS' ? 'border-[#FF6B35] bg-orange-50' : 'border-gray-100 hover:border-gray-300'}`}
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-white rounded-xl border border-slate-200 flex items-center justify-center font-bold text-[#FF6B35] text-xs">QRIS</div>
+                            <div>
+                              <p className="text-sm font-black text-slate-900">QRIS / E-Wallet</p>
+                              <p className="text-[10px] text-slate-500 uppercase tracking-tighter">Automatic Confirmation</p>
+                            </div>
                           </div>
+                          {paymentMethod === 'QRIS' && <div className="w-6 h-6 bg-[#FF6B35] rounded-full flex items-center justify-center"><svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg></div>}
                         </div>
-                        {paymentMethod === 'QRIS' && <div className="w-6 h-6 bg-[#FF6B35] rounded-full flex items-center justify-center"><svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg></div>}
-                      </div>
+                      )}
 
-                      {/* Opsi Transfer Bank */}
-                      <div 
-                        onClick={() => setPaymentMethod('MANUAL_TRANSFER')}
-                        className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${paymentMethod === 'MANUAL_TRANSFER' ? 'border-[#FF6B35] bg-orange-50' : 'border-gray-100 hover:border-gray-300'}`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-white rounded-xl border border-slate-200 flex items-center justify-center text-slate-400">
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                      {/* Opsi Transfer Bank (Hanya muncul jika EO mengaktifkannya) */}
+                      {paymentOptions.transferBank && (
+                        <div 
+                          onClick={() => setPaymentMethod('MANUAL_TRANSFER')}
+                          className={`p-5 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-center ${paymentMethod === 'MANUAL_TRANSFER' ? 'border-[#FF6B35] bg-orange-50' : 'border-gray-100 hover:border-gray-300'}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-white rounded-xl border border-slate-200 flex items-center justify-center text-slate-400">
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                              </div>
+                              <div>
+                                <p className="text-sm font-black text-slate-900">Bank Transfer</p>
+                                <p className="text-[10px] text-slate-500 uppercase tracking-tighter">Manual Instruction</p>
+                              </div>
+                            </div>
+                            {paymentMethod === 'MANUAL_TRANSFER' && <div className="w-6 h-6 bg-[#FF6B35] rounded-full flex items-center justify-center shrink-0"><svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg></div>}
                           </div>
-                          <div>
-                            <p className="text-sm font-black text-slate-900">Bank Transfer</p>
-                            <p className="text-[10px] text-slate-500 uppercase tracking-tighter">Manual Instruction</p>
-                          </div>
+                          
+                          {/* 🔥 KOTAK INFORMASI REKENING EO (MUNCUL SAAT DIKLIK) */}
+                          {paymentMethod === 'MANUAL_TRANSFER' && bankDetails && (
+                            <div className="mt-4 pt-4 border-t border-orange-100 w-full">
+                              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Please transfer to:</p>
+                              <div className="bg-white border border-orange-100 p-3 rounded-xl shadow-sm">
+                                <p className="text-sm font-black text-gray-900 uppercase">{bankDetails.bankName}</p>
+                                <p className="text-lg font-mono font-bold text-[#FF6B35] my-0.5 tracking-wide">{bankDetails.accountNumber}</p>
+                                <p className="text-xs font-semibold text-gray-500 uppercase">A.N. {bankDetails.accountName}</p>
+                              </div>
+                              <p className="text-[10px] font-medium text-gray-400 mt-2 leading-relaxed">
+                                Note: After completing the payment, you must upload the transfer proof on the next page.
+                              </p>
+                            </div>
+                          )}
                         </div>
-                        {paymentMethod === 'MANUAL_TRANSFER' && <div className="w-6 h-6 bg-[#FF6B35] rounded-full flex items-center justify-center"><svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg></div>}
-                      </div>
+                      )}
                    </div>
+
+                   {/* Peringatan Jika EO Tidak Mengatur Satupun Metode Pembayaran */}
+                   {(!paymentOptions.qris && !paymentOptions.transferBank) && (
+                     <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-center">
+                        <p className="text-sm font-bold text-red-600">The Event Organizer has not set up any payment methods.</p>
+                        <p className="text-xs text-red-500 mt-1">Please contact the organizer.</p>
+                     </div>
+                   )}
                 </div>
               )}
             </div>
@@ -607,14 +635,14 @@ export default function Checkout() {
               className="w-full max-w-sm bg-white rounded-[32px] shadow-2xl p-8 text-center relative overflow-hidden"
             >
               <h2 className="text-2xl font-black text-gray-900 mb-1 uppercase tracking-tight">Scan QRIS</h2>
-              <p className="text-xs font-bold text-gray-500 mb-6 uppercase tracking-widest">Buka e-Wallet / M-Banking Anda</p>
+              <p className="text-xs font-bold text-gray-500 mb-6 uppercase tracking-widest">Open your e-Wallet or Mobile Banking</p>
               
               <div className="flex justify-center p-6 bg-gray-50 rounded-2xl mb-6 border border-gray-100 shadow-inner">
                  {qrData ? (
                    <QRCodeSVG value={qrData} size={220} level="H" />
                  ) : (
                    <div className="w-[220px] h-[220px] flex items-center justify-center animate-pulse bg-gray-200 rounded-xl">
-                      <span className="text-sm font-bold text-gray-400 uppercase">Memuat...</span>
+                      <span className="text-sm font-bold text-gray-400 uppercase">Loading...</span>
                    </div>
                  )}
               </div>
@@ -628,7 +656,7 @@ export default function Checkout() {
                   }}
                   className="w-full py-4 bg-[#FF6B35] text-white rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-[#e85b2a] transition-all active:scale-95 shadow-lg"
                 >
-                  Saya Sudah Bayar / Refresh
+                  I Have Paid / Refresh
                 </button>
                 <button
                   type="button"
@@ -638,7 +666,7 @@ export default function Checkout() {
                   }}
                   className="w-full py-3 text-gray-500 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-gray-100 transition-colors"
                 >
-                  Tutup & Bayar Nanti
+                  Close & Pay Later
                 </button>
               </div>
             </motion.div>

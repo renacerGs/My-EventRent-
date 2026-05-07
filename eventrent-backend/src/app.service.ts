@@ -227,7 +227,7 @@ export class AppService implements OnModuleInit {
         data.img || 'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?auto=format&fit=crop&w=1000&q=80',
         data.isPrivate ? true : false,
         data.eventDetails ? JSON.stringify(data.eventDetails) : '{}',
-        data.paymentMethods ? JSON.stringify(data.paymentMethods) : '{"qris":true,"va":true,"transferBank":false}'
+        data.paymentMethods ? JSON.stringify(data.paymentMethods) : '{"qris":true,"transferBank":false}'
       ];
       
       const eventRes = await client.query(eventQuery, eventValues);
@@ -1060,10 +1060,16 @@ export class AppService implements OnModuleInit {
 
   async deleteNotifications(notifIds: number[], userId: number) {
     try {
-      const query = 'DELETE FROM notifications WHERE id = ANY($1) AND user_id = $2';
-      await this.pool.query(query, [notifIds, userId]);
-      return { message: 'Notifications successfully deleted!' };
+      // 🔥 Tambahin ::int[] agar PostgreSQL secara eksplisit mencocokkan Integer Array
+      const query = 'DELETE FROM notifications WHERE id = ANY($1::int[]) AND user_id = $2 RETURNING id';
+      const res = await this.pool.query(query, [notifIds, userId]);
+      
+      return { 
+        message: 'Notifications successfully deleted!', 
+        deleted_count: res.rowCount // Kasih tau Flutter berapa data yang beneran lenyap
+      };
     } catch (error) {
+      console.error("Error Delete Notif:", error);
       throw new InternalServerErrorException('Failed to delete notifications');
     }
   }
@@ -1488,7 +1494,6 @@ export class AppService implements OnModuleInit {
 
           const details = typeof order.ticket_details === 'string' ? JSON.parse(order.ticket_details) : order.ticket_details;
 
-          // 🔥 PERBAIKAN: Fungsi buyTicket akan mengeksekusi cetak tiket & ngubah status jadi SUCCESS sekaligus
           await this.buyTicket(
             order.user_id, 
             order.event_id, 
@@ -1568,7 +1573,6 @@ export class AppService implements OnModuleInit {
         const responseParams = JSON.parse(resData.resp_params);
         
         if (responseParams.order_state === 'PAYSUCCESS') {
-          // 🔥 PERBAIKAN: Fungsi buyTicket akan mengeksekusi cetak tiket & ngubah status jadi SUCCESS sekaligus
           await this.buyTicket(
             order.user_id, 
             order.event_id, 
@@ -1621,9 +1625,19 @@ export class AppService implements OnModuleInit {
           checkoutUrl = 'MANUAL_TRANSFER'; 
           
           const targetEmail = data.buyerEmail || 'customer@example.com';
+
+          // 🔥 AMBIL DATA REKENING EO DARI DATABASE EVENTS
+          const eventRes = await client.query('SELECT payment_methods FROM events WHERE id = $1', [data.eventId]);
+          let bankDetails = null;
+          if (eventRes.rows.length > 0 && eventRes.rows[0].payment_methods) {
+             const pm = typeof eventRes.rows[0].payment_methods === 'string'
+               ? JSON.parse(eventRes.rows[0].payment_methods)
+               : eventRes.rows[0].payment_methods;
+             bankDetails = pm?.bankDetails;
+          }
           
           if (targetEmail && targetEmail !== 'customer@example.com') {
-            await this.sendManualTransferEmail(targetEmail, orderId, totalPrice);
+            await this.sendManualTransferEmail(targetEmail, orderId, totalPrice, bankDetails);
           } else {
             console.warn(`Warning: Buyer email is empty for Order ID ${orderId}`);
           }
@@ -1672,9 +1686,14 @@ export class AppService implements OnModuleInit {
   // ========================================================
   // 2. FUNGSI KIRIM EMAIL INSTRUKSI TRANSFER MANUAL
   // ========================================================
-  private async sendManualTransferEmail(email: string, orderId: string, amount: number) {
+  private async sendManualTransferEmail(email: string, orderId: string, amount: number, bankDetails?: any) {
     try {
       const uploadLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/upload-proof/${orderId}`; 
+
+      // 🔥 Gunakan detail bank EO, fallback jika kosong
+      const bankName = bankDetails?.bankName || 'BANK BCA';
+      const accNumber = bankDetails?.accountNumber || '123-456-7890';
+      const accName = bankDetails?.accountName || 'Admin EventRent';
 
       const mailOptions = {
         from: `"${process.env.EMAIL_NAME || 'EventRent'}" <${process.env.EMAIL_USER}>`,
@@ -1682,15 +1701,15 @@ export class AppService implements OnModuleInit {
         subject: `[Payment Instruction] Order ${orderId}`,
         html: `
           <div style="font-family: sans-serif; color: #333; max-size: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 15px;">
-            <h2 style="color: #0f172a;">Hello! Thank you for ordering.</h2>
+            <h2 style="color: #0f172a;">Hello! Thank you for your order.</h2>
             <p>We have received your order <b>${orderId}</b>. Please complete your bank transfer:</p>
             
             <div style="background: #f8fafc; padding: 25px; border-radius: 12px; border: 2px dashed #cbd5e1; text-align: center; margin: 20px 0;">
               <p style="margin: 0; font-size: 14px; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Total Amount</p>
               <h1 style="color: #FF6B35; margin: 10px 0; font-size: 32px;">Rp ${amount.toLocaleString('id-ID')}</h1>
               <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 15px 0;">
-              <p style="margin: 0; font-weight: bold; color: #1e293b;">BANK BCA (123-456-7890)</p>
-              <p style="margin: 5px 0 0 0; font-size: 13px; color: #64748b;">a.n. Admin EventRent</p>
+              <p style="margin: 0; font-weight: bold; color: #1e293b; text-transform: uppercase;">${bankName} (${accNumber})</p>
+              <p style="margin: 5px 0 0 0; font-size: 13px; color: #64748b; text-transform: uppercase;">A.N. ${accName}</p>
             </div>
             
             <div style="text-align: center; margin-top: 30px;">

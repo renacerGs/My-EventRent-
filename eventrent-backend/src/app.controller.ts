@@ -330,11 +330,45 @@ export class AppController {
   }
 
   @ApiTags('Notifications')
-  @ApiOperation({ summary: 'Menghapus banyak notifikasi berdasarkan ID' })
+  @ApiOperation({ summary: 'Menandai semua notifikasi sudah dibaca' })
+  @UseGuards(SupabaseGuard)
+  @Put('notifications/read')
+  async markAllNotificationsRead(@Req() req: any) {
+    return await this.appService.markAllNotificationsRead(req.user.id);
+  }
+
+  // 🔥 PERBAIKAN: Fungsi hapus banyak notifikasi digabung buat React & Flutter
+  @ApiTags('Notifications')
+  @ApiOperation({ summary: 'Menghapus banyak notifikasi berdasarkan ID (Support Web & Mobile)' })
   @UseGuards(SupabaseGuard)
   @Delete('notifications')
-  async deleteNotifications(@Req() req, @Body() body: { notifIds: number[] }) {
-    return await this.appService.deleteNotifications(body.notifIds, req.user.id);
+  async deleteNotifications(@Req() req: any, @Query('ids') idsQuery: string, @Body() body: any) {
+    const userId = req.user.id;
+    
+    // 1. Ambil data mentah (bisa dari body React atau body Flutter)
+    let rawIds = body?.notifIds || body?.ids;
+
+    // 2. Fallback: Kalau Body kosong, ambil dari Query String (?ids=1,2,3)
+    if (!rawIds || rawIds.length === 0) {
+      if (idsQuery) {
+        rawIds = idsQuery.split(',');
+      }
+    }
+
+    // 3. Validasi wujud array
+    if (!rawIds || !Array.isArray(rawIds) || rawIds.length === 0) {
+      throw new BadRequestException('ID Notification is missing or invalid format!');
+    }
+
+    // 🔥 4. KUNCI UTAMA: Paksa semua elemen di dalam array jadi Angka (Integer) murni!
+    // Mau Flutter ngirim ["161", "162"] atau [161, 162], bakal disapu bersih jadi [161, 162]
+    const cleanIds = rawIds.map(id => parseInt(String(id).trim(), 10)).filter(id => !isNaN(id));
+
+    if (cleanIds.length === 0) {
+      throw new BadRequestException('No valid numeric IDs provided!');
+    }
+
+    return await this.appService.deleteNotifications(cleanIds, userId);
   }
 
   @ApiTags('Notifications')
@@ -343,34 +377,6 @@ export class AppController {
   @Delete('notifications/all')
   async deleteAllNotifications(@Req() req) {
     return await this.appService.deleteAllNotifications(req.user.id);
-  }
-
-  // ==========================================
-  // API BARU UNTUK MOBILE APP (NOTIFIKASI)
-  // ==========================================
-
-  // 1. API Mark All As Read
-  @UseGuards(SupabaseGuard) // Sesuaikan dengan nama Guard otentikasi kamu
-  @Put('notifications/read')
-  async markAllNotificationsRead(@Req() req: any) {
-    // req.user biasanya didapat dari hasil decode token oleh Guard
-    const userId = req.user.id; 
-    return await this.appService.markAllNotificationsRead(userId);
-  }
-
-  // 2. API Delete Selected Notifications
-  @UseGuards(SupabaseGuard) // Sesuaikan dengan nama Guard otentikasi kamu
-  @Delete('notifications')
-  async deleteSelectedNotifications(
-    @Req() req: any,
-    @Body() body: { ids: number[] }
-  ) {
-    const userId = req.user.id;
-    if (!body.ids || !Array.isArray(body.ids) || body.ids.length === 0) {
-      throw new BadRequestException('List ID notifikasi (ids) tidak boleh kosong');
-    }
-    // Fungsi ini udah ada di app.service.ts kamu
-    return await this.appService.deleteNotifications(body.ids, userId);
   }
 
   // ==========================================
@@ -492,10 +498,9 @@ export class AppController {
   // API UNTUK FLUTTER (AGENT PAYOUTS HISTORY)
   // ==========================================
   @ApiOperation({ summary: 'Get Agent Payout History' })
-  @UseGuards(SupabaseGuard) // Sesuaikan dengan nama Guard otentikasi kamu
+  @UseGuards(SupabaseGuard)
   @Get('payouts')
   async getMyPayouts(@Req() req: any) {
-    // Mengambil ID Agen dari token yang login
     const agentId = req.user.id;
     return await this.appService.getAgentPayouts(agentId);
   }
