@@ -105,6 +105,28 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
 
   const isAgentMode = user?.role === 'agent';
 
+  // 🔥 RADAR PEMISAH KASTA NOTIFIKASI MUTLAK 🔥
+  const checkIsAgentNotif = (notif) => {
+    if (!notif) return false;
+    const type = notif.type || '';
+    const title = notif.title || '';
+    
+    const agentTypes = [
+      'PAYOUT_SUCCESS', 'NEW_RATING', 
+      'INVITATION_AGENT', 'INVITATION_ACCEPTED', 'INVITATION_REJECTED',
+      'AGENT_DISMISSED', 'AGENT_REMOVED', 'PEMBERHENTIAN_TUGAS',
+      'JOB_ACCEPTED', 'JOB_REJECTED'
+    ];
+    
+    if (agentTypes.includes(type)) return true;
+    
+    if (type === 'INFO' && (title.includes('Dismissal') || title.includes('Pemberhentian') || title.includes('Tugas'))) {
+      return true;
+    }
+    
+    return false;
+  };
+
   useEffect(() => {
     let isMounted = true;
     let isLoggingOut = false;
@@ -183,10 +205,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
         (payload) => {
           const newNotif = payload.new;
           
-          // 🔥 PERBAIKAN FILTER REALTIME DI NAVBAR 🔥
-          const isAgentNotif = ['PAYOUT_SUCCESS', 'INVITATION_AGENT', 'NEW_RATING'].includes(newNotif.type);
-          
-          if ((isAgentMode && isAgentNotif) || (!isAgentMode && !isAgentNotif)) {
+          if (isAgentMode === checkIsAgentNotif(newNotif)) {
             toast.success(
               <div>
                 <p className="font-bold text-sm mb-1">{newNotif.title}</p>
@@ -197,6 +216,23 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
   
             setNotifications(prevNotifs => [newNotif, ...prevNotifs]);
           }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const updatedNotif = payload.new;
+          if (isAgentMode === checkIsAgentNotif(updatedNotif)) {
+             setNotifications(prevNotifs => prevNotifs.map(n => n.id === updatedNotif.id ? updatedNotif : n));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'notifications' },
+        (payload) => {
+          setNotifications(prevNotifs => prevNotifs.filter(n => n.id !== payload.old.id));
         }
       )
       .subscribe();
@@ -219,12 +255,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
         const notifData = await res.json();
         const allNotifs = Array.isArray(notifData) ? notifData : [];
         
-        // 🔥 PERBAIKAN FILTER FETCH AWAL DI NAVBAR 🔥
-        const filteredNotifs = allNotifs.filter(n => {
-          const isAgentNotif = ['PAYOUT_SUCCESS', 'INVITATION_AGENT', 'NEW_RATING'].includes(n.type);
-          return isAgentMode ? isAgentNotif : !isAgentNotif; 
-        });
-
+        const filteredNotifs = allNotifs.filter(n => isAgentMode ? checkIsAgentNotif(n) : !checkIsAgentNotif(n));
         setNotifications(filteredNotifs);
       }
     } catch (err) {
@@ -246,7 +277,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
       const data = await res.json();
       if (res.ok) {
         toast.success(data.message);
-        fetchNotifications(); 
       } else {
         toast.error(data.message);
       }
@@ -311,7 +341,14 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     navigate('/');
   };
 
-  const getNotifStyle = (type, isRead) => {
+  const getNotifStyle = (notif, isRead) => {
+    const type = notif.type;
+    let styleType = type;
+    
+    if (type === 'INFO' && (notif.title?.includes('Dismissal') || notif.title?.includes('Pemberhentian'))) {
+      styleType = 'AGENT_DISMISSED';
+    }
+
     const styles = {
       'REPORT_ISSUE': {
         borderColor: isAgentMode ? 'border-l-rose-500' : 'border-l-red-500',
@@ -336,6 +373,54 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
         iconBg: isAgentMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-500',
         dotColor: 'bg-blue-500',
         iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+      },
+      'INVITATION_ACCEPTED': {
+        borderColor: 'border-l-emerald-500',
+        bgUnread: isAgentMode ? 'bg-emerald-500/10' : 'bg-emerald-50/60',
+        textColor: isAgentMode ? 'text-emerald-400' : 'text-emerald-600',
+        iconBg: isAgentMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-500',
+        dotColor: 'bg-emerald-500',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path> 
+      },
+      'INVITATION_REJECTED': {
+        borderColor: 'border-l-rose-500',
+        bgUnread: isAgentMode ? 'bg-rose-500/10' : 'bg-rose-50/60',
+        textColor: isAgentMode ? 'text-rose-400' : 'text-rose-600',
+        iconBg: isAgentMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-500',
+        dotColor: 'bg-rose-500',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path> 
+      },
+      'JOB_ACCEPTED': {
+        borderColor: 'border-l-emerald-500',
+        bgUnread: isAgentMode ? 'bg-emerald-500/10' : 'bg-emerald-50/60',
+        textColor: isAgentMode ? 'text-emerald-400' : 'text-emerald-600',
+        iconBg: isAgentMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-500',
+        dotColor: 'bg-emerald-500',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path> 
+      },
+      'JOB_REJECTED': {
+        borderColor: 'border-l-rose-500',
+        bgUnread: isAgentMode ? 'bg-rose-500/10' : 'bg-rose-50/60',
+        textColor: isAgentMode ? 'text-rose-400' : 'text-rose-600',
+        iconBg: isAgentMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-500',
+        dotColor: 'bg-rose-500',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path> 
+      },
+      'AGENT_DISMISSED': {
+        borderColor: 'border-l-rose-500',
+        bgUnread: isAgentMode ? 'bg-rose-500/10' : 'bg-rose-50/60',
+        textColor: isAgentMode ? 'text-rose-400' : 'text-rose-600',
+        iconBg: isAgentMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-500',
+        dotColor: 'bg-rose-500',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path> 
+      },
+      'PEMBERHENTIAN_TUGAS': {
+        borderColor: 'border-l-rose-500',
+        bgUnread: isAgentMode ? 'bg-rose-500/10' : 'bg-rose-50/60',
+        textColor: isAgentMode ? 'text-rose-400' : 'text-rose-600',
+        iconBg: isAgentMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-500',
+        dotColor: 'bg-rose-500',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path> 
       },
       'NEW_APPLICANT': {
         borderColor: 'border-l-purple-500',
@@ -363,7 +448,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
       }
     };
 
-    const style = styles[type] || styles['DEFAULT'];
+    const style = styles[styleType] || styles['DEFAULT'];
 
     if (!isRead) {
       return {
@@ -457,7 +542,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                   <div className="max-h-[300px] overflow-y-auto overscroll-contain">
                     {displayedNotifications.length > 0 ? (
                       displayedNotifications.map(notif => {
-                        const style = getNotifStyle(notif.type, notif.is_read);
+                        const style = getNotifStyle(notif, notif.is_read);
 
                         return (
                           <div 

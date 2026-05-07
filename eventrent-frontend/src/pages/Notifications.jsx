@@ -20,6 +20,30 @@ export default function Notifications() {
   const [deleteType, setDeleteType] = useState('selected'); 
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // 🔥 RADAR PEMISAH KASTA NOTIFIKASI MUTLAK 🔥
+  const checkIsAgentNotif = (notif) => {
+    if (!notif) return false;
+    const type = notif.type || '';
+    const title = notif.title || '';
+    
+    // Tipe-tipe yang HANYA BOLEH masuk ke portal agen
+    const agentTypes = [
+      'PAYOUT_SUCCESS', 'NEW_RATING', 
+      'INVITATION_AGENT', 'INVITATION_ACCEPTED', 'INVITATION_REJECTED',
+      'AGENT_DISMISSED', 'AGENT_REMOVED', 'PEMBERHENTIAN_TUGAS',
+      'JOB_ACCEPTED', 'JOB_REJECTED'
+    ];
+    
+    if (agentTypes.includes(type)) return true;
+    
+    // Tangkap dari backend kalau temen lu pake tipe 'INFO' tapi buat pemecatan
+    if (type === 'INFO' && (title.includes('Dismissal') || title.includes('Pemberhentian') || title.includes('Tugas'))) {
+      return true;
+    }
+    
+    return false;
+  };
+
   useEffect(() => {
     if (!userId) {
       setLoading(false);
@@ -43,12 +67,7 @@ export default function Notifications() {
           const data = await res.json();
           const allNotifs = Array.isArray(data) ? data : [];
           
-          // 🔥 PERBAIKAN: REPORT_ISSUE & NEW_APPLICANT DIHAPUS DARI SINI BIAR MASUK KE USER MODE 🔥
-          const filteredNotifs = allNotifs.filter(n => {
-            const isAgentNotif = ['PAYOUT_SUCCESS', 'INVITATION_AGENT', 'NEW_RATING'].includes(n.type);
-            return isAgentMode ? isAgentNotif : !isAgentNotif; 
-          });
-
+          const filteredNotifs = allNotifs.filter(n => isAgentMode ? checkIsAgentNotif(n) : !checkIsAgentNotif(n));
           setNotifications(filteredNotifs);
         }
       } catch (err) {
@@ -68,13 +87,26 @@ export default function Notifications() {
         { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
         (payload) => {
           const newNotif = payload.new;
-          
-          // 🔥 PERBAIKAN: REPORT_ISSUE & NEW_APPLICANT DIHAPUS DARI SINI 🔥
-          const isAgentNotif = ['PAYOUT_SUCCESS', 'INVITATION_AGENT', 'NEW_RATING'].includes(newNotif.type);
-          
-          if ((isAgentMode && isAgentNotif) || (!isAgentMode && !isAgentNotif)) {
+          if (isAgentMode === checkIsAgentNotif(newNotif)) {
              setNotifications(prevNotifs => [newNotif, ...prevNotifs]);
           }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
+        (payload) => {
+          const updatedNotif = payload.new;
+          if (isAgentMode === checkIsAgentNotif(updatedNotif)) {
+             setNotifications(prevNotifs => prevNotifs.map(n => n.id === updatedNotif.id ? updatedNotif : n));
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'notifications' },
+        (payload) => {
+          setNotifications(prevNotifs => prevNotifs.filter(n => n.id !== payload.old.id));
         }
       )
       .subscribe();
@@ -95,20 +127,6 @@ export default function Notifications() {
       const data = await res.json();
       if (res.ok) {
         toast.success(data.message);
-        const resRefresh = await fetch(`${import.meta.env.VITE_API_URL}/api/users/me/notifications`, {
-           headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (resRefresh.ok) {
-          const dataRefresh = await resRefresh.json();
-          const allNotifs = Array.isArray(dataRefresh) ? dataRefresh : [];
-          
-          const filteredNotifs = allNotifs.filter(n => {
-            const isAgentNotif = ['PAYOUT_SUCCESS', 'INVITATION_AGENT', 'NEW_RATING'].includes(n.type);
-            return isAgentMode ? isAgentNotif : !isAgentNotif; 
-          });
-
-          setNotifications(filteredNotifs);
-        }
       } else {
         toast.error(data.message);
       }
@@ -193,13 +211,24 @@ export default function Notifications() {
     
     try {
       if (deleteType === 'all') {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications/all`, {
+        const allVisibleIds = notifications.map(n => n.id);
+        
+        if (allVisibleIds.length === 0) {
+           toast.error('Tidak ada notifikasi untuk dihapus.');
+           setIsDeleting(false);
+           setShowDeleteModal(false);
+           return;
+        }
+
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications`, {
           method: 'DELETE',
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ notifIds: allVisibleIds })
         });
+        
         if (res.ok) {
           setNotifications([]);
-          toast.success('All notifications cleared!');
+          toast.success('Semua notifikasi di mode ini berhasil dihapus!');
         }
       } else {
         const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications`, {
@@ -224,7 +253,14 @@ export default function Notifications() {
     }
   };
 
-  const getNotifStyle = (type, isRead) => {
+  const getNotifStyle = (notif, isRead) => {
+    const type = notif.type;
+    let styleType = type;
+    
+    if (type === 'INFO' && (notif.title?.includes('Dismissal') || notif.title?.includes('Pemberhentian'))) {
+      styleType = 'AGENT_DISMISSED';
+    }
+
     const styles = {
       'REPORT_ISSUE': {
         borderColor: isAgentMode ? 'border-l-rose-500' : 'border-l-red-500',
@@ -249,6 +285,54 @@ export default function Notifications() {
         iconBg: isAgentMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-500',
         dotColor: 'bg-blue-500',
         iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+      },
+      'INVITATION_ACCEPTED': {
+        borderColor: 'border-l-emerald-500',
+        bgUnread: isAgentMode ? 'bg-emerald-500/10' : 'bg-emerald-50/60',
+        textColor: isAgentMode ? 'text-emerald-400' : 'text-emerald-600',
+        iconBg: isAgentMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-500',
+        dotColor: 'bg-emerald-500',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path> 
+      },
+      'INVITATION_REJECTED': {
+        borderColor: 'border-l-rose-500',
+        bgUnread: isAgentMode ? 'bg-rose-500/10' : 'bg-rose-50/60',
+        textColor: isAgentMode ? 'text-rose-400' : 'text-rose-600',
+        iconBg: isAgentMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-500',
+        dotColor: 'bg-rose-500',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path> 
+      },
+      'JOB_ACCEPTED': {
+        borderColor: 'border-l-emerald-500',
+        bgUnread: isAgentMode ? 'bg-emerald-500/10' : 'bg-emerald-50/60',
+        textColor: isAgentMode ? 'text-emerald-400' : 'text-emerald-600',
+        iconBg: isAgentMode ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-500',
+        dotColor: 'bg-emerald-500',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path> 
+      },
+      'JOB_REJECTED': {
+        borderColor: 'border-l-rose-500',
+        bgUnread: isAgentMode ? 'bg-rose-500/10' : 'bg-rose-50/60',
+        textColor: isAgentMode ? 'text-rose-400' : 'text-rose-600',
+        iconBg: isAgentMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-500',
+        dotColor: 'bg-rose-500',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path> 
+      },
+      'AGENT_DISMISSED': {
+        borderColor: 'border-l-rose-500',
+        bgUnread: isAgentMode ? 'bg-rose-500/10' : 'bg-rose-50/60',
+        textColor: isAgentMode ? 'text-rose-400' : 'text-rose-600',
+        iconBg: isAgentMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-500',
+        dotColor: 'bg-rose-500',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path> 
+      },
+      'PEMBERHENTIAN_TUGAS': {
+        borderColor: 'border-l-rose-500',
+        bgUnread: isAgentMode ? 'bg-rose-500/10' : 'bg-rose-50/60',
+        textColor: isAgentMode ? 'text-rose-400' : 'text-rose-600',
+        iconBg: isAgentMode ? 'bg-rose-500/20 text-rose-400' : 'bg-rose-100 text-rose-500',
+        dotColor: 'bg-rose-500',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path> 
       },
       'NEW_APPLICANT': {
         borderColor: 'border-l-purple-500',
@@ -276,7 +360,7 @@ export default function Notifications() {
       }
     };
 
-    const style = styles[type] || styles['DEFAULT'];
+    const style = styles[styleType] || styles['DEFAULT'];
 
     if (!isRead) {
       return {
@@ -401,7 +485,7 @@ export default function Notifications() {
               <div className={`divide-y ${isAgentMode ? 'divide-slate-700/50' : 'divide-gray-100'}`}>
                 
                 {notifications.map((notif, index) => {
-                  const style = getNotifStyle(notif.type, notif.is_read);
+                  const style = getNotifStyle(notif, notif.is_read);
                   const isSelected = selectedNotifs.includes(notif.id);
 
                   return (
@@ -436,7 +520,7 @@ export default function Notifications() {
                             {new Date(notif.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
                           </p>
 
-                          {notif.type === 'INVITATION_AGENT' && !notif.is_read && !isEditMode && (
+                          {notif.type === 'INVITATION_AGENT' && !isEditMode && (
                             <div className="flex gap-3 mt-4">
                               <button 
                                 type="button" 
