@@ -12,7 +12,6 @@ async function bootstrap() {
   if (!cachedApp) {
     const app = await NestFactory.create(AppModule);
     
-    app.setGlobalPrefix('api'); 
     app.getHttpAdapter().getInstance().set('trust proxy', true);
     
     // 👇 FIX: CORS udah diamankan dan diarahkan ke Frontend lu
