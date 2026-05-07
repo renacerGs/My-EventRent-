@@ -46,6 +46,9 @@ import WeddingRSVP from './pages/WeddingRSVP';
 import PersonalInvitation from './pages/PersonalInvitation';
 import PersonalRSVP from './pages/PersonalRSVP';
 
+// 🔥 IMPORT SUPABASE UNTUK CCTV LOGIN GOOGLE 🔥
+import { supabase } from './supabase'; 
+
 export default function App() {
   const navigate = useNavigate();
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -130,6 +133,46 @@ export default function App() {
       }
     }
   };
+
+  // =========================================================================
+  // 🔥 CCTV DETEKSI GOOGLE LOGIN PAS BALIK KE WEB (REFRESH) 🔥
+  // =========================================================================
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Kalau terdeteksi ada yang login (termasuk balik dari Google OAuth)
+      if (event === 'SIGNED_IN' && session) {
+        
+        // Cek apakah user udah beneran kecatat di state, biar ngga ngeloop (muter terus)
+        const storedUser = localStorage.getItem('user');
+        const currentUser = storedUser ? JSON.parse(storedUser) : null;
+
+        // Kalau aplikasi baru bangun dan belum sinkron sama session Supabase
+        if (!currentUser || currentUser.id !== session.user.id) {
+          
+          // Ambil niat user dari brankas (pas dia klik toggle agen/reguler di modal)
+          const isAgent = localStorage.getItem('agentMode') === 'true';
+          
+          const loggedInUser = {
+            ...session.user,
+            name: session.user.user_metadata?.full_name || 'User',
+            role: isAgent ? 'agent' : 'user'
+          };
+          
+          // Simpan token biar API lu yang lain ngga error
+          localStorage.setItem('supabase_token', session.access_token);
+          
+          // Eksekusi fungsi login utama (nanti otomatis di-redirect ke /agent kalau role-nya agent)
+          handleLoginSuccess(loggedInUser);
+        }
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); 
+  // =========================================================================
 
   return (
     <div className="bg-white min-h-screen font-sans flex flex-col">

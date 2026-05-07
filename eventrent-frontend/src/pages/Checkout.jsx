@@ -335,7 +335,7 @@ export default function Checkout() {
           <div className="flex items-center gap-4 mb-8">
             <button 
               type="button" 
-              onClick={() => navigate(`/event/${id}`)} 
+              onClick={() => navigate(-1)}
               className={`w-12 h-12 flex items-center justify-center rounded-full border shadow-sm transition-all active:scale-95 bg-white border-gray-200 text-gray-500 hover:text-[#FF6B35] hover:border-[#FF6B35]`} 
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>

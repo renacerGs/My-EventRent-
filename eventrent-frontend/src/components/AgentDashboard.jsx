@@ -232,7 +232,6 @@ export default function AgentDashboard() {
   const currentItems = filteredAttendees.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredAttendees.length / itemsPerPage) || 1;
 
-  // 🔥 PERBAIKAN: Gunakan raw_date dari backend agar tidak Invalid Date di Safari/Mobile Browser 🔥
   const now = new Date();
   const activeEvents = assignedEvents.filter(ev => {
     const eventDate = new Date(ev.raw_date || ev.date_start);
@@ -255,6 +254,12 @@ export default function AgentDashboard() {
   const totalGuests = sessionAttendees.length;
   const checkedInGuests = sessionAttendees.filter(t => t.is_scanned === true).length;
   const progressPercentage = totalGuests === 0 ? 0 : Math.round((checkedInGuests / totalGuests) * 100);
+
+  // 🔥 LOGIKA BARU: HITUNG RATA-RATA RATING DARI SELURUH EVENT 🔥
+  const ratedEvents = assignedEvents.filter(ev => ev.rating_given && ev.rating_given > 0);
+  const averageRating = ratedEvents.length > 0 
+    ? (ratedEvents.reduce((acc, ev) => acc + ev.rating_given, 0) / ratedEvents.length).toFixed(1) 
+    : '0.0';
 
   return (
     <div className="bg-[#0B1426] min-h-screen font-sans pb-20 relative">
@@ -315,7 +320,7 @@ export default function AgentDashboard() {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 pt-6 md:pt-16 relative z-10">
         
-        {/* HEADER PROFILE */}
+        {/* 🔥 HEADER PROFILE BARU: DITAMBAH AVERAGE RATING 🔥 */}
         <div className="flex flex-col md:flex-row items-center md:items-end justify-between gap-6 mb-8 md:mb-10 bg-[#152036]/50 p-6 md:p-8 rounded-[24px] md:rounded-[32px] border border-[#1E2D4A]/50 backdrop-blur-sm">
           <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 text-center md:text-left">
             <div className="w-16 h-16 md:w-24 md:h-24 rounded-full overflow-hidden border-4 border-[#1E2D4A] shadow-xl shrink-0">
@@ -329,10 +334,20 @@ export default function AgentDashboard() {
               <p className="text-xs md:text-sm font-medium text-slate-400">{user?.email}</p>
             </div>
           </div>
+          
           <div className="flex w-full md:w-auto border-t md:border-t-0 border-[#1E2D4A] pt-5 md:pt-0 justify-around md:justify-end gap-6 md:gap-10">
+            {/* BLOK TOTAL EVENTS */}
             <div className="text-center md:text-right">
               <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Total Events</p>
               <p className="text-2xl md:text-3xl font-black text-white">{assignedEvents.length}</p>
+            </div>
+            {/* BLOK AVERAGE RATING */}
+            <div className="text-center md:text-right">
+              <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Rating</p>
+              <div className="flex items-center justify-center md:justify-end gap-1.5 md:gap-2">
+                <svg className="w-5 h-5 md:w-6 md:h-6 text-yellow-400 fill-current" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                <p className="text-2xl md:text-3xl font-black text-white">{averageRating}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -348,7 +363,6 @@ export default function AgentDashboard() {
                 <h2 className="text-lg md:text-2xl font-black text-white uppercase tracking-wide">Your Tasks</h2>
               </div>
               <div className="flex items-center gap-3">
-                {/* MANUAL REFRESH BUTTON */}
                 <button onClick={() => fetchAssignedEvents(true)} className="p-2 text-slate-400 hover:text-blue-500 bg-[#152036] border border-[#1E2D4A] hover:border-blue-500/30 rounded-xl transition-all" title="Refresh Data">
                   <svg className={`w-4 h-4 md:w-5 md:h-5 ${isRefreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                 </button>
@@ -372,16 +386,19 @@ export default function AgentDashboard() {
 
                 <div className="flex flex-col">
                   {displayedEvents.map((ev, index) => (
-                    <div key={ev.id} onClick={() => handleEventClick(ev)} className={`group flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-8 md:py-6 cursor-pointer hover:bg-[#152036]/80 transition-all duration-300 gap-3 md:gap-0 relative overflow-hidden ${index !== displayedEvents.length - 1 ? 'border-b border-[#1E2D4A]/50 hover:border-transparent' : ''}`}>
-                      
+                    {/* 🔥 PERBAIKAN: ONCLICK MATI KALAU DI HISTORY BIAR GA LARI KE SCAN, KURSOR JUGA DEFAULT 🔥 */},
+                    <div 
+                      key={ev.id} 
+                      onClick={() => activeTab === 'active' && handleEventClick(ev)} 
+                      className={`group flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-8 md:py-6 transition-all duration-300 gap-3 md:gap-0 relative overflow-hidden ${index !== displayedEvents.length - 1 ? 'border-b border-[#1E2D4A]/50 hover:border-transparent' : ''} ${activeTab === 'active' ? 'cursor-pointer hover:bg-[#152036]/80' : 'cursor-default'}`}
+                    >
                       <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-[45%]">
-                        <div className="w-full sm:w-20 h-36 sm:h-20 rounded-xl overflow-hidden relative shrink-0 border border-[#1E2D4A] group-hover:border-blue-500/50 transition-colors">
-                          <img src={ev.img} alt={ev.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                        <div className={`w-full sm:w-20 h-36 sm:h-20 rounded-xl overflow-hidden relative shrink-0 border border-[#1E2D4A] transition-colors ${activeTab === 'active' ? 'group-hover:border-blue-500/50' : ''}`}>
+                          <img src={ev.img} alt={ev.title} className={`w-full h-full object-cover transition-transform duration-500 ${activeTab === 'active' ? 'group-hover:scale-110' : ''}`} />
                         </div>
                         <div>
-                          <h3 className="font-black text-white text-lg md:text-lg line-clamp-1 group-hover:text-blue-400 transition-colors">{ev.title}</h3>
+                          <h3 className={`font-black text-white text-lg md:text-lg line-clamp-1 transition-colors ${activeTab === 'active' ? 'group-hover:text-blue-400' : ''}`}>{ev.title}</h3>
                           
-                          {/* VISUAL RATING BINTANG EMAS (KHUSUS AGEN, PEMILIK EVENT TIDAK ADA RATING) */}
                           {ev.rating_given > 0 && (
                             <div className="flex items-center gap-1 mt-0.5 mb-1 bg-yellow-500/10 w-max px-2 py-0.5 rounded-md border border-yellow-500/20 shadow-lg shadow-yellow-500/5">
                               <div className="flex gap-0.5">
@@ -402,11 +419,10 @@ export default function AgentDashboard() {
 
                       <div className="w-full md:w-[30%] flex flex-row items-center justify-start md:justify-between gap-2 border-t md:border-none border-[#1E2D4A] pt-3 md:pt-0">
                         <div className="flex flex-row md:flex-col items-center justify-start md:justify-center gap-2 md:w-[60%]">
-                          {/* 🔥 INJEKSI UI UNTUK MENANDAI PEMILIK EVENT 🔥 */}
                           <span className={`px-2.5 md:px-3 py-1 md:py-1.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest truncate max-w-[150px] md:max-w-full text-center transition-colors border ${
                             ev.role === 'Pemilik Event' 
-                              ? 'bg-purple-500/10 text-purple-400 border-purple-500/30 group-hover:border-purple-500/50' 
-                              : 'bg-[#0B1426] text-blue-400 border-[#1E2D4A] group-hover:border-blue-500/50'
+                              ? `bg-purple-500/10 text-purple-400 border-purple-500/30 ${activeTab === 'active' ? 'group-hover:border-purple-500/50' : ''}`
+                              : `bg-[#0B1426] text-blue-400 border-[#1E2D4A] ${activeTab === 'active' ? 'group-hover:border-blue-500/50' : ''}`
                           }`}>
                             {ev.role === 'Pemilik Event' ? '👑 Pemilik Event' : (ev.role || 'Agen')}
                           </span>
@@ -426,21 +442,28 @@ export default function AgentDashboard() {
                       </div>
 
                       <div className="w-full md:w-[25%] flex flex-row items-center justify-between md:justify-end gap-4 mt-3 md:mt-0">
-                        <div className="md:hidden flex items-center text-slate-400 group-hover:text-blue-500 text-[10px] font-black uppercase tracking-widest transition-colors">
-                          View Details <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"></path></svg>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <button onClick={(e) => { e.stopPropagation(); handleEventClick(ev); }} className="hidden md:flex flex-1 md:flex-none items-center justify-center gap-1.5 px-3 py-2.5 bg-[#1E2D4A] text-white rounded-xl hover:bg-[#2A3F63] transition-colors text-[10px] font-black uppercase tracking-widest border border-[#2A3F63] relative z-10">
-                            <span className="md:hidden lg:inline">Select</span>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"></path></svg>
-                          </button>
-                          {activeTab === 'active' && (
-                            <button onClick={(e) => { e.stopPropagation(); navigate(`/scanner/${ev.id}`); }} className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 relative z-10">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
-                              <span className="md:hidden lg:inline">Scan</span>
-                            </button>
-                          )}
-                        </div>
+                        {/* 🔥 PERBAIKAN: ACTION BUTTONS HILANG KALAU DI HISTORY 🔥 */}
+                        {activeTab === 'active' ? (
+                          <>
+                            <div className="md:hidden flex items-center text-slate-400 group-hover:text-blue-500 text-[10px] font-black uppercase tracking-widest transition-colors">
+                              View Details <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"></path></svg>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <button onClick={(e) => { e.stopPropagation(); handleEventClick(ev); }} className="hidden md:flex flex-1 md:flex-none items-center justify-center gap-1.5 px-3 py-2.5 bg-[#1E2D4A] text-white rounded-xl hover:bg-[#2A3F63] transition-colors text-[10px] font-black uppercase tracking-widest border border-[#2A3F63] relative z-10">
+                                <span className="md:hidden lg:inline">Select</span>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"></path></svg>
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); navigate(`/scanner/${ev.id}`); }} className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 relative z-10">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+                                <span className="md:hidden lg:inline">Scan</span>
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-center justify-start md:justify-end w-full">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest italic">Event Completed</span>
+                          </div>
+                        )}
                       </div>
 
                     </div>

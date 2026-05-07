@@ -183,15 +183,20 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
         (payload) => {
           const newNotif = payload.new;
           
-          toast.success(
-            <div>
-              <p className="font-bold text-sm mb-1">{newNotif.title}</p>
-              <p className="text-xs text-gray-200 line-clamp-2">{newNotif.message}</p>
-            </div>, 
-            { duration: 5000 }
-          );
-
-          setNotifications(prevNotifs => [newNotif, ...prevNotifs]);
+          // 🔥 PERBAIKAN FILTER REALTIME DI NAVBAR 🔥
+          const isAgentNotif = ['PAYOUT_SUCCESS', 'INVITATION_AGENT', 'NEW_RATING'].includes(newNotif.type);
+          
+          if ((isAgentMode && isAgentNotif) || (!isAgentMode && !isAgentNotif)) {
+            toast.success(
+              <div>
+                <p className="font-bold text-sm mb-1">{newNotif.title}</p>
+                <p className="text-xs text-gray-200 line-clamp-2">{newNotif.message}</p>
+              </div>, 
+              { duration: 5000 }
+            );
+  
+            setNotifications(prevNotifs => [newNotif, ...prevNotifs]);
+          }
         }
       )
       .subscribe();
@@ -199,7 +204,8 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     return () => {
       supabase.removeChannel(notifChannel);
     };
-  }, [user?.id]); 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, isAgentMode]); 
 
   const fetchNotifications = async () => {
     try {
@@ -211,7 +217,15 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
       });
       if (res.ok) {
         const notifData = await res.json();
-        setNotifications(notifData);
+        const allNotifs = Array.isArray(notifData) ? notifData : [];
+        
+        // 🔥 PERBAIKAN FILTER FETCH AWAL DI NAVBAR 🔥
+        const filteredNotifs = allNotifs.filter(n => {
+          const isAgentNotif = ['PAYOUT_SUCCESS', 'INVITATION_AGENT', 'NEW_RATING'].includes(n.type);
+          return isAgentMode ? isAgentNotif : !isAgentNotif; 
+        });
+
+        setNotifications(filteredNotifs);
       }
     } catch (err) {
       console.error("Error fetch notif:", err);
@@ -272,7 +286,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     else if (notif.type === 'PAYOUT_SUCCESS') {
       navigate(`/agent/wallet`);
     }
-    // 🔥 TAMBAHAN UNTUK REDIRECT KE RIWAYAT KERJA KETIKA RATING DITEKAN 🔥
     else if (notif.type === 'NEW_RATING') {
       navigate(`/agent/history`);
     }
@@ -298,7 +311,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     navigate('/');
   };
 
-  // 🔥 LOGIC STYLE (WARNA & ICON) PER KATEGORI 🔥
   const getNotifStyle = (type, isRead) => {
     const styles = {
       'REPORT_ISSUE': {
@@ -333,7 +345,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
         dotColor: 'bg-purple-500',
         iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
       },
-      // 🔥 TAMBAHAN STYLE UNTUK NEW_RATING 🔥
       'NEW_RATING': {
         borderColor: 'border-l-yellow-500',
         bgUnread: isAgentMode ? 'bg-yellow-500/10' : 'bg-yellow-50/60',
@@ -425,12 +436,13 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                 </Link>
               )}
 
-              <div className="relative shrink-0" ref={notifRef}>
+              <div className="relative shrink-0 flex items-center justify-center" ref={notifRef}>
                 <button onClick={() => setShowNotifDropdown(!showNotifDropdown)} className={`relative flex items-center justify-center w-9 h-9 md:w-[42px] md:h-[42px] border rounded-full transition shadow-sm shrink-0 ${isAgentMode ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700' : 'border-gray-100 bg-white text-gray-400 hover:bg-orange-50 hover:text-[#FF6B35] hover:border-orange-100'}`}>
                   <svg className="w-5 h-5 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+                  
                   {unreadCount > 0 && (
-                    <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-[9px] font-black leading-none text-white transform translate-x-1/4 -translate-y-1/4 bg-red-500 rounded-full">
-                      {unreadCount}
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 md:h-5 md:w-5 items-center justify-center rounded-full bg-red-500 border border-white text-[9px] md:text-[10px] font-black text-white shadow-sm z-10">
+                      {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                   )}
                 </button>

@@ -14,11 +14,10 @@ export default function Notifications() {
   const [loading, setLoading] = useState(true);
   const [visibleCount, setVisibleCount] = useState(5);
 
-  // 🔥 STATE BARU BUAT FITUR HAPUS 🔥
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedNotifs, setSelectedNotifs] = useState([]);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteType, setDeleteType] = useState('selected'); // 'selected' atau 'all'
+  const [deleteType, setDeleteType] = useState('selected'); 
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
@@ -42,7 +41,15 @@ export default function Notifications() {
         
         if (res.ok) {
           const data = await res.json();
-          setNotifications(Array.isArray(data) ? data : []);
+          const allNotifs = Array.isArray(data) ? data : [];
+          
+          // 🔥 PERBAIKAN: REPORT_ISSUE & NEW_APPLICANT DIHAPUS DARI SINI BIAR MASUK KE USER MODE 🔥
+          const filteredNotifs = allNotifs.filter(n => {
+            const isAgentNotif = ['PAYOUT_SUCCESS', 'INVITATION_AGENT', 'NEW_RATING'].includes(n.type);
+            return isAgentMode ? isAgentNotif : !isAgentNotif; 
+          });
+
+          setNotifications(filteredNotifs);
         }
       } catch (err) {
         console.error(err);
@@ -61,7 +68,13 @@ export default function Notifications() {
         { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
         (payload) => {
           const newNotif = payload.new;
-          setNotifications(prevNotifs => [newNotif, ...prevNotifs]);
+          
+          // 🔥 PERBAIKAN: REPORT_ISSUE & NEW_APPLICANT DIHAPUS DARI SINI 🔥
+          const isAgentNotif = ['PAYOUT_SUCCESS', 'INVITATION_AGENT', 'NEW_RATING'].includes(newNotif.type);
+          
+          if ((isAgentMode && isAgentNotif) || (!isAgentMode && !isAgentNotif)) {
+             setNotifications(prevNotifs => [newNotif, ...prevNotifs]);
+          }
         }
       )
       .subscribe();
@@ -69,7 +82,7 @@ export default function Notifications() {
     return () => {
       supabase.removeChannel(notifChannel);
     };
-  }, [userId]);
+  }, [userId, isAgentMode]);
 
   const handleRespondNotif = async (notifId, action) => {
     const token = localStorage.getItem('supabase_token');
@@ -87,7 +100,14 @@ export default function Notifications() {
         });
         if (resRefresh.ok) {
           const dataRefresh = await resRefresh.json();
-          setNotifications(Array.isArray(dataRefresh) ? dataRefresh : []);
+          const allNotifs = Array.isArray(dataRefresh) ? dataRefresh : [];
+          
+          const filteredNotifs = allNotifs.filter(n => {
+            const isAgentNotif = ['PAYOUT_SUCCESS', 'INVITATION_AGENT', 'NEW_RATING'].includes(n.type);
+            return isAgentMode ? isAgentNotif : !isAgentNotif; 
+          });
+
+          setNotifications(filteredNotifs);
         }
       } else {
         toast.error(data.message);
@@ -131,9 +151,7 @@ export default function Notifications() {
     }
   };
 
-  // 🔥 LOGIC ROUTING PAS DIKLIK 🔥
   const handleNotifClick = async (notif) => {
-    // Kalau lagi mode edit, klik = centang notif, JANGAN pindah halaman
     if (isEditMode) {
       toggleSelection(notif.id);
       return;
@@ -152,18 +170,15 @@ export default function Notifications() {
     }
   };
 
-  // ==========================================
-  // 🔥 FUNGSI-FUNGSI BARU BUAT HAPUS NOTIF 🔥
-  // ==========================================
   const toggleSelection = (id) => {
     setSelectedNotifs(prev => prev.includes(id) ? prev.filter(nId => nId !== id) : [...prev, id]);
   };
 
   const handleSelectAll = () => {
     if (selectedNotifs.length === notifications.length) {
-      setSelectedNotifs([]); // Kalo udah milih semua, di-unselect
+      setSelectedNotifs([]); 
     } else {
-      setSelectedNotifs(notifications.map(n => n.id)); // Pilih semua
+      setSelectedNotifs(notifications.map(n => n.id)); 
     }
   };
 
@@ -203,14 +218,12 @@ export default function Notifications() {
     } finally {
       setIsDeleting(false);
       setShowDeleteModal(false);
-      // Kalau notifnya abis, keluar dari mode edit
       if (deleteType === 'all' || notifications.length - selectedNotifs.length === 0) {
         setIsEditMode(false);
       }
     }
   };
 
-  // 🔥 LOGIC STYLE BISA BUBGLON (LIGHT/DARK) & WARNA PER KATEGORI 🔥
   const getNotifStyle = (type, isRead) => {
     const styles = {
       'REPORT_ISSUE': {
@@ -244,6 +257,14 @@ export default function Notifications() {
         iconBg: isAgentMode ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-500',
         dotColor: 'bg-purple-500',
         iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+      },
+      'NEW_RATING': {
+        borderColor: 'border-l-yellow-500',
+        bgUnread: isAgentMode ? 'bg-yellow-500/10' : 'bg-yellow-50/60',
+        textColor: isAgentMode ? 'text-yellow-400' : 'text-yellow-600',
+        iconBg: isAgentMode ? 'bg-yellow-500/20 text-yellow-400' : 'bg-yellow-100 text-yellow-500',
+        dotColor: 'bg-yellow-500',
+        iconSvg: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path>
       },
       'DEFAULT': {
         borderColor: isAgentMode ? 'border-l-orange-500' : 'border-l-[#FF6B35]',
@@ -314,7 +335,6 @@ export default function Notifications() {
 
       <div className="max-w-3xl mx-auto px-4 md:px-8 relative z-10">
         
-        {/* Header Area */}
         <div className="flex flex-col gap-4 mb-8">
           <div className="flex items-center gap-3 md:gap-4">
             <button 
@@ -331,7 +351,6 @@ export default function Notifications() {
             </h1>
           </div>
           
-          {/* Action Bar */}
           {notifications.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 mt-2">
               {isEditMode ? (
@@ -366,7 +385,6 @@ export default function Notifications() {
           )}
         </div>
 
-        {/* List Notifikasi Container */}
         <div className={`${isAgentMode ? 'bg-slate-800/50 border-slate-700/50 backdrop-blur-sm' : 'bg-white border-gray-200'} rounded-[24px] md:rounded-[32px] shadow-sm border overflow-hidden relative transition-colors duration-300`}>
           {loading ? (
             <div className="py-20 flex justify-center">
@@ -382,7 +400,6 @@ export default function Notifications() {
             <div className="flex flex-col relative">
               <div className={`divide-y ${isAgentMode ? 'divide-slate-700/50' : 'divide-gray-100'}`}>
                 
-                {/* RENDER SEMUA NOTIFIKASI */}
                 {notifications.map((notif, index) => {
                   const style = getNotifStyle(notif.type, notif.is_read);
                   const isSelected = selectedNotifs.includes(notif.id);
@@ -393,7 +410,6 @@ export default function Notifications() {
                         className={`p-5 md:p-7 transition-all flex gap-3 md:gap-5 cursor-pointer ${style.wrapperClass} ${isSelected ? (isAgentMode ? '!bg-rose-500/10' : '!bg-red-50/50') : ''} ${index >= 5 && !isShowingAll ? 'hidden' : ''}`}
                         onClick={() => handleNotifClick(notif)}
                       >
-                        {/* CHECKBOX BILA MODE EDIT AKTIF */}
                         {isEditMode && (
                           <div className="flex items-center pt-2 md:pt-3">
                             <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${isSelected ? (isAgentMode ? 'bg-rose-500 border-rose-500' : 'bg-red-500 border-red-500') : (isAgentMode ? 'border-slate-500 bg-slate-800' : 'border-gray-300 bg-white')}`}>
@@ -420,7 +436,6 @@ export default function Notifications() {
                             {new Date(notif.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
                           </p>
 
-                          {/* Tombol Terima/Tolak disembunyikan kalau lagi mode edit biar ngga salah pencet */}
                           {notif.type === 'INVITATION_AGENT' && !notif.is_read && !isEditMode && (
                             <div className="flex gap-3 mt-4">
                               <button 
@@ -442,7 +457,6 @@ export default function Notifications() {
                         </div>
                       </div>
 
-                      {/* TOMBOL MUNCUL SETELAH NOTIF KE-5 */}
                       {index === 4 && notifications.length > 5 && !isEditMode && (
                         <div className={`p-5 border-y flex justify-center z-20 ${isAgentMode ? 'bg-slate-800/80 border-slate-700' : 'bg-gray-50/50 border-gray-100'}`}>
                           {isShowingAll ? (

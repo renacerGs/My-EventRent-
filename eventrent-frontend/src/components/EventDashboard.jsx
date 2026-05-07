@@ -1282,32 +1282,35 @@ export default function EventDashboard() {
             { id: 'payouts', label: 'Payouts', badge: payouts.filter(p => p.status === 'PENDING').length, badgeColor: 'bg-emerald-500', pulse: true, icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>, colorClass: 'bg-emerald-500 shadow-emerald-200' },
             { id: 'reports', label: 'Issues', badge: pendingReportsCount, badgeColor: 'bg-rose-500', icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>, colorClass: 'bg-rose-500 shadow-rose-200' },
           ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`relative flex items-center gap-2 px-6 py-3 rounded-xl md:rounded-full font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-colors duration-300 z-10 ${
-                activeTab === tab.id ? 'text-white' : 'text-gray-500 hover:text-gray-900'
-              }`}
-            >
-              {activeTab === tab.id && (
-                <motion.div
-                  layoutId="activeTabBackground"
-                  className={`absolute inset-0 rounded-xl md:rounded-full shadow-md -z-10 ${tab.colorClass}`}
-                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                />
-              )}
-              
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {tab.icon}
-              </svg>
-              {tab.label}
-              
+            // 🔥 PERBAIKAN: Bungkus di dalam div relative baru yang lebarnya ngepas (w-max)
+            <div key={tab.id} className="relative w-max">
+              <button
+                onClick={() => setActiveTab(tab.id)}
+                className={`relative flex items-center gap-2 px-6 py-3 rounded-xl md:rounded-full font-black text-[10px] md:text-xs uppercase tracking-widest whitespace-nowrap transition-colors duration-300 z-10 ${
+                  activeTab === tab.id ? 'text-white' : 'text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                {activeTab === tab.id && (
+                  <motion.div
+                    layoutId="activeTabBackground"
+                    className={`absolute inset-0 rounded-xl md:rounded-full shadow-md -z-10 ${tab.colorClass}`}
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  />
+                )}
+                
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {tab.icon}
+                </svg>
+                {tab.label}
+              </button>
+
+              {/* 🔥 PERBAIKAN: Posisi badge disesuaikan di luar button tapi di dalam div relative-nya */}
               {tab.badge > 0 && (
-                <span className={`absolute -top-1.5 -right-1.5 ${tab.badgeColor} text-white w-5 h-5 flex items-center justify-center rounded-full text-[9px] shadow-sm ${tab.pulse ? 'animate-pulse border-2 border-white' : 'animate-bounce border-2 border-white'}`}>
+                <span className={`absolute top-0 right-0 translate-x-1/4 -translate-y-1/4 z-20 ${tab.badgeColor} text-white w-5 h-5 flex items-center justify-center rounded-full text-[9px] shadow-sm ${tab.pulse ? 'animate-pulse border-2 border-white' : 'animate-bounce border-2 border-white'}`}>
                   {tab.badge}
                 </span>
               )}
-            </button>
+            </div>
           ))}
 
         </div>
