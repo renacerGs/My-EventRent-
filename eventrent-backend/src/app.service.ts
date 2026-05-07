@@ -34,10 +34,10 @@ export class AppService implements OnModuleInit {
   async onModuleInit() {
     try {
       await this.pool.query('SELECT 1');
-      console.log('Berhasil terhubung ke database PostgreSQL EventRent!');
+      console.log('Successfully connected to EventRent PostgreSQL database!');
       console.log('Database Check: OK! 🚀 (Alphanumeric Ticket Code Ready)');
     } catch (error) {
-      console.error('Gagal terhubung ke database:', error);
+      console.error('Failed to connect to database:', error);
     }
   }
 
@@ -75,7 +75,7 @@ export class AppService implements OnModuleInit {
       return rows;
     } catch (err) {
       console.error(err);
-      throw new InternalServerErrorException('Gagal mengambil data');
+      throw new InternalServerErrorException('Failed to fetch data');
     }
   }
 
@@ -94,7 +94,7 @@ export class AppService implements OnModuleInit {
       `;
       const eventRes = await this.pool.query(eventQuery, [eventId]);
       
-      if (eventRes.rows.length === 0) throw new BadRequestException('Event tidak ditemukan');
+      if (eventRes.rows.length === 0) throw new BadRequestException('Event not found');
 
       const eventData = eventRes.rows[0];
 
@@ -136,7 +136,7 @@ export class AppService implements OnModuleInit {
     } catch (err) {
       if (err instanceof BadRequestException) throw err;
       console.error("Error getEventById:", err);
-      throw new InternalServerErrorException('Gagal mengambil detail event');
+      throw new InternalServerErrorException('Failed to fetch event details');
     }
   }
 
@@ -165,7 +165,7 @@ export class AppService implements OnModuleInit {
       return sessions;
     } catch (err) {
       console.error("Error getEventSessions:", err);
-      throw new InternalServerErrorException('Gagal mengambil data sesi event');
+      throw new InternalServerErrorException('Failed to fetch event sessions data');
     }
   }
 
@@ -188,7 +188,7 @@ export class AppService implements OnModuleInit {
       return rows;
     } catch (err) {
       console.error(err);
-      throw new InternalServerErrorException('Gagal mengambil event saya');
+      throw new InternalServerErrorException('Failed to fetch your events');
     }
   }
 
@@ -266,11 +266,11 @@ export class AppService implements OnModuleInit {
       }
 
       await client.query('COMMIT'); 
-      return { message: 'Event berhasil dibuat!', eventId };
+      return { message: 'Event successfully created!', eventId };
     } catch (err) {
       await client.query('ROLLBACK'); 
       console.error("Transaction Error Create Event:", err);
-      throw new InternalServerErrorException('Gagal membuat event beserta detailnya');
+      throw new InternalServerErrorException('Failed to create event and its details');
     } finally {
       client.release(); 
     }
@@ -302,7 +302,7 @@ export class AppService implements OnModuleInit {
       return res.rows[0];
     } catch (err) {
       console.error(err);
-      throw new InternalServerErrorException('Gagal update event');
+      throw new InternalServerErrorException('Failed to update event');
     }
   }
 
@@ -314,7 +314,7 @@ export class AppService implements OnModuleInit {
       return { message: 'Event deleted successfully' };
     } catch (err) {
       console.error(err);
-      throw new InternalServerErrorException('Gagal menghapus event');
+      throw new InternalServerErrorException('Failed to delete event');
     }
   }
 
@@ -322,7 +322,7 @@ export class AppService implements OnModuleInit {
     try {
       const checkRes = await this.pool.query('SELECT is_private FROM events WHERE id = $1 AND created_by = $2', [eventId, userId]);
       
-      if (checkRes.rows.length === 0) throw new UnauthorizedException('Event tidak ditemukan atau bukan milikmu!');
+      if (checkRes.rows.length === 0) throw new UnauthorizedException('Event not found or unauthorized access!');
 
       const currentStatus = checkRes.rows[0].is_private;
       const newStatus = !currentStatus;
@@ -333,13 +333,13 @@ export class AppService implements OnModuleInit {
       );
 
       return { 
-        message: newStatus ? 'Event disembunyikan (Private)' : 'Event ditampilkan (Public)',
+        message: newStatus ? 'Event is now hidden (Private)' : 'Event is now visible (Public)',
         isPrivate: updateRes.rows[0].is_private 
       };
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
       console.error("Error toggleEventVisibility:", err);
-      throw new InternalServerErrorException('Gagal mengubah visibilitas event');
+      throw new InternalServerErrorException('Failed to change event visibility');
     }
   }
 
@@ -355,7 +355,7 @@ export class AppService implements OnModuleInit {
       }
     } catch (err) {
       console.error(err);
-      throw new InternalServerErrorException('Gagal memproses Like');
+      throw new InternalServerErrorException('Failed to process Like action');
     }
   }
 
@@ -374,7 +374,7 @@ export class AppService implements OnModuleInit {
       return rows;
     } catch (err) {
       console.error(err);
-      throw new InternalServerErrorException('Gagal mengambil daftar Like');
+      throw new InternalServerErrorException('Failed to fetch liked events');
     }
   }
 
@@ -391,8 +391,8 @@ export class AppService implements OnModuleInit {
         const checkOrder = await client.query('SELECT payment_status FROM orders WHERE order_id = $1 FOR UPDATE', [orderId]);
         if (checkOrder.rows.length > 0 && checkOrder.rows[0].payment_status === 'SUCCESS') {
           await client.query('ROLLBACK');
-          console.log(`[BLOKIR] Pesanan ${orderId} udah dicetak tiketnya. Cegah double print!`);
-          return { message: 'Tiket sudah dicetak sebelumnya.', ticketIds: [] };
+          console.log(`[BLOCKED] Order ${orderId} has already been printed. Preventing double print!`);
+          return { message: 'Ticket has already been printed.', ticketIds: [] };
         }
       }
 
@@ -418,7 +418,7 @@ export class AppService implements OnModuleInit {
         await client.query(
           `INSERT INTO tickets (event_id, session_id, user_id, price, guest_email, attendee_name, attendee_email, custom_answers, pax, greeting, is_attending, ticket_code) 
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-          [eventId, dummySessionId, userId, 0, targetEmail || null, formAnswers.attendee_name || 'Tamu', formAnswers.email || targetEmail || '', '[]', 0, formAnswers.greeting, false, ticketCode]
+          [eventId, dummySessionId, userId, 0, targetEmail || null, formAnswers.attendee_name || 'Guest', formAnswers.email || targetEmail || '', '[]', 0, formAnswers.greeting, false, ticketCode]
         );
         
         if (orderId) {
@@ -426,7 +426,7 @@ export class AppService implements OnModuleInit {
         }
 
         await client.query('COMMIT');
-        return { message: 'Terima kasih atas doa dan ucapan Anda', ticketIds: [] };
+        return { message: 'Thank you for your RSVP and wishes.', ticketIds: [] };
       }
 
       for (const item of cart) {
@@ -436,10 +436,10 @@ export class AppService implements OnModuleInit {
         const totalStockNeeded = qty * paxPerTicket;
 
         const sessionRes = await client.query('SELECT price, stock FROM event_sessions WHERE id = $1 FOR UPDATE', [sessionId]);
-        if (sessionRes.rows.length === 0) throw new BadRequestException('Session tidak ditemukan');
+        if (sessionRes.rows.length === 0) throw new BadRequestException('Session not found');
         
         const session = sessionRes.rows[0];
-        if (session.stock < totalStockNeeded) throw new BadRequestException(`Stok tiket tidak cukup untuk session ini! (Dibutuhkan: ${totalStockNeeded})`);
+        if (session.stock < totalStockNeeded) throw new BadRequestException(`Insufficient ticket stock for this session! (Required: ${totalStockNeeded})`);
 
         await client.query('UPDATE event_sessions SET stock = stock - $1 WHERE id = $2', [totalStockNeeded, sessionId]);
 
@@ -449,7 +449,7 @@ export class AppService implements OnModuleInit {
         for (let i = 0; i < qty; i++) {
           const prefix = `cart-${item.id}-ticket-${i}`;
           
-          const name = formAnswers[`${prefix}-nama`] || formAnswers.attendee_name || `Tamu ${i + 1}`;
+          const name = formAnswers[`${prefix}-nama`] || formAnswers.attendee_name || `Guest ${i + 1}`;
           const email = formAnswers[`${prefix}-email`] || formAnswers.email || targetEmail || ``;
           const pax = paxPerTicket; 
           const greeting = formAnswers[`${prefix}-greeting`] || formAnswers.greeting || null;
@@ -489,13 +489,13 @@ export class AppService implements OnModuleInit {
           .catch(e => console.error("Gagal mengirim email struk:", e)); 
       }
 
-      return { message: 'Pembelian tiket/RSVP berhasil', ticketIds: boughtTickets };
+      return { message: 'Ticket purchase/RSVP successful', ticketIds: boughtTickets };
 
     } catch (err) {
       await client.query('ROLLBACK');
       console.error("Error Buy Ticket Transaction:", err);
       if (err instanceof BadRequestException) throw err;
-      throw new InternalServerErrorException('Gagal memproses pembelian tiket');
+      throw new InternalServerErrorException('Failed to process ticket purchase');
     } finally {
       client.release();
     }
@@ -516,12 +516,12 @@ export class AppService implements OnModuleInit {
             <td width="65%" style="padding: 30px; vertical-align: middle;">
               <h4 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 2px;">Admit One</h4>
               <h2 style="color: #0f172a; margin: 0 0 15px 0; font-size: 26px; line-height: 1.2; font-weight: 900;">${eventTitle}</h2>
-              <p style="color: #64748b; font-size: 13px; margin: 0 0 25px 0; line-height: 1.5;">Tunjukkan QR Code di pintu masuk.<br/>Tiket ini bersifat rahasia dan hanya berlaku 1 kali scan.</p>
+              <p style="color: #64748b; font-size: 13px; margin: 0 0 25px 0; line-height: 1.5;">Please present this QR Code at the entrance.<br/>This ticket is strictly confidential and valid for one-time scan only.</p>
               <table width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td>
                     <p style="color: #94a3b8; font-size: 11px; margin: 0; text-transform: uppercase; letter-spacing: 1px;">Status</p>
-                    <h3 style="color: #10b981; font-size: 18px; margin: 5px 0 0 0; text-transform: uppercase;">PAID / LUNAS</h3>
+                    <h3 style="color: #10b981; font-size: 18px; margin: 5px 0 0 0; text-transform: uppercase;">PAID</h3>
                   </td>
                 </tr>
               </table>
@@ -547,17 +547,17 @@ export class AppService implements OnModuleInit {
     const mailOptions = {
       from: '"EventRent System" <noreply@eventrent.com>',
       to: targetEmail,
-      subject: `🎟️ E-Ticket Anda: ${eventTitle}`,
+      subject: `🎟️ Your E-Ticket: ${eventTitle}`,
       attachments: emailAttachments, 
       html: `
         <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 700px; margin: 0 auto; padding: 20px; background-color: #f8fafc;">
           <div style="text-align: center; padding: 20px 0;">
              <h1 style="color: #0f172a; margin: 0; font-size: 24px; font-weight: 900; letter-spacing: 1px;">YOUR EVENT TICKETS</h1>
-             <p style="color: #64748b; font-size: 14px; margin-top: 5px;">Terima kasih telah melakukan pemesanan!</p>
+             <p style="color: #64748b; font-size: 14px; margin-top: 5px;">Thank you for your order!</p>
           </div>
           ${qrCodesHtml}
           <div style="text-align: center; margin-top: 30px; padding: 20px; background-color: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0;">
-            <p style="margin: 0; font-size: 15px; color: #334155;">Total Pembayaran Keseluruhan:</p>
+            <p style="margin: 0; font-size: 15px; color: #334155;">Total Payment:</p>
             <h2 style="margin: 5px 0 0 0; color: #FF6B35; font-size: 24px;">Rp ${totalPrice.toLocaleString('id-ID')}</h2>
           </div>
         </div>
@@ -577,7 +577,7 @@ export class AppService implements OnModuleInit {
       `;
       const checkRes = await this.pool.query(checkQuery, [ticketCode, email]);
       
-      if (checkRes.rows.length === 0) throw new NotFoundException('Tiket tidak ditemukan. Pastikan Order ID dan Email sudah benar.');
+      if (checkRes.rows.length === 0) throw new NotFoundException('Ticket not found. Please ensure Order ID and Email are correct.');
 
       const { event_id, exact_time } = checkRes.rows[0];
 
@@ -599,7 +599,7 @@ export class AppService implements OnModuleInit {
       return rows; 
     } catch (err) {
       if (err instanceof NotFoundException) throw err;
-      throw new InternalServerErrorException('Gagal melacak tiket di server.');
+      throw new InternalServerErrorException('Failed to track ticket on the server.');
     }
   }
 
@@ -621,14 +621,14 @@ export class AppService implements OnModuleInit {
       const { rows } = await this.pool.query(query, [userId]);
       return rows; 
     } catch (err) {
-      throw new InternalServerErrorException('Gagal mengambil tiket saya');
+      throw new InternalServerErrorException('Failed to fetch your tickets');
     }
   }
 
   async getEventAttendees(eventId: number, userId: number) {
     try {
       const eventCheck = await this.pool.query('SELECT created_by FROM events WHERE id = $1', [eventId]);
-      if (eventCheck.rows.length === 0) throw new BadRequestException('Event tidak ditemukan');
+      if (eventCheck.rows.length === 0) throw new BadRequestException('Event not found');
       
       const isOwner = eventCheck.rows[0].created_by == userId;
 
@@ -641,7 +641,7 @@ export class AppService implements OnModuleInit {
         isAgent = agentCheck.rows.length > 0;
       }
 
-      if (!isOwner && !isAgent) throw new UnauthorizedException('Akses ditolak! Bukan panitia atau pemilik event.');
+      if (!isOwner && !isAgent) throw new UnauthorizedException('Access denied! You are not a committee member or event owner.');
 
       const query = `
         SELECT t.ticket_code as ticket_id, t.purchase_date, t.price,
@@ -659,14 +659,14 @@ export class AppService implements OnModuleInit {
       return rows; 
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
-      throw new InternalServerErrorException('Gagal mengambil data peserta');
+      throw new InternalServerErrorException('Failed to fetch attendee data');
     }
   }
 
   async scanTicket(ticketCode: string, eventId: number, userId: number) {
     try {
       const eventCheck = await this.pool.query('SELECT created_by FROM events WHERE id = $1', [eventId]);
-      if (eventCheck.rows.length === 0) throw new BadRequestException('Event tidak ditemukan');
+      if (eventCheck.rows.length === 0) throw new BadRequestException('Event not found');
       
       const isOwner = eventCheck.rows[0].created_by == userId;
 
@@ -676,7 +676,7 @@ export class AppService implements OnModuleInit {
         isAgent = agentCheck.rows.length > 0;
       }
 
-      if (!isOwner && !isAgent) throw new UnauthorizedException('Akses ditolak! Kamu bukan panitia di event ini.');
+      if (!isOwner && !isAgent) throw new UnauthorizedException('Access denied! You are not a committee member for this event.');
 
       const ticketRes = await this.pool.query(`
         SELECT t.id, t.is_scanned, t.scanned_at, t.price, t.pax, t.greeting, t.is_attending,
@@ -688,15 +688,15 @@ export class AppService implements OnModuleInit {
         WHERE t.ticket_code = $1 AND t.event_id = $2
       `, [ticketCode, eventId]);
 
-      if (ticketRes.rows.length === 0) return { valid: false, message: 'TIKET PALSU ATAU SALAH EVENT!' };
+      if (ticketRes.rows.length === 0) return { valid: false, message: 'FAKE TICKET OR WRONG EVENT!' };
 
       const ticket = ticketRes.rows[0];
 
-      if (!ticket.is_attending) return { valid: false, message: 'TAMU INI TELAH MENGKONFIRMASI TIDAK HADIR.' };
+      if (!ticket.is_attending) return { valid: false, message: 'THIS GUEST HAS CONFIRMED NOT ATTENDING.' };
 
       if (ticket.is_scanned) {
         const scanWaktu = new Date(ticket.scanned_at).toLocaleString('id-ID');
-        return { valid: false, message: `TIKET SUDAH DIGUNAKAN pada ${scanWaktu}!`, data: ticket };
+        return { valid: false, message: `TICKET HAS ALREADY BEEN USED on ${scanWaktu}!`, data: ticket };
       }
 
       await this.pool.query(
@@ -704,10 +704,10 @@ export class AppService implements OnModuleInit {
         [ticketCode, userId]
       );
       
-      return { valid: true, message: 'SCAN SUKSES! Tiket Valid.', data: ticket };
+      return { valid: true, message: 'SCAN SUCCESS! Ticket is Valid.', data: ticket };
     } catch (err) {
       if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
-      throw new InternalServerErrorException('Gagal memproses validasi tiket');
+      throw new InternalServerErrorException('Failed to process ticket validation');
     }
   }
 
@@ -715,19 +715,19 @@ export class AppService implements OnModuleInit {
   // FITUR AGENTS (PANITIA/EO)
   // ==========================================
 
-  async addAgent(eventId: number, eoId: number, agentEmail: string, role: string = 'Agen') {
+  async addAgent(eventId: number, eoId: number, agentEmail: string, role: string = 'Agent') {
     try {
       const eventCheck = await this.pool.query('SELECT id, title FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
-      if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
+      if (eventCheck.rows.length === 0) throw new UnauthorizedException('Not the event owner!');
 
       const userRes = await this.pool.query('SELECT id FROM users WHERE email = $1', [agentEmail]);
-      if (userRes.rows.length === 0) throw new BadRequestException('Email tidak ditemukan.');
+      if (userRes.rows.length === 0) throw new BadRequestException('Email not found.');
       const agentId = userRes.rows[0].id;
 
-      if (agentId == eoId) throw new BadRequestException('Anda adalah pembuat event.');
+      if (agentId == eoId) throw new BadRequestException('You are the event creator.');
 
       const checkAgent = await this.pool.query('SELECT id FROM event_agents WHERE event_id = $1 AND user_id = $2', [eventId, agentId]);
-      if (checkAgent.rows.length > 0) throw new BadRequestException('Agen sudah terdaftar!');
+      if (checkAgent.rows.length > 0) throw new BadRequestException('Agent is already registered!');
 
       const insertRes = await this.pool.query(
         'INSERT INTO event_agents (event_id, user_id, role, is_accepted) VALUES ($1, $2, $3, FALSE) RETURNING *',
@@ -738,20 +738,20 @@ export class AppService implements OnModuleInit {
       await this.pool.query(
         `INSERT INTO notifications (user_id, title, message, type, related_event_id)
          VALUES ($1, $2, $3, 'INVITATION_AGENT', $4)`,
-        [agentId, 'Undangan Kepanitiaan 🎫', `Anda diundang menjadi ${role} untuk event: ${eventTitle}.`, eventId]
+        [agentId, 'Committee Invitation 🎫', `You are invited to be ${role} for the event: ${eventTitle}.`, eventId]
       );
 
-      return { message: 'Undangan berhasil dikirim!', data: insertRes.rows[0] };
+      return { message: 'Invitation successfully sent!', data: insertRes.rows[0] };
     } catch (err) {
       if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
-      throw new InternalServerErrorException('Gagal menambahkan agen');
+      throw new InternalServerErrorException('Failed to add agent');
     }
   }
 
   async getEventAgents(eventId: number, eoId: number) {
     try {
       const eventCheck = await this.pool.query('SELECT id FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
-      if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
+      if (eventCheck.rows.length === 0) throw new UnauthorizedException('Not the event owner!');
 
       const query = `
         SELECT ea.user_id as id, ea.role, ea.rating_given, ea.created_at, ea.is_accepted, 
@@ -765,37 +765,37 @@ export class AppService implements OnModuleInit {
       return rows;
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
-      throw new InternalServerErrorException('Gagal mengambil daftar agen');
+      throw new InternalServerErrorException('Failed to fetch agents list');
     }
   }
 
   async removeAgent(eventId: number, eoId: number, agentId: number) {
     try {
       const eventCheck = await this.pool.query('SELECT id, title FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
-      if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
+      if (eventCheck.rows.length === 0) throw new UnauthorizedException('Not the event owner!');
       
       const eventTitle = eventCheck.rows[0].title;
 
       const delRes = await this.pool.query('DELETE FROM event_agents WHERE event_id = $1 AND user_id = $2 RETURNING id', [eventId, agentId]);
-      if (delRes.rowCount === 0) throw new BadRequestException('Agen tidak ditemukan');
+      if (delRes.rowCount === 0) throw new BadRequestException('Agent not found');
 
       await this.pool.query(
         `INSERT INTO notifications (user_id, title, message, type, related_event_id)
          VALUES ($1, $2, $3, 'INFO', $4)`,
-        [agentId, 'Pemberhentian Tugas 🛑', `Anda telah diberhentikan dari kepanitiaan event: ${eventTitle}.`, eventId]
+        [agentId, 'Task Dismissal 🛑', `You have been dismissed from the committee for event: ${eventTitle}.`, eventId]
       );
 
-      return { message: 'Agen berhasil diberhentikan.' };
+      return { message: 'Agent successfully dismissed.' };
     } catch (err) {
       if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
-      throw new InternalServerErrorException('Gagal menghapus agen');
+      throw new InternalServerErrorException('Failed to remove agent');
     }
   }
 
   async updateAgent(eventId: number, eoId: number, agentId: number, data: { role?: string, rating_given?: number }) {
     try {
       const eventCheck = await this.pool.query('SELECT id, title FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
-      if (eventCheck.rows.length === 0) throw new UnauthorizedException('Bukan pemilik event!');
+      if (eventCheck.rows.length === 0) throw new UnauthorizedException('Not the event owner!');
       
       const eventTitle = eventCheck.rows[0].title;
 
@@ -805,7 +805,7 @@ export class AppService implements OnModuleInit {
         [data.role, data.rating_given, eventId, agentId]
       );
 
-      if (updateRes.rowCount === 0) throw new BadRequestException('Agen tidak ditemukan');
+      if (updateRes.rowCount === 0) throw new BadRequestException('Agent not found');
 
       if (data.rating_given !== undefined && data.rating_given !== null) {
         try {
@@ -815,7 +815,7 @@ export class AppService implements OnModuleInit {
             [
               agentId, 
               'New Rating Received! 🌟', 
-              `Asik! Kamu dapat rating ${data.rating_given}.0 Bintang atas kerjamu di event ${eventTitle}. Terus pertahankan!`, 
+              `Awesome! You received a ${data.rating_given}.0 Star rating for your work at event ${eventTitle}. Keep it up!`, 
               eventId
             ]
           );
@@ -824,10 +824,10 @@ export class AppService implements OnModuleInit {
         }
       }
 
-      return { message: 'Data agen diperbarui', data: updateRes.rows[0] };
+      return { message: 'Agent data updated', data: updateRes.rows[0] };
     } catch (err) {
       if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
-      throw new InternalServerErrorException('Gagal mengupdate agen');
+      throw new InternalServerErrorException('Failed to update agent');
     }
   }
 
@@ -852,7 +852,7 @@ export class AppService implements OnModuleInit {
 
           SELECT e.id, e.title, e.image_url as img, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as date_start, 
                  e.event_start as raw_date,
-                 e.place as location, 'Pemilik Event' as role, NULL as rating_given, u.name as organizer_name,
+                 e.place as location, 'Event Owner' as role, NULL as rating_given, u.name as organizer_name,
                  (
                    SELECT TO_CHAR(MIN(start_time), 'HH24:MI') 
                    FROM event_sessions 
@@ -867,7 +867,7 @@ export class AppService implements OnModuleInit {
       const { rows } = await this.pool.query(query, [agentId]);
       return rows;
     } catch (err) {
-      throw new InternalServerErrorException('Gagal mengambil daftar tugas');
+      throw new InternalServerErrorException('Failed to fetch assigned tasks');
     }
   }
 
@@ -885,7 +885,7 @@ export class AppService implements OnModuleInit {
 
   async deleteUserAccount(userId: number, email: string) {
     if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      throw new InternalServerErrorException('Konfigurasi Supabase Admin belum diset!');
+      throw new InternalServerErrorException('Supabase Admin configuration is missing!');
     }
 
     const supabaseAdmin = createClient(
@@ -916,17 +916,17 @@ export class AppService implements OnModuleInit {
       }
 
       await client.query('COMMIT'); 
-      return { success: true, message: 'Akun dan foto berhasil dimusnahkan permanen!' };
+      return { success: true, message: 'Account and photo successfully destroyed permanently!' };
       
     } catch (err: any) {
       await client.query('ROLLBACK');
       
       if (err.code === '23503') {
-        throw new BadRequestException('Gagal: Akun ini tidak bisa dihapus karena masih digunakan sebagai pembuat Event, agen, atau memiliki tiket yang sedang berjalan.');
+        throw new BadRequestException('Failed: This account cannot be deleted because it is still actively used as an Event creator, agent, or has ongoing tickets.');
       }
 
       console.error('Error hapus akun:', err);
-      throw new InternalServerErrorException('Terjadi kesalahan pada server saat menghapus akun.');
+      throw new InternalServerErrorException('A server error occurred while deleting the account.');
     } finally {
       client.release();
     }
@@ -947,7 +947,7 @@ export class AppService implements OnModuleInit {
       const { rows } = await this.pool.query(query, [userId]);
       return rows;
     } catch (err) {
-      throw new InternalServerErrorException('Gagal mengambil riwayat scan');
+      throw new InternalServerErrorException('Failed to fetch scan history');
     }
   }
 
@@ -960,7 +960,7 @@ export class AppService implements OnModuleInit {
       const { rows } = await this.pool.query('SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
       return rows;
     } catch (err) {
-      throw new InternalServerErrorException('Gagal mengambil notifikasi');
+      throw new InternalServerErrorException('Failed to fetch notifications');
     }
   }
 
@@ -984,13 +984,13 @@ export class AppService implements OnModuleInit {
     try {
       await this.pool.query(`UPDATE notifications SET is_read = true WHERE id = $1`, [notifId]);
       if (action === 'accept') {
-        return { message: 'Undangan berhasil diterima!' };
+        return { message: 'Invitation successfully accepted!' };
       } else {
-        return { message: 'Undangan berhasil ditolak.' };
+        return { message: 'Invitation successfully declined.' };
       }
     } catch (error) {
       console.error('Error respond notification:', error);
-      throw new InternalServerErrorException('Gagal merespon notifikasi');
+      throw new InternalServerErrorException('Failed to respond to notification');
     }
   }
 
@@ -1000,7 +1000,7 @@ export class AppService implements OnModuleInit {
       await client.query('BEGIN');
 
       const notifRes = await client.query('SELECT related_event_id FROM notifications WHERE id = $1 AND user_id = $2', [notifId, userId]);
-      if (notifRes.rows.length === 0) throw new BadRequestException('Notifikasi tidak valid');
+      if (notifRes.rows.length === 0) throw new BadRequestException('Invalid notification');
       
       const eventId = notifRes.rows[0].related_event_id;
 
@@ -1016,14 +1016,14 @@ export class AppService implements OnModuleInit {
         await client.query(
           `INSERT INTO notifications (user_id, title, message, type, related_event_id)
            VALUES ($1, $2, $3, 'INFO', $4)`,
-          [eoId, 'Undangan Agen Diterima! 🎉', `Agen ${agentName} menerima undangan di event: ${eventTitle}.`, eventId]
+          [eoId, 'Agent Invitation Accepted! 🎉', `Agent ${agentName} accepted the invitation for event: ${eventTitle}.`, eventId]
         );
       } else {
         await client.query('DELETE FROM event_agents WHERE event_id = $1 AND user_id = $2', [eventId, userId]);
         await client.query(
           `INSERT INTO notifications (user_id, title, message, type, related_event_id)
            VALUES ($1, $2, $3, 'INFO', $4)`,
-          [eoId, 'Undangan Agen Ditolak ❌', `Agen ${agentName} menolak tawaran di event: ${eventTitle}.`, eventId]
+          [eoId, 'Agent Invitation Declined ❌', `Agent ${agentName} declined the offer for event: ${eventTitle}.`, eventId]
         );
       }
 
@@ -1031,11 +1031,11 @@ export class AppService implements OnModuleInit {
       await client.query('UPDATE notifications SET is_read = TRUE, type = $1 WHERE id = $2', [newType, notifId]);
 
       await client.query('COMMIT');
-      return { message: action === 'accept' ? 'Undangan berhasil diterima!' : 'Undangan berhasil ditolak.' };
+      return { message: action === 'accept' ? 'Invitation successfully accepted!' : 'Invitation successfully declined.' };
     } catch (err) {
       await client.query('ROLLBACK');
       if (err instanceof BadRequestException) throw err;
-      throw new InternalServerErrorException('Gagal memproses undangan');
+      throw new InternalServerErrorException('Failed to process invitation');
     } finally {
       client.release();
     }
@@ -1052,9 +1052,9 @@ export class AppService implements OnModuleInit {
         'UPDATE notifications SET is_read = TRUE WHERE user_id = $1 AND is_read = FALSE', 
         [userId]
       );
-      return { success: true, message: 'Semua notifikasi berhasil ditandai sudah dibaca!' };
+      return { success: true, message: 'All notifications successfully marked as read!' };
     } catch (error) {
-      throw new InternalServerErrorException('Gagal mengubah status notifikasi');
+      throw new InternalServerErrorException('Failed to update notification status');
     }
   }
 
@@ -1062,9 +1062,9 @@ export class AppService implements OnModuleInit {
     try {
       const query = 'DELETE FROM notifications WHERE id = ANY($1) AND user_id = $2';
       await this.pool.query(query, [notifIds, userId]);
-      return { message: 'Notifikasi berhasil dihapus!' };
+      return { message: 'Notifications successfully deleted!' };
     } catch (error) {
-      throw new InternalServerErrorException('Gagal menghapus notifikasi');
+      throw new InternalServerErrorException('Failed to delete notifications');
     }
   }
 
@@ -1072,9 +1072,9 @@ export class AppService implements OnModuleInit {
     try {
       const query = 'DELETE FROM notifications WHERE user_id = $1';
       await this.pool.query(query, [userId]);
-      return { message: 'Semua notifikasi berhasil dibersihkan!' };
+      return { message: 'All notifications successfully cleared!' };
     } catch (error) {
-      throw new InternalServerErrorException('Gagal membersihkan notifikasi');
+      throw new InternalServerErrorException('Failed to clear notifications');
     }
   }
 
@@ -1091,24 +1091,24 @@ export class AppService implements OnModuleInit {
       const eventTitle = eventRes.rows[0].title;
 
       const agentRes = await this.pool.query('SELECT name FROM users WHERE id = $1', [agentId]);
-      const agentName = agentRes.rows[0]?.name || 'Agen';
+      const agentName = agentRes.rows[0]?.name || 'Agent';
 
       await this.pool.query(
         `INSERT INTO notifications (user_id, title, message, type, related_event_id)
          VALUES ($1, $2, $3, 'REPORT_ISSUE', $4)`,
-        [eoId, `⚠️ Ada Kendala di: ${eventTitle}`, `Agen ${agentName} melaporkan masalah!`, eventId]
+        [eoId, `⚠️ Issue Reported at: ${eventTitle}`, `Agent ${agentName} reported an issue!`, eventId]
       );
 
-      return { success: true, message: 'Laporan berhasil dikirim' };
+      return { success: true, message: 'Report successfully submitted' };
     } catch (err) {
-      throw new InternalServerErrorException('Gagal mengirim laporan');
+      throw new InternalServerErrorException('Failed to submit report');
     }
   }
 
   async getEventReports(eventId: number, eoId: number) {
     try {
       const check = await this.pool.query('SELECT id FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
-      if (check.rows.length === 0) throw new UnauthorizedException('Akses ditolak');
+      if (check.rows.length === 0) throw new UnauthorizedException('Access denied');
 
       const query = `
         SELECT r.id, r.message, r.status, r.created_at, u.name as agent_name, u.picture as agent_pic
@@ -1120,7 +1120,7 @@ export class AppService implements OnModuleInit {
       const { rows } = await this.pool.query(query, [eventId]);
       return rows;
     } catch (err) {
-      throw new InternalServerErrorException('Gagal mengambil laporan');
+      throw new InternalServerErrorException('Failed to fetch reports');
     }
   }
 
@@ -1131,12 +1131,12 @@ export class AppService implements OnModuleInit {
         JOIN events e ON r.event_id = e.id
         WHERE r.id = $1 AND e.created_by = $2
       `, [reportId, eoId]);
-      if (check.rows.length === 0) throw new UnauthorizedException('Akses ditolak');
+      if (check.rows.length === 0) throw new UnauthorizedException('Access denied');
 
       await this.pool.query("UPDATE event_reports SET status = 'RESOLVED' WHERE id = $1", [reportId]);
-      return { success: true, message: 'Laporan ditandai selesai' };
+      return { success: true, message: 'Report marked as resolved' };
     } catch (err) {
-      throw new InternalServerErrorException('Gagal menyelesaikan laporan');
+      throw new InternalServerErrorException('Failed to resolve report');
     }
   }
 
@@ -1154,7 +1154,7 @@ export class AppService implements OnModuleInit {
       const res = await this.pool.query(query, [data.eventId, data.eoId, data.role, data.quota, data.fee, data.description]);
       return res.rows[0];
     } catch (err) {
-      throw new InternalServerErrorException('Gagal membuat lowongan kerja');
+      throw new InternalServerErrorException('Failed to create job posting');
     }
   }
 
@@ -1164,10 +1164,10 @@ export class AppService implements OnModuleInit {
         `UPDATE job_postings SET role = $1, quota = $2, fee = $3, description = $4 WHERE id = $5 AND eo_id = $6 RETURNING *`,
         [data.role, data.quota, data.fee, data.description, jobId, eoId]
       );
-      if (res.rowCount === 0) throw new Error('Lowongan tidak ditemukan');
+      if (res.rowCount === 0) throw new Error('Job posting not found');
       return res.rows[0];
     } catch (error) {
-      throw new Error('Gagal mengubah lowongan');
+      throw new Error('Failed to update job posting');
     }
   }
 
@@ -1187,7 +1187,7 @@ export class AppService implements OnModuleInit {
       const { rows } = await this.pool.query(query, [limit, offset]);
       return rows; 
     } catch (err) {
-      throw new InternalServerErrorException('Gagal mengambil daftar lowongan');
+      throw new InternalServerErrorException('Failed to fetch job postings');
     }
   }
 
@@ -1196,7 +1196,7 @@ export class AppService implements OnModuleInit {
       const { rows } = await this.pool.query('SELECT * FROM job_postings WHERE event_id = $1 AND eo_id = $2 ORDER BY created_at DESC', [eventId, eoId]);
       return rows;
     } catch (err) {
-      throw new InternalServerErrorException('Gagal mengambil lowongan EO');
+      throw new InternalServerErrorException('Failed to fetch EO job postings');
     }
   }
 
@@ -1222,7 +1222,7 @@ export class AppService implements OnModuleInit {
         await client.query(
           `INSERT INTO notifications (user_id, title, message, type, related_event_id)
            VALUES ($1, $2, $3, 'NEW_APPLICANT', $4)`,
-          [info.eo_id, 'Pelamar Baru! 🚀', `${info.applicant_name} melamar posisi ${info.role} di event ${info.event_title}.`, info.event_id]
+          [info.eo_id, 'New Applicant! 🚀', `${info.applicant_name} applied for the ${info.role} position at event ${info.event_title}.`, info.event_id]
         );
       }
 
@@ -1230,8 +1230,8 @@ export class AppService implements OnModuleInit {
       return application;
     } catch (err: any) {
       await client.query('ROLLBACK');
-      if (err.code === '23505') throw new BadRequestException('Lu udah pernah ngelamar di posisi ini bro!');
-      throw new InternalServerErrorException('Gagal mengirim lamaran');
+      if (err.code === '23505') throw new BadRequestException('You have already applied for this position!');
+      throw new InternalServerErrorException('Failed to submit application');
     } finally {
       client.release();
     }
@@ -1250,7 +1250,7 @@ export class AppService implements OnModuleInit {
       const { rows } = await this.pool.query(query, [eventId, eoId]);
       return rows;
     } catch (err) {
-      throw new InternalServerErrorException('Gagal mengambil daftar pelamar');
+      throw new InternalServerErrorException('Failed to fetch applicants list');
     }
   }
 
@@ -1261,7 +1261,7 @@ export class AppService implements OnModuleInit {
       const updateQuery = `UPDATE job_applications SET status = $1 WHERE id = $2 RETURNING user_id, job_id`;
       const appRes = await client.query(updateQuery, [action, applicationId]);
       
-      if (appRes.rows.length === 0) throw new BadRequestException('Lamaran tidak ditemukan');
+      if (appRes.rows.length === 0) throw new BadRequestException('Application not found');
       const { user_id: applicantId, job_id: jobId } = appRes.rows[0];
 
       const jobRes = await client.query(`
@@ -1269,7 +1269,7 @@ export class AppService implements OnModuleInit {
         FROM job_postings j JOIN events e ON j.event_id = e.id WHERE j.id = $1 AND j.eo_id = $2
       `, [jobId, eoId]);
 
-      if (jobRes.rows.length === 0) throw new UnauthorizedException('Bukan lowongan milik lu bro');
+      if (jobRes.rows.length === 0) throw new UnauthorizedException('Not your job posting');
       const jobInfo = jobRes.rows[0];
 
       if (action === 'ACCEPTED') {
@@ -1279,21 +1279,21 @@ export class AppService implements OnModuleInit {
         }
         await client.query(
           `INSERT INTO notifications (user_id, title, message, type, related_event_id) VALUES ($1, $2, $3, 'JOB_ACCEPTED', $4)`,
-          [applicantId, 'Lamaran Diterima! 🎉', `Selamat! Lo diterima sebagai ${jobInfo.role} di event ${jobInfo.event_name}.`, jobInfo.event_id]
+          [applicantId, 'Application Accepted! 🎉', `Congratulations! You are accepted as ${jobInfo.role} for event ${jobInfo.event_name}.`, jobInfo.event_id]
         );
       } else if (action === 'REJECTED') {
         await client.query(
           `INSERT INTO notifications (user_id, title, message, type, related_event_id) VALUES ($1, $2, $3, 'JOB_REJECTED', $4)`,
-          [applicantId, 'Lamaran Ditolak 😔', `Maaf bro, lamaran lu untuk posisi ${jobInfo.role} di event ${jobInfo.event_name} belum diterima.`, jobInfo.event_id]
+          [applicantId, 'Application Rejected 😔', `Sorry, your application for ${jobInfo.role} at event ${jobInfo.event_name} has not been accepted.`, jobInfo.event_id]
         );
       }
 
       await client.query('COMMIT');
-      return { message: `Pelamar berhasil ${action}` };
+      return { message: `Applicant successfully ${action.toLowerCase()}` };
     } catch (err) {
       await client.query('ROLLBACK');
       if (err instanceof BadRequestException || err instanceof UnauthorizedException) throw err;
-      throw new InternalServerErrorException('Gagal memproses lamaran');
+      throw new InternalServerErrorException('Failed to process application');
     } finally {
       client.release();
     }
@@ -1306,7 +1306,7 @@ export class AppService implements OnModuleInit {
   async getEventPayouts(eventId: number, eoId: number) {
     try {
       const check = await this.pool.query('SELECT id FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
-      if (check.rows.length === 0) throw new UnauthorizedException('Akses ditolak.');
+      if (check.rows.length === 0) throw new UnauthorizedException('Access denied.');
 
       const query = `
         SELECT ea.user_id as agent_id, ea.role, u.name as agent_name, u.picture as agent_pic, 
@@ -1321,43 +1321,43 @@ export class AppService implements OnModuleInit {
       return rows;
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
-      throw new InternalServerErrorException('Gagal mengambil data penggajian');
+      throw new InternalServerErrorException('Failed to fetch payout data');
     }
   }
 
   async markAgentPaid(eventId: number, agentId: number, eoId: number, amount: number, proofUrl: string) { 
     try {
       const check = await this.pool.query('SELECT id, title FROM events WHERE id = $1 AND created_by = $2', [eventId, eoId]);
-      if (check.rows.length === 0) throw new UnauthorizedException('Akses ditolak.');
+      if (check.rows.length === 0) throw new UnauthorizedException('Access denied.');
       
       const checkPaid = await this.pool.query(`SELECT id FROM agent_payouts WHERE event_id = $1 AND agent_id = $2 AND status = 'PAID'`, [eventId, agentId]);
-      if (checkPaid.rows.length > 0) throw new BadRequestException('Bro, agen ini sudah lu bayar lunas sebelumnya!');
+      if (checkPaid.rows.length > 0) throw new BadRequestException('This agent has already been fully paid!');
 
       const query = `INSERT INTO agent_payouts (event_id, agent_id, amount, status, paid_at, proof_url) VALUES ($1, $2, $3, 'PAID', NOW(), $4) RETURNING *;`;
       const res = await this.pool.query(query, [eventId, agentId, amount, proofUrl]);
 
       await this.pool.query(
         `INSERT INTO notifications (user_id, title, message, type, related_event_id) VALUES ($1, $2, $3, 'PAYOUT_SUCCESS', $4)`,
-        [agentId, 'Gajian Cair! 💸', `EO mengirim honor Rp ${amount.toLocaleString('id-ID')} untuk event ${check.rows[0].title}.`, eventId]
+        [agentId, 'Wages Disbursed! 💸', `The EO sent your honorarium of Rp ${amount.toLocaleString('id-ID')} for event ${check.rows[0].title}.`, eventId]
       );
 
-      return { message: 'Berhasil ditandai lunas dan bukti tersimpan!', data: res.rows[0] };
+      return { message: 'Successfully marked as paid and proof saved!', data: res.rows[0] };
     } catch (err) {
       if (err instanceof UnauthorizedException || err instanceof BadRequestException) throw err;
-      throw new InternalServerErrorException('Gagal memproses pembayaran agen');
+      throw new InternalServerErrorException('Failed to process agent payment');
     }
   }
 
   async deleteJobPosting(jobId: number, eoId: number) {
     try {
       const checkRes = await this.pool.query('SELECT id FROM job_postings WHERE id = $1 AND eo_id = $2', [jobId, eoId]);
-      if (checkRes.rows.length === 0) throw new UnauthorizedException('Lowongan tidak ditemukan.');
+      if (checkRes.rows.length === 0) throw new UnauthorizedException('Job posting not found.');
 
       await this.pool.query('DELETE FROM job_postings WHERE id = $1 AND eo_id = $2 RETURNING id', [jobId, eoId]);
-      return { success: true, message: 'Lowongan berhasil dihapus!' };
+      return { success: true, message: 'Job posting successfully deleted!' };
     } catch (err) {
       if (err instanceof UnauthorizedException) throw err;
-      throw new InternalServerErrorException('Gagal menghapus lowongan kerja.');
+      throw new InternalServerErrorException('Failed to delete job posting.');
     }
   }
 
@@ -1373,7 +1373,7 @@ export class AppService implements OnModuleInit {
       const result = await this.pool.query(query, [agentId]);
       return result.rows; 
     } catch (err) {
-      throw new InternalServerErrorException('Gagal mengambil pendapatan agen');
+      throw new InternalServerErrorException('Failed to fetch agent income');
     }
   }
   
@@ -1391,7 +1391,7 @@ export class AppService implements OnModuleInit {
       .join('&');
 
     const rawKey = process.env.CAHAYA_PRIVATE_KEY || '';
-    if (!rawKey) throw new InternalServerErrorException('Private key Cahaya belum diset di .env');
+    if (!rawKey) throw new InternalServerErrorException('Cahaya private key is not set in .env');
 
     try {
       const keyBuffer = Buffer.from(rawKey.replace(/\s+/g, ''), 'base64');
@@ -1407,7 +1407,7 @@ export class AppService implements OnModuleInit {
 
     } catch (err) {
       console.error('Crypto Parsing Error:', err);
-      throw new InternalServerErrorException('Format Private Key di .env rusak atau tidak kompatibel dengan OpenSSL.');
+      throw new InternalServerErrorException('Private Key format in .env is broken or incompatible with OpenSSL.');
     }
   }
 
@@ -1459,14 +1459,14 @@ export class AppService implements OnModuleInit {
         const responseParams = JSON.parse(resData.resp_params);
         return { 
           checkout_url: responseParams.qr_code, 
-          out_trade_no: responseParams.out_trade_no // PENTING UNTUK QUERY STATUS NANTI
+          out_trade_no: responseParams.out_trade_no 
         };
       } else {
         throw new BadRequestException(`Cahaya Pay Error: ${resData.resp_msg} (Code: ${resData.resp_code})`);
       }
     } catch (err) {
       console.error("Payment API Error Detail:", err);
-      const errorMessage = err instanceof Error ? err.message : 'Gagal terhubung ke API Cahaya Pay';
+      const errorMessage = err instanceof Error ? err.message : 'Failed to connect to Cahaya Pay API';
       throw new InternalServerErrorException(errorMessage);
     }
   }
@@ -1474,10 +1474,8 @@ export class AppService implements OnModuleInit {
   async handleCahayaWebhook(payload: any) {
     try {
       if (payload.req_params) {
-        // Cahaya mengirim dalam bentuk string, kita harus parse ke objek
         const params = typeof payload.req_params === 'string' ? JSON.parse(payload.req_params) : payload.req_params;
         
-        // Cek jika status sukses dari Cahaya
         if (params.order_state === 'PAYSUCCESS') {
           const orderId = params.merchant_order_no;
 
@@ -1488,12 +1486,9 @@ export class AppService implements OnModuleInit {
 
           if (order.payment_status === 'SUCCESS') return { return_code: "01", return_msg: "success" };
 
-          // Ubah status di database
-          await this.pool.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [orderId]);
-
           const details = typeof order.ticket_details === 'string' ? JSON.parse(order.ticket_details) : order.ticket_details;
 
-          // Masukkan buyerEmail secara eksplisit
+          // 🔥 PERBAIKAN: Fungsi buyTicket akan mengeksekusi cetak tiket & ngubah status jadi SUCCESS sekaligus
           await this.buyTicket(
             order.user_id, 
             order.event_id, 
@@ -1501,7 +1496,7 @@ export class AppService implements OnModuleInit {
             details.formAnswers, 
             details.buyerEmail, 
             orderId
-          ).catch(err => console.error("Gagal auto-generate tiket via Webhook:", err));
+          ).catch(err => console.error("Failed to auto-generate tickets via Webhook:", err));
           
         } else if (params.order_state === 'PAYERROR') {
           await this.pool.query(`UPDATE orders SET payment_status = 'FAILED' WHERE order_id = $1`, [params.merchant_order_no]);
@@ -1521,19 +1516,16 @@ export class AppService implements OnModuleInit {
     const client = await this.pool.connect();
     try {
       const orderRes = await client.query('SELECT * FROM orders WHERE order_id = $1', [orderId]);
-      if (orderRes.rows.length === 0) throw new NotFoundException('Pesanan tidak ditemukan');
+      if (orderRes.rows.length === 0) throw new NotFoundException('Order not found');
       const order = orderRes.rows[0];
 
-      // Kalau udah lunas di database, langsung balik sukses
       if (order.payment_status === 'SUCCESS') {
-        return { status: 'SUCCESS', message: 'Pesanan sudah lunas sebelumnya.' };
+        return { status: 'SUCCESS', message: 'Order has already been paid.' };
       }
 
-      // Kita ambil out_trade_no yang disimpan pas checkout tadi
       const details = typeof order.ticket_details === 'string' ? JSON.parse(order.ticket_details) : order.ticket_details;
       const outTradeNo = details.cahaya_out_trade_no;
 
-      // Tanya ke Server Cahaya
       const CAHAYA_URL = process.env.CAHAYA_URL || 'https://api-pay.cahayatech.com';
       const APP_ID = process.env.CAHAYA_APP_ID || '250906140916234819';
       const MERCHANT_NO = process.env.CAHAYA_MERCHANT_NO || '820250906000001';
@@ -1547,7 +1539,6 @@ export class AppService implements OnModuleInit {
         terminal_time: Math.floor(Date.now() / 1000).toString(),
       };
 
-      // 🔥 KUNCI UTAMA: Kirim out_trade_no ke server Cahaya biar mereka nggak bingung nyari
       if (outTradeNo) {
         reqParamsObj.out_trade_no = outTradeNo;
       }
@@ -1576,10 +1567,8 @@ export class AppService implements OnModuleInit {
       if (resData.resp_code === '10000') {
         const responseParams = JSON.parse(resData.resp_params);
         
-        // JIKA CAHAYA BILANG LUNAS, EKSEKUSI TIKET & EMAIL!
         if (responseParams.order_state === 'PAYSUCCESS') {
-          await client.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [orderId]);
-          
+          // 🔥 PERBAIKAN: Fungsi buyTicket akan mengeksekusi cetak tiket & ngubah status jadi SUCCESS sekaligus
           await this.buyTicket(
             order.user_id, 
             order.event_id, 
@@ -1587,18 +1576,18 @@ export class AppService implements OnModuleInit {
             details.formAnswers, 
             details.buyerEmail, 
             orderId
-          ).catch(err => console.error("Gagal auto-generate tiket via Query Check:", err));
+          ).catch(err => console.error("Failed to auto-generate tickets via Query Check:", err));
 
-          return { status: 'SUCCESS', message: 'Pembayaran terkonfirmasi! Tiket sedang dikirim ke email.' };
+          return { status: 'SUCCESS', message: 'Payment confirmed! Tickets are being sent to your email.' };
         } else {
-          return { status: 'PENDING', message: 'Pembayaran belum terdeteksi. Silakan coba lagi nanti.' };
+          return { status: 'PENDING', message: 'Payment not detected yet. Please try again later.' };
         }
       } else {
         return { status: 'PENDING', message: `Cahaya Pay: ${resData.resp_msg}` };
       }
     } catch (err) {
       console.error("Check Status Error:", err);
-      throw new InternalServerErrorException('Gagal mengecek status pembayaran ke Cahaya');
+      throw new InternalServerErrorException('Failed to check payment status from Cahaya');
     } finally {
       client.release();
     }
@@ -1624,7 +1613,7 @@ export class AppService implements OnModuleInit {
       }
 
       let checkoutUrl: string | null = null;
-      let outTradeNo: string | null = null; // 🔥 Tambahan untuk nyimpen ID dari Cahaya
+      let outTradeNo: string | null = null; 
       let paymentStatus = 'PENDING';
 
       if (totalPrice > 0) {
@@ -1636,12 +1625,12 @@ export class AppService implements OnModuleInit {
           if (targetEmail && targetEmail !== 'customer@example.com') {
             await this.sendManualTransferEmail(targetEmail, orderId, totalPrice);
           } else {
-            console.warn(`Peringatan: Email pembeli kosong untuk Order ID ${orderId}`);
+            console.warn(`Warning: Buyer email is empty for Order ID ${orderId}`);
           }
         } else {
           const pgData = await this.createCahayaTransaction(orderId, totalPrice, ip);
           checkoutUrl = pgData.checkout_url; 
-          outTradeNo = pgData.out_trade_no; // 🔥 Simpan ID nya di sini
+          outTradeNo = pgData.out_trade_no; 
         }
       }
 
@@ -1660,21 +1649,21 @@ export class AppService implements OnModuleInit {
             formAnswers: data.formAnswers, 
             paymentMethod: data.paymentMethod,
             buyerEmail: data.buyerEmail, 
-            cahaya_out_trade_no: outTradeNo // 🔥 Lempar ke database biar bisa dicek nanti
+            cahaya_out_trade_no: outTradeNo 
           })
         ]
       );
       
       await client.query('COMMIT');
       return { 
-        message: 'Pesanan berhasil dibuat', 
+        message: 'Order successfully created', 
         orderId: orderId, 
         checkoutUrl: checkoutUrl 
       };
     } catch (err) {
       await client.query('ROLLBACK');
       console.error("Checkout Error:", err);
-      throw new InternalServerErrorException(err instanceof Error ? err.message : 'Gagal membuat pesanan');
+      throw new InternalServerErrorException(err instanceof Error ? err.message : 'Failed to create order');
     } finally {
       client.release();
     }
@@ -1685,20 +1674,19 @@ export class AppService implements OnModuleInit {
   // ========================================================
   private async sendManualTransferEmail(email: string, orderId: string, amount: number) {
     try {
-      // Pastikan FRONTEND_URL di .env sudah benar (contoh: http://localhost:5173)
       const uploadLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/upload-proof/${orderId}`; 
 
       const mailOptions = {
         from: `"${process.env.EMAIL_NAME || 'EventRent'}" <${process.env.EMAIL_USER}>`,
         to: email,
-        subject: `[Instruksi Pembayaran] Pesanan ${orderId}`,
+        subject: `[Payment Instruction] Order ${orderId}`,
         html: `
           <div style="font-family: sans-serif; color: #333; max-size: 600px; margin: auto; border: 1px solid #eee; padding: 20px; border-radius: 15px;">
-            <h2 style="color: #0f172a;">Halo! Terimakasih telah memesan tiket.</h2>
-            <p>Pesanan Anda <b>${orderId}</b> telah kami terima. Silakan lakukan transfer bank:</p>
+            <h2 style="color: #0f172a;">Hello! Thank you for ordering.</h2>
+            <p>We have received your order <b>${orderId}</b>. Please complete your bank transfer:</p>
             
             <div style="background: #f8fafc; padding: 25px; border-radius: 12px; border: 2px dashed #cbd5e1; text-align: center; margin: 20px 0;">
-              <p style="margin: 0; font-size: 14px; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Total Tagihan</p>
+              <p style="margin: 0; font-size: 14px; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Total Amount</p>
               <h1 style="color: #FF6B35; margin: 10px 0; font-size: 32px;">Rp ${amount.toLocaleString('id-ID')}</h1>
               <hr style="border: 0; border-top: 1px solid #e2e8f0; margin: 15px 0;">
               <p style="margin: 0; font-weight: bold; color: #1e293b;">BANK BCA (123-456-7890)</p>
@@ -1706,11 +1694,11 @@ export class AppService implements OnModuleInit {
             </div>
             
             <div style="text-align: center; margin-top: 30px;">
-              <p style="font-size: 14px; color: #475569;">Sudah transfer? Klik tombol di bawah untuk kirim bukti:</p>
-              <a href="${uploadLink}" style="background-color: #FF6B35; color: white; padding: 16px 30px; text-decoration: none; border-radius: 12px; font-weight: 900; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);">Upload Bukti Sekarang</a>
+              <p style="font-size: 14px; color: #475569;">Already transferred? Click the button below to upload your proof:</p>
+              <a href="${uploadLink}" style="background-color: #FF6B35; color: white; padding: 16px 30px; text-decoration: none; border-radius: 12px; font-weight: 900; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);">Upload Proof Now</a>
             </div>
 
-            <p style="margin-top: 40px; font-size: 12px; color: #94a3b8; text-align: center;">Jika tombol tidak bisa diklik, buka link berikut:<br>${uploadLink}</p>
+            <p style="margin-top: 40px; font-size: 12px; color: #94a3b8; text-align: center;">If the button is not clickable, open this link:<br>${uploadLink}</p>
           </div>
         `
       };
@@ -1730,7 +1718,7 @@ export class AppService implements OnModuleInit {
       const { rows } = await this.pool.query(query, [userId]);
       return rows;
     } catch (err) {
-      throw new InternalServerErrorException('Gagal mengambil daftar pesanan');
+      throw new InternalServerErrorException('Failed to fetch orders list');
     }
   }
 
@@ -1741,10 +1729,10 @@ export class AppService implements OnModuleInit {
          FROM orders WHERE order_id = $1`, 
         [orderId]
       );
-      if (res.rowCount === 0) throw new NotFoundException('Pesanan tidak ditemukan');
+      if (res.rowCount === 0) throw new NotFoundException('Order not found');
       return res.rows[0];
     } catch (err) {
-      throw new InternalServerErrorException('Gagal mengambil info tagihan');
+      throw new InternalServerErrorException('Failed to fetch billing info');
     }
   }
 
@@ -1756,7 +1744,7 @@ export class AppService implements OnModuleInit {
       );
       return res.rows;
     } catch (error) {
-      throw new InternalServerErrorException('Gagal mengambil data peserta');
+      throw new InternalServerErrorException('Failed to fetch participants data');
     }
   }
 
@@ -1774,16 +1762,16 @@ export class AppService implements OnModuleInit {
       );
 
       if (res.rowCount === 0) {
-        throw new NotFoundException('Pesanan tidak ditemukan');
+        throw new NotFoundException('Order not found');
       }
 
       return { 
-        message: 'Bukti transfer berhasil diunggah. Menunggu verifikasi admin.', 
+        message: 'Transfer proof successfully uploaded. Waiting for admin verification.', 
         order: res.rows[0] 
       };
     } catch (err) {
       console.error("Update Proof Error:", err);
-      throw new InternalServerErrorException('Gagal mengunggah bukti transfer');
+      throw new InternalServerErrorException('Failed to upload transfer proof');
     } finally {
       client.release();
     }
@@ -1798,11 +1786,11 @@ export class AppService implements OnModuleInit {
       await client.query('BEGIN');
 
       const orderRes = await client.query('SELECT * FROM orders WHERE order_id = $1', [orderId]);
-      if (orderRes.rowCount === 0) throw new NotFoundException('Pesanan tidak ditemukan');
+      if (orderRes.rowCount === 0) throw new NotFoundException('Order not found');
       const order = orderRes.rows[0];
 
       if (order.payment_status === 'SUCCESS') {
-        throw new BadRequestException('Pesanan ini sudah lunas sebelumnya.');
+        throw new BadRequestException('This order has already been fully paid.');
       }
 
       // JIKA DITOLAK
@@ -1812,7 +1800,7 @@ export class AppService implements OnModuleInit {
           [orderId]
         );
         await client.query('COMMIT');
-        return { message: 'Bukti transfer ditolak. Status kembali menjadi PENDING.' };
+        return { message: 'Transfer proof rejected. Status reverted to PENDING.' };
       }
 
       // JIKA DITERIMA -> UBAH JADI SUCCESS
@@ -1842,7 +1830,6 @@ export class AppService implements OnModuleInit {
         }
         
         for (const item of cart) {
-          // Ambil harga tiket untuk dihitung ke struk email
           const sessionRes = await client.query('SELECT price FROM event_sessions WHERE id = $1 FOR UPDATE', [item.sessionId]);
           const singlePrice = sessionRes.rows.length > 0 ? Number(sessionRes.rows[0].price) : 0;
 
@@ -1851,11 +1838,9 @@ export class AppService implements OnModuleInit {
             const attendeeName = formAnswers[`${formKeyPrefix}-nama`] || 'Guest';
             const attendeeEmail = formAnswers[`${formKeyPrefix}-email`] || '';
             
-            // 🔥 TICKET CODE DIGENERATE BERUPA HURUF
             const ticketCode = this.generateTicketCode();
             totalTransactionPrice += singlePrice;
 
-            // 🔥 KOLOM ID DIHILANGKAN AGAR DATABASE MEMBUAT ANGKA OTOMATIS
             const ticketRes = await client.query(
               `INSERT INTO tickets (order_id, event_id, session_id, user_id, attendee_name, attendee_email, is_scanned, ticket_code, guest_email, price, is_attending)
                VALUES ($1, $2, $3, $4, $5, $6, false, $7, $8, $9, true) RETURNING ticket_code`,
@@ -1876,11 +1861,11 @@ export class AppService implements OnModuleInit {
       }
 
       await client.query('COMMIT');
-      return { message: 'Pembayaran diterima. Tiket berhasil diterbitkan & email terkirim!' };
+      return { message: 'Payment accepted. Tickets generated & email sent!' };
     } catch (err) {
       await client.query('ROLLBACK');
       console.error("Verify Payment Error:", err);
-      throw new InternalServerErrorException(err instanceof Error ? err.message : 'Gagal memverifikasi pembayaran');
+      throw new InternalServerErrorException(err instanceof Error ? err.message : 'Failed to verify payment');
     } finally {
       client.release();
     }
