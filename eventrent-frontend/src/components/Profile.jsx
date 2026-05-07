@@ -20,10 +20,8 @@ export default function Profile() {
 
   const [bankData, setBankData] = useState({ bank_name: '', bank_account: '', bank_account_name: '' });
 
-  // State untuk Notifikasi Info/Success/Error
   const [popup, setPopup] = useState({ isOpen: false, message: '', type: 'info', action: null });
   
-  // STATE BARU UNTUK MODAL KONFIRMASI DELETE AKUN
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
@@ -36,7 +34,6 @@ export default function Profile() {
     setPopup({ isOpen: false, message: '', type: 'info', action: null });
   };
 
-  // 🔥 FUNGSI HELPER UNTUK AMBIL TOKEN YANG BENAR
   const getAuthToken = () => {
     const authKey = Object.keys(localStorage).find(key => key.endsWith('-auth-token'));
     const sessionStr = authKey ? localStorage.getItem(authKey) : null;
@@ -108,7 +105,6 @@ export default function Profile() {
     e.preventDefault();
     setIsLoadingProfile(true);
     
-    // 🔥 PERBAIKAN: Gunakan fungsi getAuthToken()
     const token = getAuthToken();
 
     try {
@@ -226,11 +222,9 @@ export default function Profile() {
     }
   };
 
-  // 🔥 FUNGSI PEMUSNAH AKUN (MANGGIL BACKEND) 🔥
   const handleDeleteAccount = async () => {
     setIsDeletingAccount(true);
     try {
-      // 🔥 PERBAIKAN: Gunakan fungsi getAuthToken()
       const token = getAuthToken();
       
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/users/me`, {
@@ -247,11 +241,9 @@ export default function Profile() {
           console.log("Sesi sudah dihancurkan oleh backend.");
         }
 
-        // Bersihkan brankas lokal
         localStorage.removeItem('user');
         localStorage.removeItem('agentMode');
         
-        // Bersihkan token Supabase dinamis
         const authKeys = Object.keys(localStorage).filter(key => key.endsWith('-auth-token'));
         authKeys.forEach(key => localStorage.removeItem(key));
         
@@ -273,11 +265,28 @@ export default function Profile() {
   
   if (!user) return null;
   
-  // 🔥 PERBAIKAN LOGIKA: Cek ID Google asli, jangan cek 'gmail' di text email!
-  const isGoogleUser = !!user.googleId || !!user.google_id || (user.provider && user.provider === 'google');
+  // 🔥 PERBAIKAN LOGIKA: Sadap langsung info provider dari Supabase Session di LocalStorage
+  let isGoogleUser = false;
+  try {
+    const authKey = Object.keys(localStorage).find(key => key.endsWith('-auth-token'));
+    if (authKey) {
+      const sessionData = JSON.parse(localStorage.getItem(authKey));
+      // Jika jalur loginnya terekam asli sebagai 'google', langsung kunci true!
+      if (sessionData?.user?.app_metadata?.provider === 'google') {
+        isGoogleUser = true;
+      }
+    }
+  } catch (error) {
+    console.error("Gagal mengecek session Supabase", error);
+  }
+
+  // Fallback (Jaga-jaga kalau cara di atas gagal)
+  if (!isGoogleUser && user) {
+    isGoogleUser = !!user.googleId || !!user.google_id || user.provider === 'google' || (user.picture && user.picture.includes('googleusercontent'));
+  }
+
   const isAgentMode = user.role === 'agent';
 
-  // 🔥 UPDATE: Ubah warna focus menyesuaikan Agent Mode dengan biru #2596be
   const inputStyle = `w-full border rounded-xl px-5 py-4 text-sm font-bold focus:outline-none transition-all ${
     isAgentMode 
       ? 'bg-slate-900 border-slate-700 text-white placeholder-slate-500 focus:border-[#2596be] focus:ring-1 focus:ring-[#2596be]' 
@@ -375,7 +384,7 @@ export default function Profile() {
       <div className="max-w-5xl mx-auto px-4 md:px-8 relative z-10">
         
         <div className="flex items-center gap-4 mb-8">
-          <button onClick={() => navigate(-1)} className={`w-12 h-12 flex items-center justify-center rounded-full border shadow-sm transition-all active:scale-95 ${isAgentMode ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-[#2596be] hover:border-[#2596be]' : 'bg-white border-gray-200 text-gray-500 hover:text-[#FF6B35] hover:border-[#FF6B35]'}`}>
+          <button onClick={() => navigate(-1)} className={`w-12 h-12 flex items-center justify-center rounded-full border shadow-sm transition-all active:scale-95 ${isAgentMode ? 'bg-slate-800 border-slate-700 text-slate-400 hover:text-blue-500 hover:border-blue-500' : 'bg-white border-gray-200 text-gray-500 hover:text-[#FF6B35] hover:border-[#FF6B35]'}`}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
           </button>
           <h1 className={`text-3xl md:text-4xl font-black uppercase tracking-tight m-0 ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>My Account</h1>
@@ -430,7 +439,7 @@ export default function Profile() {
                   </div>
 
                   <div className={`pt-4 mt-6 border-t ${isAgentMode ? 'border-slate-700' : 'border-gray-100'}`}>
-                    <h3 className={`text-[10px] font-black mb-4 uppercase tracking-widest w-max px-3 py-1.5 rounded-lg border ${isAgentMode ? 'bg-[#2596be]/10 text-[#2596be] border-[#2596be]/20' : 'bg-orange-50 text-[#FF6B35] border-orange-100'}`}>🏦 ACCOUNT DATA (FOR AGENTS)</h3>
+                    <h3 className={`text-[10px] font-black mb-4 uppercase tracking-widest w-max px-3 py-1.5 rounded-lg border ${isAgentMode ? 'bg-[#2596be]/10 text-blue-500 border-[#2596be]/20' : 'bg-orange-50 text-[#FF6B35] border-orange-100'}`}>🏦 ACCOUNT DATA (FOR AGENTS)</h3>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
@@ -453,7 +462,7 @@ export default function Profile() {
                     <button 
                       type="submit" 
                       disabled={isLoadingProfile}
-                      className={`w-full sm:w-auto text-white px-10 py-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 shadow-xl ${isAgentMode ? 'bg-[#2596be] hover:bg-[#1f7ca0] shadow-[#2596be]/20' : 'bg-[#FF6B35] hover:bg-[#E85526] shadow-orange-100/50'}`}
+                      className={`w-full sm:w-auto text-white px-10 py-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 shadow-xl ${isAgentMode ? 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/20' : 'bg-[#FF6B35] hover:bg-[#E85526] shadow-orange-100/50'}`}
                     >
                       {isLoadingProfile ? 'SAVING...' : 'SAVE CHANGES'}
                     </button>
