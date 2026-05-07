@@ -831,7 +831,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 🔥 QUERY INI UDAH DIROMBAK BRO BIAR EVENT SENDIRI MASUK JUGA
   async getAssignedEvents(agentId: number) {
     try {
       const query = `
@@ -1460,7 +1459,7 @@ export class AppService implements OnModuleInit {
         const responseParams = JSON.parse(resData.resp_params);
         return { 
           checkout_url: responseParams.qr_code, 
-          out_trade_no: responseParams.out_trade_no
+          out_trade_no: responseParams.out_trade_no // PENTING UNTUK QUERY STATUS NANTI
         };
       } else {
         throw new BadRequestException(`Cahaya Pay Error: ${resData.resp_msg} (Code: ${resData.resp_code})`);
@@ -1478,30 +1477,29 @@ export class AppService implements OnModuleInit {
         // Cahaya mengirim dalam bentuk string, kita harus parse ke objek
         const params = typeof payload.req_params === 'string' ? JSON.parse(payload.req_params) : payload.req_params;
         
-        // Cek jika status sukses dari Cahaya[cite: 2]
+        // Cek jika status sukses dari Cahaya
         if (params.order_state === 'PAYSUCCESS') {
           const orderId = params.merchant_order_no;
 
           const orderRes = await this.pool.query('SELECT * FROM orders WHERE order_id = $1', [orderId]);
-          if (orderRes.rows.length === 0) return { return_code: "02", return_msg: "Order not found" }; //[cite: 2]
+          if (orderRes.rows.length === 0) return { return_code: "02", return_msg: "Order not found" };
 
           const order = orderRes.rows[0];
 
-          if (order.payment_status === 'SUCCESS') return { return_code: "01", return_msg: "success" }; //[cite: 2]
+          if (order.payment_status === 'SUCCESS') return { return_code: "01", return_msg: "success" };
 
           // Ubah status di database
           await this.pool.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [orderId]);
 
-          // 🔥 PERBAIKAN 1: Pastikan data parsing dari string ke JSON
           const details = typeof order.ticket_details === 'string' ? JSON.parse(order.ticket_details) : order.ticket_details;
 
-          // 🔥 PERBAIKAN 2: Masukkan buyerEmail secara eksplisit
+          // Masukkan buyerEmail secara eksplisit
           await this.buyTicket(
             order.user_id, 
             order.event_id, 
             details.cart, 
             details.formAnswers, 
-            details.buyerEmail, // <--- Ini kunci utamanya biar email kekirim!
+            details.buyerEmail, 
             orderId
           ).catch(err => console.error("Gagal auto-generate tiket via Webhook:", err));
           
@@ -1509,11 +1507,10 @@ export class AppService implements OnModuleInit {
           await this.pool.query(`UPDATE orders SET payment_status = 'FAILED' WHERE order_id = $1`, [params.merchant_order_no]);
         }
       }
-      // Kembalikan kode "01" (sukses) ke Cahaya agar mereka tahu notifikasi sudah kita terima[cite: 2]
       return { return_code: "01", return_msg: "success" };
     } catch (error) {
       console.error("Webhook Cahaya Error:", error);
-      return { return_code: "02", return_msg: "failed" }; //[cite: 2]
+      return { return_code: "02", return_msg: "failed" }; 
     }
   }
 
@@ -1532,19 +1529,28 @@ export class AppService implements OnModuleInit {
         return { status: 'SUCCESS', message: 'Pesanan sudah lunas sebelumnya.' };
       }
 
+      // Kita ambil out_trade_no yang disimpan pas checkout tadi
+      const details = typeof order.ticket_details === 'string' ? JSON.parse(order.ticket_details) : order.ticket_details;
+      const outTradeNo = details.cahaya_out_trade_no;
+
       // Tanya ke Server Cahaya
       const CAHAYA_URL = process.env.CAHAYA_URL || 'https://api-pay.cahayatech.com';
       const APP_ID = process.env.CAHAYA_APP_ID || '250906140916234819';
       const MERCHANT_NO = process.env.CAHAYA_MERCHANT_NO || '820250906000001';
       const TERMINAL_NO = process.env.CAHAYA_TERMINAL_NO || '10005965';
 
-      const reqParamsObj = {
+      const reqParamsObj: any = {
         pay_ver: "100",
         merchant_order_no: orderId,
         merchant_no: MERCHANT_NO,
         terminal_no: TERMINAL_NO,
         terminal_time: Math.floor(Date.now() / 1000).toString(),
       };
+
+      // 🔥 KUNCI UTAMA: Kirim out_trade_no ke server Cahaya biar mereka nggak bingung nyari
+      if (outTradeNo) {
+        reqParamsObj.out_trade_no = outTradeNo;
+      }
 
       const payload = {
         req_ver: "1.0",
@@ -1573,7 +1579,6 @@ export class AppService implements OnModuleInit {
         // JIKA CAHAYA BILANG LUNAS, EKSEKUSI TIKET & EMAIL!
         if (responseParams.order_state === 'PAYSUCCESS') {
           await client.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [orderId]);
-          const details = typeof order.ticket_details === 'string' ? JSON.parse(order.ticket_details) : order.ticket_details;
           
           await this.buyTicket(
             order.user_id, 
@@ -1619,6 +1624,7 @@ export class AppService implements OnModuleInit {
       }
 
       let checkoutUrl: string | null = null;
+      let outTradeNo: string | null = null; // 🔥 Tambahan untuk nyimpen ID dari Cahaya
       let paymentStatus = 'PENDING';
 
       if (totalPrice > 0) {
@@ -1635,6 +1641,7 @@ export class AppService implements OnModuleInit {
         } else {
           const pgData = await this.createCahayaTransaction(orderId, totalPrice, ip);
           checkoutUrl = pgData.checkout_url; 
+          outTradeNo = pgData.out_trade_no; // 🔥 Simpan ID nya di sini
         }
       }
 
@@ -1652,7 +1659,8 @@ export class AppService implements OnModuleInit {
             cart: data.cart, 
             formAnswers: data.formAnswers, 
             paymentMethod: data.paymentMethod,
-            buyerEmail: data.buyerEmail // 🔥 PENTING: Disimpan agar tidak lupa saat cetak tiket
+            buyerEmail: data.buyerEmail, 
+            cahaya_out_trade_no: outTradeNo // 🔥 Lempar ke database biar bisa dicek nanti
           })
         ]
       );
