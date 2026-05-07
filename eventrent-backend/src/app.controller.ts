@@ -487,4 +487,16 @@ export class AppController {
   async checkPaymentStatus(@Param('orderId') orderId: string) {
     return await this.appService.checkCahayaPaymentStatus(orderId);
   }
+
+  // ==========================================
+  // API UNTUK FLUTTER (AGENT PAYOUTS HISTORY)
+  // ==========================================
+  @ApiOperation({ summary: 'Get Agent Payout History' })
+  @UseGuards(SupabaseGuard) // Sesuaikan dengan nama Guard otentikasi kamu
+  @Get('payouts')
+  async getMyPayouts(@Req() req: any) {
+    // Mengambil ID Agen dari token yang login
+    const agentId = req.user.id;
+    return await this.appService.getAgentPayouts(agentId);
+  }
 }
