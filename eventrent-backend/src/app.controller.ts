@@ -481,4 +481,10 @@ export class AppController {
   async getAgentWalletPayouts(@Req() req) {
     return await this.appService.getAgentPayouts(req.user.id);
   }
+
+  @ApiOperation({ summary: 'Cek status pembayaran manual ke server Cahaya Pay' })
+  @Get('orders/:orderId/check-status')
+  async checkPaymentStatus(@Param('orderId') orderId: string) {
+    return await this.appService.checkCahayaPaymentStatus(orderId);
+  }
 }

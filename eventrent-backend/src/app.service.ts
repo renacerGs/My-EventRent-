@@ -1431,7 +1431,7 @@ export class AppService implements OnModuleInit {
         pay_type: "2", 
         total_fee: amount.toString(), 
         terminal_ip: ip || "127.0.0.1", 
-        notify_url: "https://my-event-rent.vercel.app/api/payment/webhook"
+        notify_url: `${process.env.BACKEND_URL || 'https://my-event-rent.vercel.app'}/api/payment/webhook`
       };
 
       const payload = {
@@ -1514,6 +1514,88 @@ export class AppService implements OnModuleInit {
     } catch (error) {
       console.error("Webhook Cahaya Error:", error);
       return { return_code: "02", return_msg: "failed" }; //[cite: 2]
+    }
+  }
+
+  // ==========================================
+  // FITUR JEMPUT BOLA: CEK STATUS MANUAL KE CAHAYA
+  // ==========================================
+  async checkCahayaPaymentStatus(orderId: string) {
+    const client = await this.pool.connect();
+    try {
+      const orderRes = await client.query('SELECT * FROM orders WHERE order_id = $1', [orderId]);
+      if (orderRes.rows.length === 0) throw new NotFoundException('Pesanan tidak ditemukan');
+      const order = orderRes.rows[0];
+
+      // Kalau udah lunas di database, langsung balik sukses
+      if (order.payment_status === 'SUCCESS') {
+        return { status: 'SUCCESS', message: 'Pesanan sudah lunas sebelumnya.' };
+      }
+
+      // Tanya ke Server Cahaya
+      const CAHAYA_URL = process.env.CAHAYA_URL || 'https://api-pay.cahayatech.com';
+      const APP_ID = process.env.CAHAYA_APP_ID || '250906140916234819';
+      const MERCHANT_NO = process.env.CAHAYA_MERCHANT_NO || '820250906000001';
+      const TERMINAL_NO = process.env.CAHAYA_TERMINAL_NO || '10005965';
+
+      const reqParamsObj = {
+        pay_ver: "100",
+        merchant_order_no: orderId,
+        merchant_no: MERCHANT_NO,
+        terminal_no: TERMINAL_NO,
+        terminal_time: Math.floor(Date.now() / 1000).toString(),
+      };
+
+      const payload = {
+        req_ver: "1.0",
+        req_mode: "0",
+        app_id: APP_ID,
+        sign_type: "RSA2",
+        req_time: Date.now().toString(),
+        req_id: crypto.randomBytes(16).toString('hex'),
+        req_params: JSON.stringify(reqParamsObj)
+      };
+
+      const signature = this.generateCahayaSignature(payload);
+      const finalPayload = { ...payload, key_sign: signature };
+
+      const response = await fetch(`${CAHAYA_URL}/open/payment/query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(finalPayload)
+      });
+
+      const resData = await response.json();
+      
+      if (resData.resp_code === '10000') {
+        const responseParams = JSON.parse(resData.resp_params);
+        
+        // JIKA CAHAYA BILANG LUNAS, EKSEKUSI TIKET & EMAIL!
+        if (responseParams.order_state === 'PAYSUCCESS') {
+          await client.query(`UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`, [orderId]);
+          const details = typeof order.ticket_details === 'string' ? JSON.parse(order.ticket_details) : order.ticket_details;
+          
+          await this.buyTicket(
+            order.user_id, 
+            order.event_id, 
+            details.cart, 
+            details.formAnswers, 
+            details.buyerEmail, 
+            orderId
+          ).catch(err => console.error("Gagal auto-generate tiket via Query Check:", err));
+
+          return { status: 'SUCCESS', message: 'Pembayaran terkonfirmasi! Tiket sedang dikirim ke email.' };
+        } else {
+          return { status: 'PENDING', message: 'Pembayaran belum terdeteksi. Silakan coba lagi nanti.' };
+        }
+      } else {
+        return { status: 'PENDING', message: `Cahaya Pay: ${resData.resp_msg}` };
+      }
+    } catch (err) {
+      console.error("Check Status Error:", err);
+      throw new InternalServerErrorException('Gagal mengecek status pembayaran ke Cahaya');
+    } finally {
+      client.release();
     }
   }
 

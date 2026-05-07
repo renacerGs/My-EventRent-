@@ -16,10 +16,10 @@ export default function MyOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // State untuk mengontrol Modal QR Code Cahaya Pay
-  const [activeQrUrl, setActiveQrUrl] = useState(null);
+  // 🔥 PERBAIKAN: State untuk mengontrol Modal QR Code (simpan URL dan Order ID)
+  const [activeQr, setActiveQr] = useState({ url: null, orderId: null });
 
-  // 🔥 STATE BARU UNTUK MODAL UPLOAD BUKTI TRANSFER
+  // STATE UNTUK MODAL UPLOAD BUKTI TRANSFER
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [file, setFile] = useState(null);
@@ -75,13 +75,36 @@ export default function MyOrders() {
 
   const handlePayNow = (order) => {
     if (order.snap_token === 'MANUAL_TRANSFER') {
-      // Arahkan ke halaman UploadProof yang baru!
       navigate(`/upload-proof/${order.order_id}`);
     } else if (order.snap_token) {
-      // Buka modal QR jika ini pakai Cahaya Pay
-      setActiveQrUrl(order.snap_token);
+      // Buka modal QR dan simpan orderId nya juga
+      setActiveQr({ url: order.snap_token, orderId: order.order_id });
     } else {
       toast.error('Metode pembayaran tidak valid.');
+    }
+  };
+
+  const closeQrModal = () => {
+    setActiveQr({ url: null, orderId: null });
+    fetchOrders(true); // Refresh data di background saat modal ditutup
+  };
+
+  // 🔥 FUNGSI BARU UNTUK CEK STATUS KE SERVER CAHAYA PAY
+  const handleRefreshStatus = async () => {
+    if (!activeQr.orderId) return;
+    const toastId = toast.loading('Mengecek status ke server pusat...');
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/${activeQr.orderId}/check-status`);
+      const data = await res.json();
+      
+      if (res.ok && data.status === 'SUCCESS') {
+        toast.success(data.message, { id: toastId });
+        closeQrModal(); // Tutup modal otomatis setelah lunas
+      } else {
+        toast.error(data.message || 'Pembayaran belum masuk bro, coba sebentar lagi.', { id: toastId });
+      }
+    } catch (err) {
+      toast.error('Gagal mengecek status jaringan.', { id: toastId });
     }
   };
 
@@ -160,11 +183,6 @@ export default function MyOrders() {
     setSelectedOrder(null);
     setFile(null);
     setPreviewUrl(null);
-  };
-
-  const closeQrModal = () => {
-    setActiveQrUrl(null);
-    fetchOrders(true); // Refresh data di background untuk cek webhook Cahaya
   };
 
   if (loading) return (
@@ -264,7 +282,7 @@ export default function MyOrders() {
       {/* MODAL QR CODE PEMBAYARAN (CAHAYA PAY)                   */}
       {/* ======================================================= */}
       <AnimatePresence>
-        {activeQrUrl && (
+        {activeQr.url && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
@@ -276,21 +294,23 @@ export default function MyOrders() {
               <p className="text-xs font-bold text-gray-500 mb-6 uppercase tracking-widest">Buka e-Wallet / M-Banking Anda</p>
               
               <div className="flex justify-center p-6 bg-gray-50 rounded-2xl mb-6 border border-gray-100 shadow-inner">
-                 <QRCodeSVG value={activeQrUrl} size={220} level="H" />
+                 <QRCodeSVG value={activeQr.url} size={220} level="H" />
               </div>
 
               <div className="space-y-3">
+                {/* 🔥 TOMBOL CEK STATUS JEMPUT BOLA */}
                 <button
-                  onClick={closeQrModal}
-                  className="w-full py-4 bg-[#FF6B35] text-white rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-[#e85b2a] transition-all active:scale-95 shadow-lg"
+                  onClick={handleRefreshStatus}
+                  className="w-full py-4 bg-[#FF6B35] text-white rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-[#e85b2a] transition-all active:scale-95 shadow-lg flex items-center justify-center gap-2"
                 >
-                  Saya Sudah Bayar / Refresh
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                  Saya Sudah Bayar
                 </button>
                 <button
-                  onClick={() => setActiveQrUrl(null)}
+                  onClick={closeQrModal}
                   className="w-full py-3 text-gray-500 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-gray-100 transition-colors"
                 >
-                  Tutup
+                  Tutup & Bayar Nanti
                 </button>
               </div>
             </motion.div>
