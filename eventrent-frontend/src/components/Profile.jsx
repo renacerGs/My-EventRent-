@@ -501,7 +501,7 @@ export default function Profile() {
                     <input type="password" value={passData.confirmPass} onChange={e => setPassData({...passData, confirmPass: e.target.value})} className={inputStyle} placeholder="••••••••" required />
                   </div>
                   <div className="pt-2">
-                     <button type="submit" disabled={isLoadingPass} className={`w-full text-white py-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 ${isAgentMode ? 'bg-[#2596be] hover:bg-[#1f7ca0]' : 'bg-gray-900 hover:bg-black'}`}>
+                     <button type="submit" disabled={isLoadingPass} className={`w-full text-white py-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 ${isAgentMode ? 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/20' : 'bg-gray-900 hover:bg-black'}`}>
                       {isLoadingPass ? 'PROCESSING...' : 'CHANGE PASSWORD'}
                     </button>
                   </div>

@@ -98,12 +98,17 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
   const [notifications, setNotifications] = useState([]);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   
+  // 🔥 TAMBAHAN: State lokal untuk user agar lebih cepat nge-render
+  const [localUser, setLocalUser] = useState(() => {
+    return user || JSON.parse(localStorage.getItem('user')) || null;
+  });
+
   const notifRef = useRef(null);
   const profileRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
 
-  const isAgentMode = user?.role === 'agent';
+  const isAgentMode = localUser?.role === 'agent';
 
   // 🔥 RADAR PEMISAH KASTA NOTIFIKASI MUTLAK 🔥
   const checkIsAgentNotif = (notif) => {
@@ -127,6 +132,13 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     return false;
   };
 
+  // 🔥 UPDATE: Sinkronisasi data user antara props dan lokal
+  useEffect(() => {
+    if (user) {
+      setLocalUser(user);
+    }
+  }, [user]);
+
   useEffect(() => {
     let isMounted = true;
     let isLoggingOut = false;
@@ -145,6 +157,11 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
         if (res.ok && isMounted) {
           const richUser = await res.json();
           richUser.role = localStorage.getItem('agentMode') === 'true' ? 'agent' : (richUser.role || 'user');
+          
+          // 🔥 UPDATE: Simpan dan set langsung
+          localStorage.setItem('user', JSON.stringify(richUser));
+          setLocalUser(richUser);
+          
           if (onLoginSuccess) onLoginSuccess(richUser, false);
         } else if (res.status === 401) {
           isLoggingOut = true;
@@ -168,6 +185,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
       } else if (event === 'SIGNED_OUT') {
         isLoggingOut = true;
         localStorage.removeItem('supabase_token');
+        setLocalUser(null);
         if(onLogout) onLogout();
       }
     });
@@ -188,19 +206,19 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
   }, []);
 
   useEffect(() => {
-    if (!user?.id) return; 
+    if (!localUser?.id) return; 
 
     fetchNotifications();
 
     const notifChannel = supabase
-      .channel(`navbar-notif-${user.id}`)
+      .channel(`navbar-notif-${localUser.id}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT', 
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${user.id}` 
+          filter: `user_id=eq.${localUser.id}` 
         },
         (payload) => {
           const newNotif = payload.new;
@@ -220,7 +238,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${localUser.id}` },
         (payload) => {
           const updatedNotif = payload.new;
           if (isAgentMode === checkIsAgentNotif(updatedNotif)) {
@@ -241,7 +259,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
       supabase.removeChannel(notifChannel);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, isAgentMode]); 
+  }, [localUser?.id, isAgentMode]); 
 
   const fetchNotifications = async () => {
     try {
@@ -326,9 +344,10 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
 
   const toggleRole = () => {
     const newRole = isAgentMode ? 'user' : 'agent';
-    const updatedUser = { ...user, role: newRole };
+    const updatedUser = { ...localUser, role: newRole };
     
     localStorage.setItem('agentMode', !isAgentMode);
+    setLocalUser(updatedUser);
     if(onLoginSuccess) onLoginSuccess(updatedUser, true); 
 
     setIsDropdownOpen(false);
@@ -513,7 +532,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
             </>
           )}
 
-          {user ? (
+          {localUser ? (
             <>
               {!isAgentMode && (
                 <Link to="/likes" className="flex items-center justify-center w-9 h-9 md:w-[42px] md:h-[42px] border border-gray-100 text-gray-400 bg-white rounded-full hover:bg-orange-50 hover:text-[#FF6B35] hover:border-orange-100 transition shadow-sm shrink-0">
@@ -597,11 +616,15 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
               <div className="relative shrink-0" ref={profileRef}>
                 <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className={`flex items-center gap-3 p-0 md:p-1 md:pr-3 rounded-full border hover:bg-gray-50 transition-all shadow-none md:shadow-sm focus:outline-none shrink-0 ${isAgentMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-700' : 'bg-transparent md:bg-white border-transparent md:border-gray-100'}`}>
                   <div className={`w-9 h-9 rounded-full overflow-hidden border shadow-inner shrink-0 ${isAgentMode ? 'border-slate-600' : 'border-gray-100'}`}>
-                    <img src={user.picture || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} alt="Profile" className="w-full h-full object-cover" />
+                    <img 
+                       src={localUser?.picture || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} 
+                       alt="Profile" 
+                       className="w-full h-full object-cover transition-opacity duration-300 opacity-100" 
+                    />
                   </div>
                   <div className="text-left hidden md:block">
-                    <p className={`text-[11px] font-bold leading-none uppercase tracking-tight max-w-[100px] truncate ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>{user.name}</p>
-                    <p className={`text-[9px] font-medium mt-0.5 lowercase max-w-[100px] truncate ${isAgentMode ? 'text-slate-400' : 'text-gray-400'}`}>{user.email}</p>
+                    <p className={`text-[11px] font-bold leading-none uppercase tracking-tight max-w-[100px] truncate ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>{localUser?.name}</p>
+                    <p className={`text-[9px] font-medium mt-0.5 lowercase max-w-[100px] truncate ${isAgentMode ? 'text-slate-400' : 'text-gray-400'}`}>{localUser?.email}</p>
                   </div>
                   <svg className={`w-3.5 h-3.5 hidden md:block transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''} ${isAgentMode ? 'text-slate-400' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
                 </button>
