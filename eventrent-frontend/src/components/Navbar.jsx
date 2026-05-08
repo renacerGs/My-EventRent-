@@ -98,9 +98,14 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
   const [notifications, setNotifications] = useState([]);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   
-  // 🔥 TAMBAHAN: State lokal untuk user agar lebih cepat nge-render
   const [localUser, setLocalUser] = useState(() => {
     return user || JSON.parse(localStorage.getItem('user')) || null;
+  });
+
+  // 🔥 STATE BARU: Buat ngatur animasi Skeleton Loading pas pertama login 🔥
+  const [isAuthLoading, setIsAuthLoading] = useState(() => {
+    const cachedUser = localStorage.getItem('user');
+    return !cachedUser; 
   });
 
   const notifRef = useRef(null);
@@ -110,7 +115,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
 
   const isAgentMode = localUser?.role === 'agent';
 
-  // 🔥 RADAR PEMISAH KASTA NOTIFIKASI MUTLAK 🔥
   const checkIsAgentNotif = (notif) => {
     if (!notif) return false;
     const type = notif.type || '';
@@ -132,7 +136,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     return false;
   };
 
-  // 🔥 UPDATE: Sinkronisasi data user antara props dan lokal
   useEffect(() => {
     if (user) {
       setLocalUser(user);
@@ -144,9 +147,13 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     let isLoggingOut = false;
 
     const syncUserProfile = async (session) => {
-      if (isLoggingOut || !session?.access_token) return;
+      if (isLoggingOut || !session?.access_token) {
+        if (isMounted) setIsAuthLoading(false);
+        return;
+      }
 
       try {
+        if (isMounted) setIsAuthLoading(true);
         const token = session.access_token;
         localStorage.setItem('supabase_token', token);
 
@@ -158,9 +165,9 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
           const richUser = await res.json();
           richUser.role = localStorage.getItem('agentMode') === 'true' ? 'agent' : (richUser.role || 'user');
           
-          // 🔥 UPDATE: Simpan dan set langsung
           localStorage.setItem('user', JSON.stringify(richUser));
           setLocalUser(richUser);
+          setIsAuthLoading(false); // Matiin efek loading
           
           if (onLoginSuccess) onLoginSuccess(richUser, false);
         } else if (res.status === 401) {
@@ -168,14 +175,17 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
           localStorage.removeItem('supabase_token');
           await supabase.auth.signOut();
           if (onLogout) onLogout();
+          if (isMounted) setIsAuthLoading(false);
         }
       } catch (err) {
         console.error("Gagal sync user:", err);
+        if (isMounted) setIsAuthLoading(false);
       }
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) syncUserProfile(session);
+      else if (isMounted) setIsAuthLoading(false);
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
@@ -187,6 +197,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
         localStorage.removeItem('supabase_token');
         setLocalUser(null);
         if(onLogout) onLogout();
+        if (isMounted) setIsAuthLoading(false);
       }
     });
 
@@ -194,6 +205,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
       isMounted = false;
       authListener.subscription.unsubscribe();
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -614,17 +626,32 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
               </div>
 
               <div className="relative shrink-0" ref={profileRef}>
-                <button onClick={() => setIsDropdownOpen(!isDropdownOpen)} className={`flex items-center gap-3 p-0 md:p-1 md:pr-3 rounded-full border hover:bg-gray-50 transition-all shadow-none md:shadow-sm focus:outline-none shrink-0 ${isAgentMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-700' : 'bg-transparent md:bg-white border-transparent md:border-gray-100'}`}>
-                  <div className={`w-9 h-9 rounded-full overflow-hidden border shadow-inner shrink-0 ${isAgentMode ? 'border-slate-600' : 'border-gray-100'}`}>
-                    <img 
-                       src={localUser?.picture || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} 
-                       alt="Profile" 
-                       className="w-full h-full object-cover transition-opacity duration-300 opacity-100" 
-                    />
+                <button onClick={() => !isAuthLoading && setIsDropdownOpen(!isDropdownOpen)} className={`flex items-center gap-3 p-0 md:p-1 md:pr-3 rounded-full border hover:bg-gray-50 transition-all shadow-none md:shadow-sm focus:outline-none shrink-0 ${isAgentMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-700' : 'bg-transparent md:bg-white border-transparent md:border-gray-100'}`}>
+                  
+                  {/* 🔥 SKELETON LOADING BUAT FOTO PROFIL 🔥 */}
+                  <div className={`w-9 h-9 rounded-full overflow-hidden border shadow-inner shrink-0 ${isAgentMode ? 'border-slate-600' : 'border-gray-100'} ${isAuthLoading ? (isAgentMode ? 'bg-slate-700 animate-pulse' : 'bg-gray-200 animate-pulse') : ''}`}>
+                    {!isAuthLoading && (
+                      <img 
+                        src={localUser?.picture || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} 
+                        alt="Profile" 
+                        className="w-full h-full object-cover transition-opacity duration-300 opacity-100" 
+                      />
+                    )}
                   </div>
+                  
                   <div className="text-left hidden md:block">
-                    <p className={`text-[11px] font-bold leading-none uppercase tracking-tight max-w-[100px] truncate ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>{localUser?.name}</p>
-                    <p className={`text-[9px] font-medium mt-0.5 lowercase max-w-[100px] truncate ${isAgentMode ? 'text-slate-400' : 'text-gray-400'}`}>{localUser?.email}</p>
+                    {/* 🔥 SKELETON LOADING BUAT NAMA & EMAIL 🔥 */}
+                    {isAuthLoading ? (
+                      <div className="flex flex-col gap-1.5 justify-center h-full">
+                        <div className={`w-16 h-2 rounded ${isAgentMode ? 'bg-slate-700 animate-pulse' : 'bg-gray-200 animate-pulse'}`}></div>
+                        <div className={`w-20 h-1.5 rounded ${isAgentMode ? 'bg-slate-700 animate-pulse' : 'bg-gray-200 animate-pulse'}`}></div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className={`text-[11px] font-bold leading-none uppercase tracking-tight max-w-[100px] truncate ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>{localUser?.name}</p>
+                        <p className={`text-[9px] font-medium mt-0.5 lowercase max-w-[100px] truncate ${isAgentMode ? 'text-slate-400' : 'text-gray-400'}`}>{localUser?.email}</p>
+                      </>
+                    )}
                   </div>
                   <svg className={`w-3.5 h-3.5 hidden md:block transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''} ${isAgentMode ? 'text-slate-400' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
                 </button>

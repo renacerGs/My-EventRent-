@@ -4,6 +4,55 @@ import toast from 'react-hot-toast';
 import { supabase } from '../supabase';
 import { motion } from 'framer-motion';
 
+// 🔥 KOMPONEN SKELETON DASHBOARD 🔥
+const DashboardSkeleton = () => (
+  <div className="bg-[#F8F9FA] min-h-screen font-sans pb-20 pt-4 md:pt-8 text-left relative px-4 md:px-8 max-w-7xl mx-auto">
+    
+    {/* Header Skeleton */}
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-4 mb-6 md:mb-8 mt-2 md:mt-0 animate-pulse">
+      <div className="flex items-start md:items-center gap-3 w-full md:w-auto">
+        <div className="w-8 h-8 md:w-8 md:h-8 rounded-full bg-gray-200 shrink-0"></div>
+        <div className="flex-1 w-full">
+          <div className="w-32 h-6 md:h-8 bg-gray-200 rounded-lg mb-2"></div>
+          <div className="w-48 h-4 bg-gray-200 rounded-lg"></div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto">
+        <div className="w-24 h-10 md:h-12 bg-gray-200 rounded-xl"></div>
+        <div className="w-32 h-10 md:h-12 bg-gray-200 rounded-xl"></div>
+      </div>
+    </div>
+
+    {/* Statistik Kotak Skeleton */}
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 mb-8 md:mb-10 animate-pulse">
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className={`bg-white p-5 md:p-8 rounded-[20px] md:rounded-[32px] border border-gray-100 shadow-sm flex flex-col justify-center h-32 ${i === 2 ? 'col-span-2 md:col-span-1' : ''}`}>
+          <div className="w-20 h-3 bg-gray-200 rounded-full mb-3"></div>
+          <div className="w-16 h-8 md:h-10 bg-gray-200 rounded-lg mb-3"></div>
+          <div className="w-24 h-4 bg-gray-200 rounded-full"></div>
+        </div>
+      ))}
+    </div>
+
+    {/* Tab Navbar Skeleton */}
+    <div className="bg-white p-2 rounded-2xl md:rounded-full shadow-sm border border-gray-100 mb-8 flex gap-2 animate-pulse w-full sm:w-max h-14">
+       {[...Array(4)].map((_, i) => (
+         <div key={i} className="w-24 h-full bg-gray-200 rounded-xl md:rounded-full"></div>
+       ))}
+    </div>
+
+    {/* Konten Bawah Skeleton (Tabel/List) */}
+    <div className="bg-white rounded-[24px] md:rounded-[32px] shadow-sm border border-gray-200 p-6 md:p-8 h-[400px] animate-pulse flex flex-col">
+       <div className="w-48 h-6 bg-gray-200 rounded-lg mb-8"></div>
+       <div className="space-y-4 flex-1">
+         {[...Array(4)].map((_, i) => (
+           <div key={i} className="w-full h-12 bg-gray-100 rounded-xl"></div>
+         ))}
+       </div>
+    </div>
+  </div>
+);
+
 export default function EventDashboard() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -120,7 +169,6 @@ export default function EventDashboard() {
       setEvent(prev => JSON.stringify(prev) === JSON.stringify(eventData) ? prev : eventData);
       setGroupedAttendees(prev => JSON.stringify(prev) === JSON.stringify(finalAttendees) ? prev : finalAttendees);
       
-      // 🔥 FETCH ORDER MANUAL YANG BUTUH VERIFIKASI
       const { data: verifyData, error: verifyError } = await supabase
         .from('orders')
         .select('*')
@@ -201,7 +249,6 @@ export default function EventDashboard() {
     }
   };
 
-  // 🔥 FUNGSI APPROVE / REJECT BUKTI TRANSFER MANUAL
   const handleVerifyPayment = async (orderId, isApproved) => {
     const toastId = toast.loading('Memproses verifikasi...');
     try {
@@ -600,10 +647,8 @@ export default function EventDashboard() {
     } catch (err) { setPopup({ show: true, message: "Network error.", type: 'error' }); }
   };
 
-  const isWed = event?.is_private || event?.category === 'Wedding' || event?.category === 'Personal';
-  const isEventEnded = event ? new Date(event.date_end) < new Date() : false;
-
   const handleExportCSV = () => {
+    const isWed = event?.is_private || event?.category === 'Wedding' || event?.category === 'Personal';
     let csvHeader = isWed 
       ? "Order ID;Ticket ID;Attendance Status;Scan Status;Session;Guest Name;Guest Email;Total Pax;Greeting;Scanned By;Custom Answers\n"
       : "Order ID;Ticket ID;Attendance Status;Session;Buyer Name;Buyer Email;Attendee Name;Attendee Email;Scanned By;Custom Answers\n";
@@ -639,6 +684,13 @@ export default function EventDashboard() {
     setPopup({ show: true, message: "Event Link copied successfully!", type: 'success' }); 
   };
 
+  // 🔥 TAMPILIN SKELETON KALAU BELUM ADA DATA EVENT 🔥
+  if (loading && !event) return <DashboardSkeleton />;
+
+  // AMANIN VARIABEL SETELAH EVENT ADA
+  const isWed = event?.is_private || event?.category === 'Wedding' || event?.category === 'Personal';
+  const isEventEnded = event ? new Date(event.date_end) < new Date() : false;
+
   const filteredOrders = groupedAttendees.map(order => {
     const filteredTickets = order.tickets.filter(t => {
       if (selectedStatusFilter === 'Attended') return t.is_scanned;
@@ -668,13 +720,6 @@ export default function EventDashboard() {
   const currentItems = filteredOrders.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage) || 1;
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
-
-  if (loading && !event) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-400 font-bold">
-      <div className="w-12 h-12 border-4 border-gray-200 border-t-[#FF6B35] rounded-full animate-spin mb-4"></div>
-      <p className="uppercase tracking-widest text-xs">Loading Dashboard Data...</p>
-    </div>
-  );
 
   let totalSold = 0; let totalCheckedIn = 0; let totalRevenue = 0; let totalPaxExpected = 0; 
   groupedAttendees.forEach(o => {
@@ -1282,7 +1327,6 @@ export default function EventDashboard() {
             { id: 'payouts', label: 'Payouts', badge: payouts.filter(p => p.status === 'PENDING').length, badgeColor: 'bg-emerald-500', pulse: true, icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>, colorClass: 'bg-emerald-500 shadow-emerald-200' },
             { id: 'reports', label: 'Issues', badge: pendingReportsCount, badgeColor: 'bg-rose-500', icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>, colorClass: 'bg-rose-500 shadow-rose-200' },
           ].map((tab) => (
-            // 🔥 PERBAIKAN: Bungkus di dalam div relative baru yang lebarnya ngepas (w-max)
             <div key={tab.id} className="relative w-max">
               <button
                 onClick={() => setActiveTab(tab.id)}
@@ -1304,7 +1348,6 @@ export default function EventDashboard() {
                 {tab.label}
               </button>
 
-              {/* 🔥 PERBAIKAN: Posisi badge disesuaikan di luar button tapi di dalam div relative-nya */}
               {tab.badge > 0 && (
                 <span className={`absolute top-0 right-0 translate-x-1/4 -translate-y-1/4 z-20 ${tab.badgeColor} text-white w-5 h-5 flex items-center justify-center rounded-full text-[9px] shadow-sm ${tab.pulse ? 'animate-pulse border-2 border-white' : 'animate-bounce border-2 border-white'}`}>
                   {tab.badge}

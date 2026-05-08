@@ -2,6 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CustomDatePicker from "../components/shared/CustomDatePicker";
 
+// 🔥 KOMPONEN SKELETON CARD RIWAYAT (DARK MODE) 🔥
+const HistoryCardSkeleton = () => (
+  <div className="bg-slate-800/50 border border-slate-700/50 rounded-[24px] p-6 animate-pulse flex flex-col justify-between min-h-[160px] shadow-lg">
+    <div>
+      <div className="w-3/4 h-7 bg-slate-700 rounded-lg mb-4"></div>
+      <div className="flex gap-2 mb-4">
+        <div className="w-16 h-5 bg-slate-700 rounded-md"></div>
+        <div className="w-20 h-5 bg-slate-700 rounded-md"></div>
+      </div>
+    </div>
+    <div className="flex items-center justify-between border-t border-slate-700/50 pt-4 mt-auto">
+      <div>
+        <div className="w-24 h-3 bg-slate-700 rounded mb-2"></div>
+        <div className="w-16 h-6 bg-slate-700 rounded-lg"></div>
+      </div>
+      <div className="w-8 h-8 rounded-full bg-slate-700"></div>
+    </div>
+  </div>
+);
+
 export default function RiwayatScan() { 
   const navigate = useNavigate();
   const [user] = useState(() => JSON.parse(localStorage.getItem('user')) || null);
@@ -155,11 +175,13 @@ export default function RiwayatScan() {
           </div>
         </div>
 
-        {/* TAMPILAN LOADING */}
+        {/* 🔥 TAMPILAN SKELETON SAAT LOADING 🔥 */}
         {loading ? (
-          <div className="py-20 text-center flex flex-col items-center">
-            <div className="w-8 h-8 border-4 border-slate-700 border-t-blue-500 rounded-full animate-spin mb-4"></div>
-            <p className="text-slate-500 font-bold text-xs uppercase tracking-widest">Fetching Data Logs...</p>
+          <div className="relative z-10">
+            <div className="w-32 h-4 bg-slate-700 rounded mb-4 animate-pulse"></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[...Array(6)].map((_, idx) => <HistoryCardSkeleton key={idx} />)}
+            </div>
           </div>
         ) : eventListSummary.length === 0 ? (
           <div className="bg-slate-800/30 border border-slate-700/50 rounded-[32px] py-20 text-center relative z-10">

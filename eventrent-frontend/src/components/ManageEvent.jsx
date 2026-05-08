@@ -33,15 +33,41 @@ const isEventPassed = (dateStr) => {
   }
 };
 
+// 🔥 KOMPONEN SKELETON MANAGE EVENT 🔥
+const ManageEventSkeletonRow = () => (
+  <div className="flex flex-col md:grid md:grid-cols-12 gap-2 md:gap-4 p-5 md:px-8 md:py-5 md:items-center animate-pulse border-b border-gray-50">
+    <div className="md:col-span-5 flex items-center gap-3 md:gap-5 w-full mb-2 md:mb-0">
+      <div className="w-16 h-12 md:w-20 md:h-14 rounded-lg bg-gray-200 flex-shrink-0"></div>
+      <div className="text-left flex-1 min-w-0">
+        <div className="w-3/4 h-5 bg-gray-200 rounded mb-2"></div>
+        <div className="w-1/2 h-3 bg-gray-200 rounded mb-3"></div>
+        <div className="w-20 h-4 bg-gray-200 rounded-full"></div>
+      </div>
+    </div>
+    <div className="hidden md:block md:col-span-2 text-center">
+      <div className="w-16 h-6 bg-gray-200 rounded-full mx-auto"></div>
+    </div>
+    <div className="hidden md:block md:col-span-2 text-center">
+      <div className="w-16 h-6 bg-gray-200 rounded-full mx-auto"></div>
+    </div>
+    <div className="hidden md:block md:col-span-2 text-center">
+      <div className="w-20 h-5 bg-gray-200 rounded mx-auto"></div>
+    </div>
+    <div className="hidden md:block md:col-span-1 text-right">
+      <div className="w-8 h-8 bg-gray-200 rounded-full ml-auto"></div>
+    </div>
+  </div>
+);
+
 export default function ManageEvent() {
   const [myEvents, setMyEvents] = useState([]);
+  const [loading, setLoading] = useState(true); // 🔥 STATE LOADING DITAMBAHIN 🔥
   const [activeMenuId, setActiveMenuId] = useState(null); 
   const [eventToDelete, setEventToDelete] = useState(null);
 
   const navigate = useNavigate();
   const menuRef = useRef(null);
   
-  // Tetap ngambil user dari localStorage buat validasi awal (biar gak error kalau belum login)
   const user = JSON.parse(localStorage.getItem('user'));
 
   useEffect(() => {
@@ -49,12 +75,11 @@ export default function ManageEvent() {
     fetchEvents();
   }, [user?.id]); 
 
-  // 1️⃣ 🔥 PERUBAHAN KE-1: TARIK DATA (GET) BAWA TOKEN
   const fetchEvents = () => {
     const token = localStorage.getItem('supabase_token');
     if (!token) return;
 
-    // Hapus ?userId= karena udah diurus Satpam backend
+    setLoading(true); // Mulai loading
     fetch(`${import.meta.env.VITE_API_URL}/api/events/my`, {
       headers: {
         'Authorization': `Bearer ${token}`
@@ -64,7 +89,8 @@ export default function ManageEvent() {
       .then(data => { 
         setMyEvents(Array.isArray(data) ? data : []); 
       })
-      .catch(err => console.error("Gagal ambil event:", err));
+      .catch(err => console.error("Gagal ambil event:", err))
+      .finally(() => setLoading(false)); // Beres loading
   };
 
   useEffect(() => {
@@ -139,13 +165,11 @@ export default function ManageEvent() {
     setActiveMenuId(null);
   };
 
-  // 2️⃣ 🔥 PERUBAHAN KE-2: HAPUS EVENT (DELETE) BAWA TOKEN
   const confirmDelete = async () => {
     if (!eventToDelete) return;
     const token = localStorage.getItem('supabase_token');
 
     try {
-      // Hapus ?userId=
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${eventToDelete}`, { 
         method: 'DELETE',
         headers: {
@@ -167,11 +191,9 @@ export default function ManageEvent() {
     }
   };
 
-  // 3️⃣ 🔥 PERUBAHAN KE-3: UBAH VISIBILITAS (PATCH) BAWA TOKEN
   const handleToggleVisibility = async (e, eventId, currentPrivateStatus) => {
     e.stopPropagation(); 
     
-    // Optimistic UI Update (Ubah di layar duluan biar kerasa cepet)
     setMyEvents(prev => prev.map(event => 
       event.id === eventId ? { ...event, is_private: !currentPrivateStatus } : event
     ));
@@ -179,7 +201,6 @@ export default function ManageEvent() {
     const token = localStorage.getItem('supabase_token');
 
     try {
-      // Hapus ?userId=
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${eventId}/visibility`, {
         method: 'PATCH',
         headers: {
@@ -188,12 +209,10 @@ export default function ManageEvent() {
       });
       if (!res.ok) throw new Error("Gagal update di server");
       
-      // Kasih toast biar informatif
       toast.success(!currentPrivateStatus ? "Event sekarang Private!" : "Event sekarang Publik!");
     } catch (err) {
       console.error(err);
       toast.error("Oops! Gagal merubah visibilitas. Coba lagi.");
-      // Rollback (Balikin lagi) UI-nya kalau server gagal
       setMyEvents(prev => prev.map(event => 
         event.id === eventId ? { ...event, is_private: currentPrivateStatus } : event
       ));
@@ -222,7 +241,10 @@ export default function ManageEvent() {
           </div>
 
           <div className="divide-y divide-gray-100">
-            {sortedEvents.length > 0 ? (
+            {/* 🔥 TAMPILIN SKELETON KALAU LAGI LOADING 🔥 */}
+            {loading ? (
+               [...Array(4)].map((_, i) => <ManageEventSkeletonRow key={i} />)
+            ) : sortedEvents.length > 0 ? (
               sortedEvents.map((event) => {
                 const isPast = isEventPassed(event.date_start);
                 const isMenuActive = activeMenuId === event.id;
@@ -317,7 +339,6 @@ export default function ManageEvent() {
                           <div className="py-1">
                             <button onClick={(e) => handleView(e, event)} className="w-full text-left px-4 py-3 md:py-2.5 text-xs md:text-sm font-bold text-gray-700 hover:bg-gray-50 hover:text-[#FF6B35] flex items-center gap-2">View Event Page</button>
                             
-                            {/* 👇 TOMBOL BARU UNTUK SHARE LINK 👇 */}
                             <button onClick={(e) => handleShare(e, event)} className="w-full text-left px-4 py-3 md:py-2.5 text-xs md:text-sm font-bold text-gray-700 hover:bg-gray-50 hover:text-[#FF6B35] flex items-center gap-2">
                               Share Link
                             </button>

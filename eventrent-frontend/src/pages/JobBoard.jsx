@@ -3,6 +3,33 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// 🔥 KOMPONEN SKELETON JOB CARD (DARK MODE) 🔥
+const JobCardSkeleton = () => (
+  <div className="bg-[#152036]/50 rounded-[24px] p-6 border border-[#1E2D4A] animate-pulse flex flex-col h-full relative overflow-hidden">
+    <div className="flex justify-between items-start mb-5 relative z-10">
+      <div className="w-24 h-8 bg-[#1E2D4A] rounded-lg"></div>
+      <div className="w-20 h-6 bg-[#1E2D4A] rounded-md"></div>
+    </div>
+    
+    <div className="w-3/4 h-7 bg-[#1E2D4A] rounded-lg mb-2 relative z-10"></div>
+    <div className="w-1/2 h-4 bg-[#1E2D4A] rounded-md mb-5 relative z-10"></div>
+
+    <div className="bg-[#0B1426]/80 rounded-xl p-4 mb-6 flex-grow border border-[#1E2D4A]/50 relative z-10">
+      <div className="w-full h-3 bg-[#1E2D4A] rounded mb-2.5"></div>
+      <div className="w-full h-3 bg-[#1E2D4A] rounded mb-2.5"></div>
+      <div className="w-2/3 h-3 bg-[#1E2D4A] rounded"></div>
+    </div>
+
+    <div className="mt-auto pt-2 flex items-center justify-between gap-4 relative z-10">
+      <div>
+        <div className="w-16 h-3 bg-[#1E2D4A] rounded mb-1.5"></div>
+        <div className="w-24 h-6 bg-[#1E2D4A] rounded-md"></div>
+      </div>
+      <div className="w-28 h-10 bg-[#1E2D4A] rounded-xl"></div>
+    </div>
+  </div>
+);
+
 export default function JobBoard() {
   const navigate = useNavigate();
   const [user] = useState(() => JSON.parse(localStorage.getItem('user')) || null);
@@ -120,13 +147,6 @@ export default function JobBoard() {
     );
   });
 
-  if (loading) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#0B1426]">
-      <div className="w-12 h-12 border-4 border-[#1E2D4A] border-t-blue-500 rounded-full animate-spin mb-4"></div>
-      <p className="uppercase tracking-widest text-xs font-bold text-slate-500">Looking for Opportunities...</p>
-    </div>
-  );
-
   return (
     <div className="bg-[#0B1426] min-h-screen font-sans pb-20 relative">
       
@@ -171,7 +191,7 @@ export default function JobBoard() {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 pt-6 md:pt-16 relative z-10">
         
-        {/* HEADER SECTION */}
+        {/* HEADER SECTION (TETAP MUNCUL SAAT LOADING) */}
         <div className="flex flex-col lg:flex-row items-center justify-between gap-6 mb-8 md:mb-10 bg-[#152036]/50 p-6 md:p-8 rounded-[24px] md:rounded-[32px] border border-[#1E2D4A]/50 backdrop-blur-sm shadow-xl">
           <div className="max-w-2xl text-center lg:text-left mx-auto lg:mx-0">
             <div className="inline-flex items-center justify-center lg:justify-start gap-2 bg-blue-500/20 text-blue-400 px-3 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest mb-4 border border-blue-500/30">
@@ -198,15 +218,20 @@ export default function JobBoard() {
           </div>
         </div>
 
-        {/* JOB CARDS GRID */}
+        {/* JOB CARDS GRID SECTION */}
         <div className="mb-6 flex items-center justify-between px-2">
           <div className="flex items-center gap-3">
              <span className="w-2 h-6 md:h-8 bg-blue-500 rounded-full inline-block"></span>
-             <h2 className="text-lg md:text-xl font-black text-white uppercase tracking-wide">Available Jobs <span className="text-slate-500 text-sm ml-1">({filteredJobs.length})</span></h2>
+             <h2 className="text-lg md:text-xl font-black text-white uppercase tracking-wide">Available Jobs <span className="text-slate-500 text-sm ml-1">({loading ? '...' : filteredJobs.length})</span></h2>
           </div>
         </div>
 
-        {filteredJobs.length > 0 ? (
+        {/* 🔥 TAMPILIN SKELETON PAS LAGI LOADING 🔥 */}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => <JobCardSkeleton key={i} />)}
+          </div>
+        ) : filteredJobs.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredJobs.map((job) => {
               const isApplied = appliedJobs.includes(job.id);

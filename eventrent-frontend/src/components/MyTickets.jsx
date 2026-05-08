@@ -49,6 +49,22 @@ const isEventPassed = (dateStr) => {
   }
 };
 
+// 🔥 KOMPONEN SKELETON TIKET 🔥
+const TicketSkeleton = () => (
+  <div className="bg-white hover:shadow-md mb-4 md:mb-6 rounded-[20px] border border-gray-100 p-3 shadow-sm md:rounded-[32px] md:shadow-sm md:border-gray-200 md:p-0 md:overflow-hidden animate-pulse flex flex-row gap-3 md:gap-0 h-[150px] md:h-[220px]">
+    {/* Kotak Gambar Kiri */}
+    <div className="w-24 h-full rounded-xl shrink-0 bg-gray-200 md:w-64 md:rounded-none"></div>
+
+    {/* Kotak Konten Kanan (Mobile & Desktop disamain kerangkanya) */}
+    <div className="flex flex-col flex-1 py-1 md:p-8 justify-center w-full">
+      <div className="w-20 h-4 bg-gray-200 rounded-full mb-3 md:mb-5"></div>
+      <div className="w-3/4 h-5 md:h-8 bg-gray-200 rounded-lg mb-3 md:mb-5"></div>
+      <div className="w-1/2 h-4 bg-gray-200 rounded-lg mb-2 md:mb-3"></div>
+      <div className="w-1/3 h-4 bg-gray-200 rounded-lg mt-auto md:mt-4"></div>
+    </div>
+  </div>
+);
+
 export default function MyTickets() {
   const navigate = useNavigate();
   const [groupedOrders, setGroupedOrders] = useState([]);
@@ -118,8 +134,6 @@ export default function MyTickets() {
     const interval = setInterval(fetchMyTickets, 10000);
     return () => clearInterval(interval);
   }, [user?.id]);
-
-  if (loading) return <div className="text-center py-20 font-bold text-gray-500 animate-pulse">Loading My Tickets...</div>;
 
   const activeEvents = groupedOrders.filter(order => !isEventPassed(order.event_date));
   const pastEvents = groupedOrders.filter(order => isEventPassed(order.event_date));
@@ -277,24 +291,26 @@ export default function MyTickets() {
                           const isScanned = trx.is_scanned; 
                           
                           return (
-                            <div key={trx.ticket_id} className={`bg-white border rounded-xl md:rounded-2xl p-3 md:p-4 flex flex-row items-center justify-between shadow-sm transition-colors gap-3 ${isScanned ? 'border-gray-200 opacity-60' : 'border-gray-200 hover:border-[#FF6B35]'}`}>
+                            <div key={trx.ticket_id} className={`bg-white border rounded-xl md:rounded-2xl p-3 md:p-4 flex flex-row items-center justify-between shadow-sm transition-colors gap-3 ${isScanned ? 'border-gray-200 opacity-80' : 'border-gray-200 hover:border-[#FF6B35]'}`}>
                               <div className="overflow-hidden">
-                                <span className="text-[9px] md:text-[10px] text-[#FF6B35] font-black uppercase tracking-widest block mb-0.5 md:mb-1">
+                                <span className={`text-[9px] md:text-[10px] font-black uppercase tracking-widest block mb-0.5 md:mb-1 ${isScanned ? 'text-green-500' : 'text-[#FF6B35]'}`}>
                                   {isScanned ? 'TICKET USED' : trx.ticket_id}
                                 </span>
                                 <p className={`font-bold text-xs md:text-sm truncate uppercase ${isScanned ? 'text-gray-500 line-through' : 'text-gray-900'}`}>
                                   {attendeeName}
                                 </p>
                               </div>
+                              
+                              {/* 🔥 FIX: TOMBOL DIBIKIN BISA DIKLIK WALAUPUN UDAH DI-SCAN 🔥 */}
                               <button 
                                 onClick={() => openQR(trx, tIndex)}
-                                disabled={isPast || isScanned}
+                                disabled={isPast && !isScanned} // Kalau udah kadaluarsa dan belum discan baru dimatiin. Kalo udah discan tetep bisa dilihat.
                                 className={`shrink-0 px-4 py-2 md:px-5 md:py-2.5 rounded-lg md:rounded-xl text-[10px] md:text-xs font-bold transition-all shadow-sm uppercase tracking-wider
-                                  ${isPast ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none' 
-                                  : isScanned ? 'bg-green-50 text-green-600 border border-green-200 cursor-not-allowed' 
+                                  ${isPast && !isScanned ? 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none' 
+                                  : isScanned ? 'bg-green-50 text-green-600 border border-green-200 hover:bg-green-100 active:scale-95' 
                                   : 'bg-[#FF6B35] text-white hover:bg-orange-600 active:scale-95 shadow-md shadow-orange-100'}`}
                               >
-                                {isPast ? 'Expired' : isScanned ? 'Used' : 'Open QR'}
+                                {isPast && !isScanned ? 'Expired' : isScanned ? 'View QR' : 'Open QR'}
                               </button>
                             </div>
                           );
@@ -320,21 +336,32 @@ export default function MyTickets() {
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="w-full max-w-sm">
               <div id="ticket-download-area" className="bg-white rounded-[24px] md:rounded-[32px] shadow-2xl overflow-hidden relative">
+                
+                {/* 🔥 STAMPEL ALREADY USED DI DALAM TIKET 🔥 */}
+                {selectedQR.is_scanned && (
+                  <div className="absolute top-4 right-4 z-20 bg-green-500 text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg border border-green-400 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+                    Already Used
+                  </div>
+                )}
+
                 <div className="relative h-20 md:h-24 bg-gray-900">
                   <img src={selectedQR.img} alt="header" className="w-full h-full object-cover opacity-30" crossOrigin="anonymous" />
                 </div>
                 <div className="p-6 md:p-8 flex flex-col items-center -mt-8 md:-mt-10 relative z-10 bg-white rounded-t-[24px] md:rounded-t-[32px]">
                   
-                  <div className="bg-white p-3 md:p-5 rounded-[20px] md:rounded-[24px] shadow-lg border border-gray-100 mb-2">
+                  <div className={`bg-white p-3 md:p-5 rounded-[20px] md:rounded-[24px] shadow-lg border border-gray-100 mb-2 relative ${selectedQR.is_scanned ? 'opacity-50 grayscale' : ''}`}>
                     <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&ecc=H&data=${encodeURIComponent(selectedQR.uniqueQRData)}`} alt="QR" className="w-40 h-40 md:w-48 md:h-48 mix-blend-multiply" crossOrigin="anonymous" />
                   </div>
                   
-                  <p className="text-[10px] md:text-xs font-black text-gray-400 uppercase tracking-widest mb-4 border-b-2 border-dashed border-gray-200 pb-4 px-8">
+                  <p className={`text-[10px] md:text-xs font-black uppercase tracking-widest mb-4 border-b-2 border-dashed border-gray-200 pb-4 px-8 ${selectedQR.is_scanned ? 'text-gray-300 line-through' : 'text-gray-400'}`}>
                     {selectedQR.ticket_id}
                   </p>
 
                   <div className="text-center w-full mt-2">
-                    <span className="bg-orange-50 text-[#FF6B35] border border-orange-100 text-[9px] md:text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest mb-3 inline-block">Admit One</span>
+                    <span className={`border text-[9px] md:text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest mb-3 inline-block ${selectedQR.is_scanned ? 'bg-green-50 text-green-600 border-green-100' : 'bg-orange-50 text-[#FF6B35] border-orange-100'}`}>
+                      {selectedQR.is_scanned ? 'Scanned' : 'Admit One'}
+                    </span>
                     <h3 className="text-xl md:text-2xl font-black text-gray-900 uppercase tracking-widest mb-2 md:mb-3 truncate px-2">{selectedQR.attendeeName}</h3>
                     <div className="pt-3">
                       <h4 className="text-xs md:text-sm font-bold text-gray-600 leading-tight line-clamp-2">{selectedQR.title}</h4>
@@ -373,7 +400,12 @@ export default function MyTickets() {
 
         {/* LIST KONTEN SESUAI TAB */}
         <div className="min-h-[50vh]">
-          {displayedEvents.length > 0 ? (
+          {loading ? (
+             // 🔥 TAMPILIN SKELETON PAS LAGI LOADING TIKET 🔥
+             <div className="space-y-4">
+               {[...Array(3)].map((_, i) => <TicketSkeleton key={i} />)}
+             </div>
+          ) : displayedEvents.length > 0 ? (
             displayedEvents.map(orderGroup => (
               <OrderCardGroup key={orderGroup.order_id} orderGroup={orderGroup} isPast={activeTab === 'riwayat'} />
             ))

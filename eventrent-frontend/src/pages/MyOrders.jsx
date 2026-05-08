@@ -10,6 +10,32 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// 🔥 KOMPONEN SKELETON ORDER LIST 🔥
+const OrderSkeleton = () => (
+  <div className="bg-white border border-slate-200 rounded-[24px] p-5 md:p-6 shadow-sm flex flex-col md:flex-row gap-5 md:items-center justify-between animate-pulse">
+    <div className="flex items-center gap-4">
+      {/* Skeleton Gambar */}
+      <div className="w-16 h-16 md:w-20 md:h-20 bg-slate-200 rounded-xl shrink-0"></div>
+      <div>
+        {/* Skeleton ID & Judul */}
+        <div className="w-20 h-4 bg-slate-200 rounded mb-2"></div>
+        <div className="w-48 md:w-64 h-5 md:h-6 bg-slate-200 rounded mb-2"></div>
+        <div className="w-32 h-3 bg-slate-200 rounded"></div>
+      </div>
+    </div>
+
+    <div className="flex flex-row md:flex-col items-center md:items-end justify-between border-t border-slate-100 md:border-none pt-4 md:pt-0 gap-3">
+      {/* Skeleton Harga */}
+      <div className="text-left md:text-right">
+        <div className="w-24 h-3 bg-slate-200 rounded mb-1 ml-auto"></div>
+        <div className="w-32 h-6 bg-slate-200 rounded ml-auto"></div>
+      </div>
+      {/* Skeleton Tombol */}
+      <div className="w-32 h-10 bg-slate-200 rounded-xl"></div>
+    </div>
+  </div>
+);
+
 export default function MyOrders() {
   const navigate = useNavigate();
   const [user] = useState(() => JSON.parse(localStorage.getItem('user')) || null);
@@ -178,13 +204,6 @@ export default function MyOrders() {
     setPreviewUrl(null);
   };
 
-  if (loading) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-      <div className="w-12 h-12 border-4 border-slate-200 border-t-[#FF6B35] rounded-full animate-spin mb-4"></div>
-      <p className="uppercase tracking-widest text-xs font-bold text-slate-400">Loading Orders...</p>
-    </div>
-  );
-
   return (
     <div className="bg-slate-50 min-h-screen font-sans pb-20 relative text-left">
 
@@ -206,11 +225,17 @@ export default function MyOrders() {
           </div>
         </div>
 
-        {/* ORDER LIST */}
-        {orders.length === 0 ? (
+        {/* ORDER LIST / SKELETON */}
+        {loading ? (
+          <div className="grid grid-cols-1 gap-5">
+            {[...Array(3)].map((_, index) => (
+              <OrderSkeleton key={index} />
+            ))}
+          </div>
+        ) : orders.length === 0 ? (
           <div className="bg-white border border-slate-200 shadow-sm rounded-[32px] py-20 text-center relative z-10">
              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
-               <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+               <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
              </div>
              <p className="font-black text-slate-900 text-lg tracking-tight mb-1">No Orders Yet</p>
              <p className="text-xs font-medium text-slate-500">You haven't made any orders yet.</p>

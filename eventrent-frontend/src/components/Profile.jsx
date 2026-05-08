@@ -3,6 +3,57 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../supabase'; 
 
+// 🔥 KOMPONEN SKELETON PROFILE (ADAPTIF TERANG/GELAP) 🔥
+const ProfileSkeleton = ({ isAgentMode }) => (
+  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-pulse mt-8">
+    <div className="lg:col-span-7">
+      <div className={`p-8 rounded-[32px] shadow-sm border ${isAgentMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-gray-100'}`}>
+        <div className={`w-1/3 h-6 mb-6 rounded ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+        
+        <div className={`flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8 p-6 rounded-2xl border ${isAgentMode ? 'bg-slate-900/50 border-slate-700' : 'bg-gray-50 border-gray-100'}`}>
+          <div className={`w-24 h-24 rounded-full shrink-0 ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+          <div className="text-center sm:text-left w-full mt-2">
+            <div className={`w-1/2 h-6 mb-2 rounded mx-auto sm:mx-0 ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+            <div className={`w-1/3 h-4 mb-3 rounded mx-auto sm:mx-0 ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+            <div className={`w-32 h-8 rounded-lg mx-auto sm:mx-0 ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <div className={`w-1/4 h-3 mb-2 rounded ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+              <div className={`w-full h-12 rounded-xl ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+            </div>
+            <div>
+              <div className={`w-1/3 h-3 mb-2 rounded ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+              <div className={`w-full h-12 rounded-xl ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+            </div>
+          </div>
+          <div>
+            <div className={`w-1/4 h-3 mb-2 rounded ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+            <div className={`w-full h-12 rounded-xl ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div className="lg:col-span-5 flex flex-col gap-8">
+      <div className={`p-8 rounded-[32px] shadow-sm border ${isAgentMode ? 'bg-slate-800/50 border-slate-700/50' : 'bg-white border-gray-100'}`}>
+         <div className={`w-1/3 h-6 mb-6 rounded ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+         <div className="space-y-5">
+            {[...Array(3)].map((_, i) => (
+              <div key={i}>
+                <div className={`w-1/2 h-3 mb-2 rounded ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+                <div className={`w-full h-12 rounded-xl ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+              </div>
+            ))}
+         </div>
+      </div>
+    </div>
+  </div>
+);
+
 export default function Profile() {
   const navigate = useNavigate();
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null);
@@ -24,6 +75,7 @@ export default function Profile() {
   
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true); // 🔥 STATE BUAT SKELETON
 
   const showPopup = (message, type = 'info', action = null) => {
     setPopup({ isOpen: true, message, type, action });
@@ -57,6 +109,10 @@ export default function Profile() {
         bank_account_name: user.bank_account_name || ''
       });
     }
+
+    // Pura-pura nunggu sebentar biar skeletonnya keliatan halus transisinya
+    const timer = setTimeout(() => setIsInitialLoad(false), 800);
+    return () => clearTimeout(timer);
   }, [navigate, user]);
 
   const handleImageChange = (e) => {
@@ -271,7 +327,6 @@ export default function Profile() {
     const authKey = Object.keys(localStorage).find(key => key.endsWith('-auth-token'));
     if (authKey) {
       const sessionData = JSON.parse(localStorage.getItem(authKey));
-      // Jika jalur loginnya terekam asli sebagai 'google', langsung kunci true!
       if (sessionData?.user?.app_metadata?.provider === 'google') {
         isGoogleUser = true;
       }
@@ -280,7 +335,6 @@ export default function Profile() {
     console.error("Gagal mengecek session Supabase", error);
   }
 
-  // Fallback (Jaga-jaga kalau cara di atas gagal)
   if (!isGoogleUser && user) {
     isGoogleUser = !!user.googleId || !!user.google_id || user.provider === 'google' || (user.picture && user.picture.includes('googleusercontent'));
   }
@@ -390,143 +444,147 @@ export default function Profile() {
           <h1 className={`text-3xl md:text-4xl font-black uppercase tracking-tight m-0 ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>My Account</h1>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          
-          <div className="lg:col-span-7">
-            <div className={`p-8 rounded-[32px] shadow-sm border ${isAgentMode ? 'bg-slate-800/50 border-slate-700/50 backdrop-blur-sm' : 'bg-white border-gray-100'}`}>
-              <h2 className={`text-xl font-black mb-6 uppercase tracking-wide border-b pb-4 ${isAgentMode ? 'text-white border-slate-700' : 'text-gray-900 border-gray-100'}`}>Personal & Bank Info</h2>
-              
-              <form onSubmit={handleUpdateProfile}>
-                <div className={`flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8 p-6 rounded-2xl border ${isAgentMode ? 'bg-slate-900/50 border-slate-700' : 'bg-gray-50 border-gray-100'}`}>
-                  <div className={`w-24 h-24 rounded-full overflow-hidden border-4 shadow-md relative group shrink-0 ${isAgentMode ? 'border-slate-700 bg-slate-800' : 'border-white bg-gray-200'}`}>
-                     {currentImage && currentImage.length > 10 ? (
-                       <img src={currentImage} alt="Profile" className="w-full h-full object-cover" />
-                     ) : (
-                       <svg className={`w-12 h-12 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 ${isAgentMode ? 'text-slate-500' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg>
-                     )}
-                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer">
-                        <span className="text-white text-[10px] font-bold uppercase tracking-widest">Edit</span>
-                     </div>
-                     <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" />
-                  </div>
-                  
-                  <div className="text-center sm:text-left">
-                    <h3 className={`text-lg font-black ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>{user.name}</h3>
-                    <p className={`text-sm font-semibold mb-2 ${isAgentMode ? 'text-slate-400' : 'text-gray-500'}`}>{user.email}</p>
-                    <label className={`cursor-pointer inline-block px-4 py-1.5 border rounded-lg text-xs font-bold uppercase tracking-widest transition-colors shadow-sm ${isAgentMode ? 'bg-slate-700 text-slate-300 border-slate-600 hover:bg-slate-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'}`}>
-                      CHANGE PHOTO
-                      <input type="file" className="hidden" onChange={handleImageChange} accept="image/*" />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className={labelStyle}>Full Name</label>
-                      <input type="text" value={name} onChange={e => setName(e.target.value)} className={inputStyle} required />
+        {/* 🔥 TAMPILIN SKELETON PAS INITIAL LOAD 🔥 */}
+        {isInitialLoad ? (
+          <ProfileSkeleton isAgentMode={isAgentMode} />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-7">
+              <div className={`p-8 rounded-[32px] shadow-sm border ${isAgentMode ? 'bg-slate-800/50 border-slate-700/50 backdrop-blur-sm' : 'bg-white border-gray-100'}`}>
+                <h2 className={`text-xl font-black mb-6 uppercase tracking-wide border-b pb-4 ${isAgentMode ? 'text-white border-slate-700' : 'text-gray-900 border-gray-100'}`}>Personal & Bank Info</h2>
+                
+                <form onSubmit={handleUpdateProfile}>
+                  <div className={`flex flex-col sm:flex-row items-center sm:items-start gap-6 mb-8 p-6 rounded-2xl border ${isAgentMode ? 'bg-slate-900/50 border-slate-700' : 'bg-gray-50 border-gray-100'}`}>
+                    <div className={`w-24 h-24 rounded-full overflow-hidden border-4 shadow-md relative group shrink-0 ${isAgentMode ? 'border-slate-700 bg-slate-800' : 'border-white bg-gray-200'}`}>
+                      {currentImage && currentImage.length > 10 ? (
+                        <img src={currentImage} alt="Profile" className="w-full h-full object-cover" />
+                      ) : (
+                        <svg className={`w-12 h-12 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 ${isAgentMode ? 'text-slate-500' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg>
+                      )}
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer">
+                          <span className="text-white text-[10px] font-bold uppercase tracking-widest">Edit</span>
+                      </div>
+                      <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleImageChange} accept="image/*" />
                     </div>
-                    <div>
-                      <label className={labelStyle}>WhatsApp / Phone</label>
-                      <input type="tel" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, ''))} className={inputStyle} placeholder="081234567890" />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className={labelStyle}>Email Address</label>
-                    <input type="email" value={user.email} disabled className={`w-full rounded-xl px-5 py-4 text-sm font-bold cursor-not-allowed ${isAgentMode ? 'bg-slate-800 border border-slate-700 text-slate-500' : 'bg-gray-100 border border-gray-200 text-gray-400'}`} />
-                    <p className="text-[10px] text-red-400 font-bold mt-2 ml-1 uppercase tracking-widest">*EMAIL CANNOT BE CHANGED</p>
-                  </div>
-
-                  <div className={`pt-4 mt-6 border-t ${isAgentMode ? 'border-slate-700' : 'border-gray-100'}`}>
-                    <h3 className={`text-[10px] font-black mb-4 uppercase tracking-widest w-max px-3 py-1.5 rounded-lg border ${isAgentMode ? 'bg-[#2596be]/10 text-blue-500 border-[#2596be]/20' : 'bg-orange-50 text-[#FF6B35] border-orange-100'}`}>🏦 ACCOUNT DATA (FOR AGENTS)</h3>
                     
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="text-center sm:text-left">
+                      <h3 className={`text-lg font-black ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>{user.name}</h3>
+                      <p className={`text-sm font-semibold mb-2 ${isAgentMode ? 'text-slate-400' : 'text-gray-500'}`}>{user.email}</p>
+                      <label className={`cursor-pointer inline-block px-4 py-1.5 border rounded-lg text-xs font-bold uppercase tracking-widest transition-colors shadow-sm ${isAgentMode ? 'bg-slate-700 text-slate-300 border-slate-600 hover:bg-slate-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'}`}>
+                        CHANGE PHOTO
+                        <input type="file" className="hidden" onChange={handleImageChange} accept="image/*" />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <label className={labelStyle}>BANK NAME</label>
-                        <input type="text" value={bankData.bank_name} onChange={e => setBankData({...bankData, bank_name: e.target.value})} className={inputStyle} placeholder="BCA / Mandiri" />
+                        <label className={labelStyle}>Full Name</label>
+                        <input type="text" value={name} onChange={e => setName(e.target.value)} className={inputStyle} required />
                       </div>
                       <div>
-                        <label className={labelStyle}>ACCOUNT NUMBER</label>
-                        <input type="text" value={bankData.bank_account} onChange={e => setBankData({...bankData, bank_account: e.target.value})} className={inputStyle} placeholder="1234567890" />
-                      </div>
-                      <div>
-                        <label className={labelStyle}>A/N (OWNER)</label>
-                        <input type="text" value={bankData.bank_account_name} onChange={e => setBankData({...bankData, bank_account_name: e.target.value})} className={inputStyle} placeholder="Budi Santoso" />
+                        <label className={labelStyle}>WhatsApp / Phone</label>
+                        <input type="tel" value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, ''))} className={inputStyle} placeholder="081234567890" />
                       </div>
                     </div>
-                    <p className={`text-[10px] font-bold mt-2 ml-1 ${isAgentMode ? 'text-slate-400' : 'text-gray-400'}`}>*Complete this data so that the Event Organizer can easily transfer your wages.</p>
-                  </div>
+                    
+                    <div>
+                      <label className={labelStyle}>Email Address</label>
+                      <input type="email" value={user.email} disabled className={`w-full rounded-xl px-5 py-4 text-sm font-bold cursor-not-allowed ${isAgentMode ? 'bg-slate-800 border border-slate-700 text-slate-500' : 'bg-gray-100 border border-gray-200 text-gray-400'}`} />
+                      <p className="text-[10px] text-red-400 font-bold mt-2 ml-1 uppercase tracking-widest">*EMAIL CANNOT BE CHANGED</p>
+                    </div>
 
-                  <div className="pt-6">
-                    <button 
-                      type="submit" 
-                      disabled={isLoadingProfile}
-                      className={`w-full sm:w-auto text-white px-10 py-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 shadow-xl ${isAgentMode ? 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/20' : 'bg-[#FF6B35] hover:bg-[#E85526] shadow-orange-100/50'}`}
-                    >
-                      {isLoadingProfile ? 'SAVING...' : 'SAVE CHANGES'}
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </div>
-          </div>
+                    <div className={`pt-4 mt-6 border-t ${isAgentMode ? 'border-slate-700' : 'border-gray-100'}`}>
+                      <h3 className={`text-[10px] font-black mb-4 uppercase tracking-widest w-max px-3 py-1.5 rounded-lg border ${isAgentMode ? 'bg-[#2596be]/10 text-blue-500 border-[#2596be]/20' : 'bg-orange-50 text-[#FF6B35] border-orange-100'}`}>🏦 ACCOUNT DATA (FOR AGENTS)</h3>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                          <label className={labelStyle}>BANK NAME</label>
+                          <input type="text" value={bankData.bank_name} onChange={e => setBankData({...bankData, bank_name: e.target.value})} className={inputStyle} placeholder="BCA / Mandiri" />
+                        </div>
+                        <div>
+                          <label className={labelStyle}>ACCOUNT NUMBER</label>
+                          <input type="text" value={bankData.bank_account} onChange={e => setBankData({...bankData, bank_account: e.target.value})} className={inputStyle} placeholder="1234567890" />
+                        </div>
+                        <div>
+                          <label className={labelStyle}>A/N (OWNER)</label>
+                          <input type="text" value={bankData.bank_account_name} onChange={e => setBankData({...bankData, bank_account_name: e.target.value})} className={inputStyle} placeholder="Budi Santoso" />
+                        </div>
+                      </div>
+                      <p className={`text-[10px] font-bold mt-2 ml-1 ${isAgentMode ? 'text-slate-400' : 'text-gray-400'}`}>*Complete this data so that the Event Organizer can easily transfer your wages.</p>
+                    </div>
 
-          <div className="lg:col-span-5 flex flex-col gap-8">
-            <div className={`p-8 rounded-[32px] shadow-sm border ${isAgentMode ? 'bg-slate-800/50 border-slate-700/50 backdrop-blur-sm' : 'bg-white border-gray-100'}`}>
-              <h2 className={`text-xl font-black mb-6 uppercase tracking-wide border-b pb-4 ${isAgentMode ? 'text-white border-slate-700' : 'text-gray-900 border-gray-100'}`}>SECURITY</h2>
-              
-              {isGoogleUser ? (
-                <div className={`text-center py-10 px-4 rounded-2xl border ${isAgentMode ? 'bg-blue-900/10 border-blue-800/50' : 'bg-blue-50/50 border-blue-100'}`}>
-                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${isAgentMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-500'}`}>
-                    <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/></svg>
-                  </div>
-                  <h3 className={`text-sm font-black mb-1 uppercase tracking-wide ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>Login via Google</h3>
-                  <p className={`text-[10px] font-bold leading-relaxed px-4 ${isAgentMode ? 'text-slate-400' : 'text-gray-500'}`}>
-                    Your account is securely connected with Google. No need to remember a password.
-                  </p>
-                </div>
-              ) : (
-                <form onSubmit={handleChangePassword} className="space-y-5">
-                  <div>
-                    <label className={labelStyle}>OLD PASSWORD</label>
-                    <input type="password" value={passData.oldPass} onChange={e => setPassData({...passData, oldPass: e.target.value})} className={inputStyle} placeholder="••••••••" required />
-                  </div>
-                  <div>
-                    <label className={labelStyle}>NEW PASSWORD</label>
-                    <input type="password" value={passData.newPass} onChange={e => setPassData({...passData, newPass: e.target.value})} className={inputStyle} placeholder="••••••••" required />
-                  </div>
-                  <div>
-                    <label className={labelStyle}>CONFIRM NEW PASSWORD</label>
-                    <input type="password" value={passData.confirmPass} onChange={e => setPassData({...passData, confirmPass: e.target.value})} className={inputStyle} placeholder="••••••••" required />
-                  </div>
-                  <div className="pt-2">
-                     <button type="submit" disabled={isLoadingPass} className={`w-full text-white py-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 ${isAgentMode ? 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/20' : 'bg-gray-900 hover:bg-black'}`}>
-                      {isLoadingPass ? 'PROCESSING...' : 'CHANGE PASSWORD'}
-                    </button>
+                    <div className="pt-6">
+                      <button 
+                        type="submit" 
+                        disabled={isLoadingProfile}
+                        className={`w-full sm:w-auto text-white px-10 py-4 rounded-xl font-bold text-xs uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50 shadow-xl ${isAgentMode ? 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/20' : 'bg-[#FF6B35] hover:bg-[#E85526] shadow-orange-100/50'}`}
+                      >
+                        {isLoadingProfile ? 'SAVING...' : 'SAVE CHANGES'}
+                      </button>
+                    </div>
                   </div>
                 </form>
-              )}
+              </div>
             </div>
 
-            {/* DANGER ZONE */}
-            <div className={`p-8 rounded-[32px] shadow-sm border ${isAgentMode ? 'bg-red-900/10 border-red-900/50 backdrop-blur-sm' : 'bg-red-50 border-red-100'}`}>
-              <h2 className={`text-xl font-black mb-2 uppercase tracking-wide ${isAgentMode ? 'text-red-500' : 'text-red-600'}`}>Danger Zone</h2>
-              <p className={`text-xs font-bold leading-relaxed mb-6 ${isAgentMode ? 'text-red-400/80' : 'text-red-500/80'}`}>
-                Hati-hati! Menghapus akun bersifat permanen. Seluruh data tiket dan riwayat event lu bakal hilang.
-              </p>
-              
-              <button 
-                onClick={() => setShowDeleteModal(true)}
-                className="w-full bg-red-600 text-white py-4 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-500/30"
-              >
-                DELETE MY ACCOUNT
-              </button>
+            <div className="lg:col-span-5 flex flex-col gap-8">
+              <div className={`p-8 rounded-[32px] shadow-sm border ${isAgentMode ? 'bg-slate-800/50 border-slate-700/50 backdrop-blur-sm' : 'bg-white border-gray-100'}`}>
+                <h2 className={`text-xl font-black mb-6 uppercase tracking-wide border-b pb-4 ${isAgentMode ? 'text-white border-slate-700' : 'text-gray-900 border-gray-100'}`}>SECURITY</h2>
+                
+                {isGoogleUser ? (
+                  <div className={`text-center py-10 px-4 rounded-2xl border ${isAgentMode ? 'bg-blue-900/10 border-blue-800/50' : 'bg-blue-50/50 border-blue-100'}`}>
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${isAgentMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-500'}`}>
+                      <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/></svg>
+                    </div>
+                    <h3 className={`text-sm font-black mb-1 uppercase tracking-wide ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>Login via Google</h3>
+                    <p className={`text-[10px] font-bold leading-relaxed px-4 ${isAgentMode ? 'text-slate-400' : 'text-gray-500'}`}>
+                      Your account is securely connected with Google. No need to remember a password.
+                    </p>
+                  </div>
+                ) : (
+                  <form onSubmit={handleChangePassword} className="space-y-5">
+                    <div>
+                      <label className={labelStyle}>OLD PASSWORD</label>
+                      <input type="password" value={passData.oldPass} onChange={e => setPassData({...passData, oldPass: e.target.value})} className={inputStyle} placeholder="••••••••" required />
+                    </div>
+                    <div>
+                      <label className={labelStyle}>NEW PASSWORD</label>
+                      <input type="password" value={passData.newPass} onChange={e => setPassData({...passData, newPass: e.target.value})} className={inputStyle} placeholder="••••••••" required />
+                    </div>
+                    <div>
+                      <label className={labelStyle}>CONFIRM NEW PASSWORD</label>
+                      <input type="password" value={passData.confirmPass} onChange={e => setPassData({...passData, confirmPass: e.target.value})} className={inputStyle} placeholder="••••••••" required />
+                    </div>
+                    <div className="pt-2">
+                       <button type="submit" disabled={isLoadingPass} className={`w-full text-white py-4 rounded-xl font-bold text-xs uppercase tracking-widest shadow-xl transition-all active:scale-95 disabled:opacity-50 ${isAgentMode ? 'bg-blue-500 hover:bg-blue-600 shadow-blue-500/20' : 'bg-gray-900 hover:bg-black'}`}>
+                        {isLoadingPass ? 'PROCESSING...' : 'CHANGE PASSWORD'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+
+              {/* DANGER ZONE */}
+              <div className={`p-8 rounded-[32px] shadow-sm border ${isAgentMode ? 'bg-red-900/10 border-red-900/50 backdrop-blur-sm' : 'bg-red-50 border-red-100'}`}>
+                <h2 className={`text-xl font-black mb-2 uppercase tracking-wide ${isAgentMode ? 'text-red-500' : 'text-red-600'}`}>Danger Zone</h2>
+                <p className={`text-xs font-bold leading-relaxed mb-6 ${isAgentMode ? 'text-red-400/80' : 'text-red-500/80'}`}>
+                  Hati-hati! Menghapus akun bersifat permanen. Seluruh data tiket dan riwayat event lu bakal hilang.
+                </p>
+                
+                <button 
+                  onClick={() => setShowDeleteModal(true)}
+                  className="w-full bg-red-600 text-white py-4 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-red-700 transition-all active:scale-95 shadow-lg shadow-red-500/30"
+                >
+                  DELETE MY ACCOUNT
+                </button>
+              </div>
+
             </div>
 
           </div>
-
-        </div>
+        )}
       </div>
     </div>
   );
