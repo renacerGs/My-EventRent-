@@ -807,7 +807,9 @@ export class AppService implements OnModuleInit {
 
       if (updateRes.rowCount === 0) throw new BadRequestException('Agent not found');
 
-      if (data.rating_given !== undefined && data.rating_given !== null) {
+      // 🔥 FIX LOGIKA NOTIFIKASI RATING 🔥
+      // Pastiin rating BUKAN null, BUKAN undefined, dan angkanya LEBIH DARI 0
+      if (data.rating_given !== undefined && data.rating_given !== null && Number(data.rating_given) > 0) {
         try {
           await this.pool.query(
             `INSERT INTO notifications (user_id, title, message, type, related_event_id)
