@@ -68,27 +68,12 @@ export default function AgentDashboard() {
   const [confirmCheckIn, setConfirmCheckIn] = useState({ isOpen: false, ticketId: null, eventId: null });
 
   useEffect(() => {
-    // Pastikan hanya user yang sedang dalam mode agent yang bisa akses
     if (!user || user.role !== 'agent') {
       navigate('/');
       return;
     }
     fetchAssignedEvents();
   }, [user?.id, user?.role, navigate]); 
-
-  // 🔥 AUTO-REFRESH SAAT KEMBALI KE TAB INI
-  useEffect(() => {
-    const handleFocus = () => {
-      if (viewMode === 'events') {
-        fetchAssignedEvents(true);
-      } else if (viewMode === 'guests' && selectedEvent) {
-        fetchGuestList(selectedEvent.id, true);
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [viewMode, selectedEvent]);
 
   const fetchAssignedEvents = async (silent = false) => {
     try {
@@ -284,7 +269,6 @@ export default function AgentDashboard() {
   const checkedInGuests = sessionAttendees.filter(t => t.is_scanned === true).length;
   const progressPercentage = totalGuests === 0 ? 0 : Math.round((checkedInGuests / totalGuests) * 100);
 
-  // 🔥 LOGIKA BARU: HITUNG RATA-RATA RATING DARI SELURUH EVENT 🔥
   const ratedEvents = assignedEvents.filter(ev => ev.rating_given && ev.rating_given > 0);
   const averageRating = ratedEvents.length > 0 
     ? (ratedEvents.reduce((acc, ev) => acc + ev.rating_given, 0) / ratedEvents.length).toFixed(1) 
