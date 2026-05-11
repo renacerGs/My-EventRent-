@@ -87,6 +87,7 @@ export default function EventDashboard() {
 
   const [agents, setAgents] = useState([]);
   const [agentEmailInput, setAgentEmailInput] = useState('');
+  const [agentRoleInput, setAgentRoleInput] = useState(''); // 🔥 STATE BARU UNTUK INPUT ROLE
   const [agentDetailModal, setAgentDetailModal] = useState(null); 
   const [agentEditRole, setAgentEditRole] = useState({ show: false, agentId: null, role: '', rating_given: 0 });
 
@@ -542,11 +543,15 @@ export default function EventDashboard() {
 
   useEffect(() => { setCurrentPage(1); }, [searchQuery, selectedSessionFilter, selectedStatusFilter]); 
 
+  // 🔥 UPDATE LOGIKA HANDLE ADD AGENT 🔥
   const handleAddAgent = async (e) => {
     e.preventDefault();
     if (!agentEmailInput) return;
     const sessionData = await supabase.auth.getSession();
     const token = sessionData.data.session?.access_token;
+    
+    // Ambil role yang diketik, kalau kosong kita kasih default 'Agent'
+    const finalRole = agentRoleInput.trim() || 'Agent';
 
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/agents`, {
@@ -555,12 +560,13 @@ export default function EventDashboard() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ email: agentEmailInput, role: 'Agent' })
+        body: JSON.stringify({ email: agentEmailInput, role: finalRole })
       });
       const data = await res.json();
       if (res.ok) {
         toast.success(data.message);
         setAgentEmailInput('');
+        setAgentRoleInput(''); // Kosongin input role abis disubmit
         fetchAgents();
         fetchPayouts(); 
       } else {
@@ -1523,12 +1529,41 @@ export default function EventDashboard() {
             <div className="px-5 py-6 md:px-8 md:py-8 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
               <h3 className="text-xl md:text-2xl font-black text-gray-900 mb-2">Manual Agent Recruitment</h3>
               <p className="text-xs md:text-sm font-bold text-gray-500 mb-6">Enter agent email manually. Or post a job in the Recruitment tab.</p>
-              <form onSubmit={handleAddAgent} className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none"><svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"></path></svg></div>
-                  <input value={agentEmailInput} onChange={e => setAgentEmailInput(e.target.value)} type="email" placeholder="e.g., john@gmail.com" required className="w-full pl-11 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl md:rounded-2xl text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all shadow-sm" />
+              
+              <form onSubmit={handleAddAgent} className="flex flex-col sm:flex-row gap-3 items-start">
+                <div className="relative flex-[2] w-full">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207"></path></svg>
+                  </div>
+                  <input 
+                    value={agentEmailInput} 
+                    onChange={e => setAgentEmailInput(e.target.value)} 
+                    type="email" 
+                    placeholder="e.g., andri@gmail.com" 
+                    required 
+                    className="w-full pl-11 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl md:rounded-2xl text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all shadow-sm" 
+                  />
+                  <span className="absolute -top-2 left-4 bg-white px-1 text-[9px] font-black uppercase text-purple-600 tracking-widest">Agent Email</span>
                 </div>
-                <button type="submit" className="bg-purple-600 text-white px-8 py-3.5 rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest hover:bg-purple-700 transition-colors shadow-lg shadow-purple-200 flex items-center justify-center gap-2 whitespace-nowrap"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg> Add Agent</button>
+                
+                <div className="relative flex-1 w-full">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                  </div>
+                  <input 
+                    value={agentRoleInput} 
+                    onChange={e => setAgentRoleInput(e.target.value)} 
+                    type="text" 
+                    placeholder="Koordinator, Keamanan..." 
+                    className="w-full pl-10 pr-4 py-3.5 bg-white border border-gray-200 rounded-xl md:rounded-2xl text-sm font-bold text-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 transition-all shadow-sm" 
+                  />
+                  <span className="absolute -top-2 left-4 bg-white px-1 text-[9px] font-black uppercase text-purple-600 tracking-widest">Task / Role</span>
+                </div>
+
+                <button type="submit" className="w-full sm:w-auto bg-purple-600 text-white px-8 py-3.5 rounded-xl md:rounded-2xl font-black text-[10px] md:text-xs uppercase tracking-widest hover:bg-purple-700 transition-colors shadow-lg shadow-purple-200 flex items-center justify-center gap-2 whitespace-nowrap h-[52px]">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg> 
+                  Add Agent
+                </button>
               </form>
             </div>
 

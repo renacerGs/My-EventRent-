@@ -415,11 +415,15 @@ export class AppController {
   }
 
   @ApiTags('Recruitment')
+  @UseGuards(SupabaseGuard) // 🔥 KUNCI 1: Harus di-Gembok biar dapet KTP (userId)! 🔥
   @Get('jobs')
-  async getAllJobs(@Query('page') page?: string, @Query('limit') limit?: string) {
+  async getAllJobs(@Req() req, @Query('page') page?: string, @Query('limit') limit?: string) {
     const pageNum = page ? Number(page) : 1;
     const limitNum = limit ? Number(limit) : 10;
-    return await this.appService.getAllActiveJobs(pageNum, limitNum);
+    const userId = req.user.id; // 🔥 KUNCI 2: Dapet ID si pelamar
+    
+    // 🔥 KUNCI 3: Lempar ID ke fungsi service yang udah kita benerin kemaren! 🔥
+    return await this.appService.getAllActiveJobs(userId, pageNum, limitNum);
   }
 
   @ApiTags('Recruitment')

@@ -1178,20 +1178,25 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  async getAllActiveJobs(page: number = 1, limit: number = 10) {
+  async getAllActiveJobs(userId: number, page: number = 1, limit: number = 10) {
     try {
       const offset = (page - 1) * limit; 
+      
       const query = `
         SELECT j.*, e.title as event_title, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date,
-               e.image_url as event_img, e.city as event_location, u.name as eo_name, u.picture as eo_pic
+               e.image_url as event_img, e.city as event_location, u.name as eo_name, u.picture as eo_pic,
+               COALESCE(
+                 (SELECT 'ALREADY_JOINED' FROM event_agents WHERE event_id = e.id AND user_id = $1 LIMIT 1),
+                 (SELECT status FROM job_applications WHERE job_id = j.id AND user_id = $1 LIMIT 1)
+               ) as user_status
         FROM job_postings j
         JOIN events e ON j.event_id = e.id
         JOIN users u ON j.eo_id = u.id
         WHERE j.is_active = TRUE AND e.event_end >= CURRENT_DATE 
         ORDER BY j.created_at DESC
-        LIMIT $1 OFFSET $2
+        LIMIT $2 OFFSET $3
       `;
-      const { rows } = await this.pool.query(query, [limit, offset]);
+      const { rows } = await this.pool.query(query, [userId, limit, offset]);
       return rows; 
     } catch (err) {
       throw new InternalServerErrorException('Failed to fetch job postings');
@@ -1211,10 +1216,24 @@ export class AppService implements OnModuleInit {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN'); 
+      
+      // 1. Cari tau job ini buat event yang mana
+      const jobRes = await client.query('SELECT event_id FROM job_postings WHERE id = $1', [jobId]);
+      if (jobRes.rows.length === 0) throw new BadRequestException('Job posting not found');
+      const targetEventId = jobRes.rows[0].event_id;
+
+      // 🔥 SATPAM PENJAGA: Cek apakah dia udah jadi Agen di event ini? 🔥
+      const checkAgent = await client.query('SELECT id FROM event_agents WHERE event_id = $1 AND user_id = $2', [targetEventId, userId]);
+      if (checkAgent.rows.length > 0) {
+        throw new BadRequestException('Kamu sudah terdaftar sebagai panitia/agen di event ini!');
+      }
+
+      // 3. Kalau aman (bukan agen), baru lanjut masukin lamaran
       const query = `INSERT INTO job_applications (job_id, user_id, status) VALUES ($1, $2, 'PENDING') RETURNING *`;
       const { rows } = await client.query(query, [jobId, userId]);
       const application = rows[0];
 
+      // 4. Kirim notif ke EO
       const infoQuery = `
         SELECT j.eo_id, j.event_id, j.role, u.name as applicant_name, e.title as event_title
         FROM job_postings j
@@ -1237,7 +1256,9 @@ export class AppService implements OnModuleInit {
       return application;
     } catch (err: any) {
       await client.query('ROLLBACK');
-      if (err.code === '23505') throw new BadRequestException('You have already applied for this position!');
+      // Tangkap pesan error dari satpam biar dilempar ke Frontend
+      if (err instanceof BadRequestException) throw err;
+      if (err.code === '23505') throw new BadRequestException('Kamu sudah pernah melamar untuk posisi ini!');
       throw new InternalServerErrorException('Failed to submit application');
     } finally {
       client.release();

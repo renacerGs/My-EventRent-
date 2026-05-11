@@ -38,13 +38,10 @@ export default function JobBoard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [applyingId, setApplyingId] = useState(null);
   
-  // State buat nyimpen ID pekerjaan yang udah pernah dilamar sama user ini
-  const [appliedJobs, setAppliedJobs] = useState([]);
-  
-  // 👇 STATE BARU BUAT MODAL KONFIRMASI LAMAR 👇
+  // State buat nyimpen STATUS dari masing-masing Job (Bukan cuma ID doang)
+  const [jobStatuses, setJobStatuses] = useState({});
   const [confirmApply, setConfirmApply] = useState({ show: false, jobId: null });
 
-  // 🔥 FIX 1: Ganti dependency dari [user] jadi [user?.id] biar GAK KEDIP-KEDIP!
   useEffect(() => {
     if (!user || !user.id) {
       toast.error('You must login first to find a job!');
@@ -52,13 +49,8 @@ export default function JobBoard() {
       return;
     }
     fetchJobs();
-    
-    // Load data lamaran dari localStorage (sementara nunggu API backend)
-    const savedApplications = JSON.parse(localStorage.getItem(`applied_jobs_${user.id}`)) || [];
-    setAppliedJobs(savedApplications);
   }, [user?.id, navigate]);
 
-  // 🔥 FIX 2: Tambah Token di Headers saat narik lowongan
   const fetchJobs = async () => {
     try {
       setLoading(true);
@@ -66,19 +58,33 @@ export default function JobBoard() {
 
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/jobs`, {
         headers: {
-          'Authorization': `Bearer ${token}` // 👈 Ini KTP lu bro!
+          'Authorization': `Bearer ${token}`
         }
       });
       
       if (res.ok) {
         const data = await res.json();
         setJobs(data);
+        
+        // Bersihin sisa LocalStorage yang bikin PENDING nyangkut!
+        const savedStatuses = JSON.parse(localStorage.getItem(`job_status_${user.id}`)) || {};
+        const validStatuses = {};
+        
+        data.forEach(job => {
+          // Kalo Backend udah ngasih tau dia ALREADY_JOINED, pake data Backend
+          if (job.user_status) {
+             validStatuses[job.id] = job.user_status;
+          } else if (savedStatuses[job.id]) {
+             // Kalau Backend kosong, tapi di lokal ada (misal barusan klik Apply), pake lokal
+             validStatuses[job.id] = savedStatuses[job.id];
+          }
+        });
+        
+        setJobStatuses(validStatuses);
+
       } else {
-        console.warn("API /api/jobs not ready, showing dummy data temporarily.");
-        setJobs([
-          { id: 1, event_title: "We The Fest 2026 Concert", event_date: "May 10, 2026", role: "Gate Keeper A", fee: 150000, quota: 5, description: "Standby from 15:00 - 22:00. Assist in scanning VIP tickets." },
-          { id: 2, event_title: "National Tech Seminar", event_date: "June 15, 2026", role: "VIP Registration", fee: 250000, quota: 2, description: "Handle VIP guests. Must look neat, black shirt dresscode." }
-        ]);
+        console.warn("API /api/jobs not ready.");
+        setJobs([]);
       }
     } catch (err) {
       console.error("Failed to fetch job data:", err);
@@ -88,15 +94,13 @@ export default function JobBoard() {
     }
   };
 
-  // Trigger modal konfirmasi
   const handleApplyClick = (jobId) => {
     setConfirmApply({ show: true, jobId });
   };
 
-  // 🔥 FIX 3: Tambah Token & Buang userId saat mengeksekusi lamaran
   const executeApply = async () => {
     const jobId = confirmApply.jobId;
-    setConfirmApply({ show: false, jobId: null }); // Tutup modal
+    setConfirmApply({ show: false, jobId: null });
 
     try {
       setApplyingId(jobId);
@@ -107,27 +111,32 @@ export default function JobBoard() {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` // 👈 Ini KTP lu bro!
+          'Authorization': `Bearer ${token}`
         },
-        // 👇 userId DIHAPUS, karena backend baca dari Token
         body: JSON.stringify({ jobId: jobId }) 
       });
       
       const data = await res.json();
 
       if (res.ok) {
-        toast.success("Application sent successfully! Keep an eye on your notifications.", { id: toastId });
+        toast.success("Application sent successfully!", { id: toastId });
         
-        const newAppliedList = [...appliedJobs, jobId];
-        setAppliedJobs(newAppliedList);
-        localStorage.setItem(`applied_jobs_${user.id}`, JSON.stringify(newAppliedList));
+        const newStatuses = { ...jobStatuses, [jobId]: 'PENDING' };
+        setJobStatuses(newStatuses);
+        localStorage.setItem(`job_status_${user.id}`, JSON.stringify(newStatuses));
         
       } else {
-        toast.error(data.message || "Failed to send application. Maybe you've already applied?", { id: toastId });
-        if(data.message && (data.message.includes('pernah ngelamar') || data.message.includes('already applied'))){
-            const newAppliedList = [...appliedJobs, jobId];
-            setAppliedJobs(newAppliedList);
-            localStorage.setItem(`applied_jobs_${user.id}`, JSON.stringify(newAppliedList));
+        toast.error(data.message || "Failed to send application.", { id: toastId });
+        
+        // 🔥 JURUS TANGKAP ERROR SATPAM BACKEND 🔥
+        if (data.message && (data.message.includes('terdaftar sebagai panitia') || data.message.includes('agen di event ini'))) {
+            const newStatuses = { ...jobStatuses, [jobId]: 'ALREADY_JOINED' };
+            setJobStatuses(newStatuses);
+            localStorage.setItem(`job_status_${user.id}`, JSON.stringify(newStatuses));
+        } else if (data.message && data.message.includes('pernah melamar')) {
+            const newStatuses = { ...jobStatuses, [jobId]: 'PENDING' };
+            setJobStatuses(newStatuses);
+            localStorage.setItem(`job_status_${user.id}`, JSON.stringify(newStatuses));
         }
       }
     } catch (err) {
@@ -150,7 +159,6 @@ export default function JobBoard() {
   return (
     <div className="bg-[#0B1426] min-h-screen font-sans pb-20 relative">
       
-      {/* 👇 MODAL KONFIRMASI LAMAR JOB 👇 */}
       <AnimatePresence>
         {confirmApply.show && (
           <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[#0B1426]/80 backdrop-blur-sm p-4">
@@ -191,7 +199,6 @@ export default function JobBoard() {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 pt-6 md:pt-16 relative z-10">
         
-        {/* HEADER SECTION (TETAP MUNCUL SAAT LOADING) */}
         <div className="flex flex-col lg:flex-row items-center justify-between gap-6 mb-8 md:mb-10 bg-[#152036]/50 p-6 md:p-8 rounded-[24px] md:rounded-[32px] border border-[#1E2D4A]/50 backdrop-blur-sm shadow-xl">
           <div className="max-w-2xl text-center lg:text-left mx-auto lg:mx-0">
             <div className="inline-flex items-center justify-center lg:justify-start gap-2 bg-blue-500/20 text-blue-400 px-3 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest mb-4 border border-blue-500/30">
@@ -218,7 +225,6 @@ export default function JobBoard() {
           </div>
         </div>
 
-        {/* JOB CARDS GRID SECTION */}
         <div className="mb-6 flex items-center justify-between px-2">
           <div className="flex items-center gap-3">
              <span className="w-2 h-6 md:h-8 bg-blue-500 rounded-full inline-block"></span>
@@ -226,7 +232,6 @@ export default function JobBoard() {
           </div>
         </div>
 
-        {/* 🔥 TAMPILIN SKELETON PAS LAGI LOADING 🔥 */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {[...Array(6)].map((_, i) => <JobCardSkeleton key={i} />)}
@@ -234,12 +239,14 @@ export default function JobBoard() {
         ) : filteredJobs.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredJobs.map((job) => {
-              const isApplied = appliedJobs.includes(job.id);
+              const status = jobStatuses[job.id] || job.user_status; // BACA DARI API ATAU STATE LOKAL
+              const isApplied = status === 'PENDING';
+              const isJoined = status === 'ACCEPTED' || status === 'ALREADY_JOINED';
               
               return (
-                <div key={job.id} className={`bg-[#152036]/50 rounded-[24px] p-6 border transition-all duration-300 flex flex-col h-full group relative overflow-hidden ${isApplied ? 'border-[#1E2D4A] opacity-60 grayscale-[50%]' : 'border-[#1E2D4A] hover:border-blue-500/50 hover:shadow-[0_0_30px_rgba(59,130,246,0.15)] hover:-translate-y-1'}`}>
+                <div key={job.id} className={`bg-[#152036]/50 rounded-[24px] p-6 border transition-all duration-300 flex flex-col h-full group relative overflow-hidden ${(isApplied || isJoined) ? 'border-[#1E2D4A] opacity-60 grayscale-[50%]' : 'border-[#1E2D4A] hover:border-blue-500/50 hover:shadow-[0_0_30px_rgba(59,130,246,0.15)] hover:-translate-y-1'}`}>
                   
-                  {!isApplied && (
+                  {!(isApplied || isJoined) && (
                     <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-blue-500 to-blue-300 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   )}
                   
@@ -271,14 +278,22 @@ export default function JobBoard() {
                       </p>
                     </div>
                     
-                    {isApplied ? (
+                    {/* 👇 JURUS ANTI HANTU: Tombol otomatis nyesuaiin status 👇 */}
+                    {isJoined ? (
+                      <button 
+                        disabled
+                        className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-500 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-500/30 cursor-not-allowed"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+                        Already Joined
+                      </button>
+                    ) : isApplied ? (
                       <button 
                         disabled
                         className="flex items-center gap-1.5 bg-[#1E2D4A]/50 text-slate-500 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border border-[#1E2D4A] cursor-not-allowed"
                       >
                         <svg className="w-4 h-4 animate-spin text-slate-500" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        <span className="hidden sm:inline">Pending ACC</span>
-                        <span className="sm:hidden">Pending...</span>
+                        Pending ACC
                       </button>
                     ) : (
                       <button 
