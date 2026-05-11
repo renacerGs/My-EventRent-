@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Toaster, toast } from 'react-hot-toast'; 
 
@@ -21,52 +21,65 @@ import Notifications from './pages/Notifications';
 import AgentWallet from './components/AgentWallet';
 import MyOrders from './pages/MyOrders'; 
 import UploadProof from './pages/UploadProof';
+import About from './pages/About';
 
-// 👇 IMPORT HALAMAN JOB BOARD BARU 👇
+// Import Halaman Job Board
 import JobBoard from './pages/JobBoard';
 
-// --- ROUTE KHUSUS AGEN 👇
+// Route Khusus Agen
 import AgentDashboard from './components/AgentDashboard'; 
 import RiwayatScan from './pages/RiwayatScan'; 
 
-// --- ROUTE KHUSUS PEMBUATAN EVENT ---
+// Route Khusus Pembuatan Event
 import ChooseEventType from "./components/ChooseEventType"; 
 import CreatePublicEvent from "./components/CreatePublicEvent"; 
 import CreateWeddingEvent from "./components/CreateWeddingEvent"; 
 import CreatePersonalEvent from "./components/CreatePersonalEvent"; 
 
-// --- ROUTE KHUSUS EDIT EVENT ---
+// Route Khusus Edit Event
 import EditPublicEvent from "./components/EditPublicEvent"; 
 import EditWeddingEvent from "./components/EditWeddingEvent"; 
 import EditPersonalEvent from "./components/EditPersonalEvent"; 
 
-// --- ROUTE KHUSUS WEDDING/PERSONAL ---
+// Route Khusus Wedding / Personal
 import WeddingInvitation from './pages/WeddingInvitation';
 import WeddingRSVP from './pages/WeddingRSVP';
 import PersonalInvitation from './pages/PersonalInvitation';
 import PersonalRSVP from './pages/PersonalRSVP';
 
-// 🔥 IMPORT SUPABASE UNTUK CCTV LOGIN GOOGLE 🔥
+// Supabase
 import { supabase } from './supabase'; 
 
 export default function App() {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [events, setEvents] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Safe initialization untuk localStorage
   const [user, setUser] = useState(() => {
-    const storedUser = localStorage.getItem('user');
-    return storedUser ? JSON.parse(storedUser) : null;
+    try {
+      const storedUser = localStorage.getItem('user');
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (error) {
+      console.error("Gagal parse data user dari localStorage", error);
+      return null;
+    }
   });
 
-  const location = useLocation();
+  const isInvitationPage = 
+    location.pathname.startsWith('/invitation') || 
+    location.pathname.startsWith('/party') || 
+    location.pathname.startsWith('/rsvp') || 
+    location.pathname.startsWith('/party-rsvp') ||
+    location.pathname.startsWith('/about');
 
-  // 🔥 DETEKSI & HANDLE ERROR URL DARI SUPABASE GOOGLE AUTH 🔥
+  // Deteksi & Handle Error URL dari Supabase Google Auth
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
     const hashParams = new URLSearchParams(location.hash.replace('#', '?'));
-    
     const errorDesc = queryParams.get('error_description') || hashParams.get('error_description');
 
     if (errorDesc) {
@@ -79,40 +92,39 @@ export default function App() {
           fontWeight: 'bold'
         },
       });
-
       navigate(location.pathname, { replace: true });
     }
   }, [location, navigate]);
 
-  const isInvitationPage = 
-    location.pathname.startsWith('/invitation') || 
-    location.pathname.startsWith('/party') || 
-    location.pathname.startsWith('/rsvp') || 
-    location.pathname.startsWith('/party-rsvp');
-
+  // Fetch Event Data menggunakan Async/Await
   useEffect(() => {
-    fetch(`${import.meta.env.VITE_API_URL}/api/events`)
-      .then(res => res.json())
-      .then(data => {
+    const fetchEvents = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/events`);
+        if (!res.ok) throw new Error("Network response was not ok");
+        const data = await res.json();
         setEvents(Array.isArray(data) ? data : []);
-      })
-      .catch(err => {
+      } catch (err) {
         console.error("Gagal mengambil data event:", err);
         toast.error("Gagal terhubung ke server"); 
         setEvents([]); 
-      });
+      }
+    };
+    fetchEvents();
   }, []);
 
+  // Protected Route Wrapper
   const ProtectedRoute = ({ children }) => {
     if (!user) {
+      // setTimeout mencegah warning React saat update state di render cycle
       setTimeout(() => setIsLoginOpen(true), 0);
       return <Navigate to="/" replace />;
     }
     return children;
   };
 
-  // Set default showToast = true biar dari LoginModal tetep muncul
-  const handleLoginSuccess = (userData, showToast = true) => {
+  // useCallback agar fungsi tidak di-recreate setiap render
+  const handleLoginSuccess = useCallback((userData, showToast = true) => {
     setUser(userData); 
     try {
       localStorage.setItem('user', JSON.stringify(userData)); 
@@ -121,10 +133,8 @@ export default function App() {
     }
     setIsLoginOpen(false); 
 
-    // Cuma eksekusi toast kalau showToast true
     if (showToast) {
       if (userData.role === 'agent') {
-        // Kasih id: 'auth-toast' biar toast nggak numpuk kalau kepanggil 2x
         toast.success(`Berhasil masuk portal agen, ${userData.name}!`, { id: 'auth-toast' });
         if (location.pathname === '/') navigate('/agent');
       } else {
@@ -132,36 +142,24 @@ export default function App() {
         if (location.pathname === '/agent') navigate('/');
       }
     }
-  };
+  }, [location.pathname, navigate]);
 
-  // =========================================================================
-  // 🔥 CCTV DETEKSI GOOGLE LOGIN PAS BALIK KE WEB (REFRESH) 🔥
-  // =========================================================================
+  // CCTV Deteksi Google Login via Supabase
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Kalau terdeteksi ada yang login (termasuk balik dari Google OAuth)
       if (event === 'SIGNED_IN' && session) {
-        
-        // Cek apakah user udah beneran kecatat di state, biar ngga ngeloop (muter terus)
         const storedUser = localStorage.getItem('user');
         const currentUser = storedUser ? JSON.parse(storedUser) : null;
 
-        // Kalau aplikasi baru bangun dan belum sinkron sama session Supabase
         if (!currentUser || currentUser.id !== session.user.id) {
-          
-          // Ambil niat user dari brankas (pas dia klik toggle agen/reguler di modal)
           const isAgent = localStorage.getItem('agentMode') === 'true';
-          
           const loggedInUser = {
             ...session.user,
             name: session.user.user_metadata?.full_name || 'User',
             role: isAgent ? 'agent' : 'user'
           };
           
-          // Simpan token biar API lu yang lain ngga error
           localStorage.setItem('supabase_token', session.access_token);
-          
-          // Eksekusi fungsi login utama (nanti otomatis di-redirect ke /agent kalau role-nya agent)
           handleLoginSuccess(loggedInUser);
         }
       }
@@ -170,22 +168,24 @@ export default function App() {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); 
-  // =========================================================================
+  }, [handleLoginSuccess]); 
+
+  // Handle Logout Logic
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('agentMode');
+    localStorage.removeItem('supabase_token'); // Pastikan token juga dihapus
+    toast.success('Berhasil logout bro!'); 
+  };
 
   return (
     <div className="bg-white min-h-screen font-sans flex flex-col">
-      
       <Toaster 
         position="top-center" 
         toastOptions={{
           duration: 3000,
-          style: {
-            background: '#333',
-            color: '#fff',
-            borderRadius: '10px',
-          },
+          style: { background: '#333', color: '#fff', borderRadius: '10px' },
         }} 
       />
 
@@ -196,19 +196,14 @@ export default function App() {
           searchQuery={searchQuery}
           onSearchSelect={(title) => setSearchQuery(title)}
           onOpenLogin={() => setIsLoginOpen(true)}
-          onLogout={() => {
-            setUser(null);
-            localStorage.removeItem('user');
-            localStorage.removeItem('agentMode'); // Bersihin memori mode agen
-            toast.success('Berhasil logout bro!'); 
-          }}
+          onLogout={handleLogout}
           onLoginSuccess={handleLoginSuccess}
         />
       )}
 
       <main className="flex-grow">
         <Routes>
-          {/* --- HALAMAN PUBLIK --- */}
+          {/* Rute Publik */}
           <Route path="/" element={
             <>
               <Hero />
@@ -221,45 +216,42 @@ export default function App() {
           <Route path="/checkout/:id" element={<Checkout />} />
           <Route path="/cek-tiket" element={<TrackTicket />} />
           <Route path="/notifications" element={<Notifications />} />
+          <Route path="/about" element={<About />} />
           
-          {/* --- HALAMAN UNDANGAN KHUSUS --- */}
+          {/* Rute Undangan */}
           <Route path="/invitation/:id" element={<WeddingInvitation />} />
           <Route path="/party/:id" element={<PersonalInvitation />} /> 
           <Route path="/rsvp/:id" element={<WeddingRSVP />} />
           <Route path="/party-rsvp/:id" element={<PersonalRSVP />} />
           
-          {/* --- HALAMAN PROTECTED (BUTUH LOGIN) --- */}
+          {/* Rute Proteksi */}
           <Route path="/likes" element={<ProtectedRoute><Likes /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/my-tickets" element={<ProtectedRoute><MyTickets /></ProtectedRoute>} />
           <Route path="/my-orders" element={<MyOrders />} />
-          
-          {/* 👇 ROUTE JOB BOARD (CARI KERJA) 👇 */}
           <Route path="/jobs" element={<ProtectedRoute><JobBoard /></ProtectedRoute>} />
           
-          {/* --- ROUTE KHUSUS PORTAL AGEN --- */}
+          {/* Rute Agen */}
           <Route path="/agent" element={<ProtectedRoute><AgentDashboard /></ProtectedRoute>} />
           <Route path="/agent/history" element={<ProtectedRoute><RiwayatScan /></ProtectedRoute>} /> 
           <Route path="/agent/wallet" element={<ProtectedRoute><AgentWallet /></ProtectedRoute>} />
           
-          {/* --- MANAJEMEN EVENT & DASHBOARD --- */}
+          {/* Rute Manajemen & Event */}
           <Route path="/manage" element={<ProtectedRoute><ManageEvent /></ProtectedRoute>} />
           <Route path="/manage/event/:id" element={<ProtectedRoute><EventDashboard /></ProtectedRoute>} />
           <Route path="/scanner/:eventId" element={<ProtectedRoute><Scanner /></ProtectedRoute>} />
           <Route path="/upload-proof/:orderId" element={<UploadProof />} />
           
-          {/* --- PEMBUATAN EVENT --- */}
           <Route path="/create" element={<ProtectedRoute><ChooseEventType /></ProtectedRoute>} />
           <Route path="/create/public" element={<ProtectedRoute><CreatePublicEvent /></ProtectedRoute>} />
           <Route path="/create/wedding" element={<ProtectedRoute><CreateWeddingEvent /></ProtectedRoute>} />
           <Route path="/create/personal" element={<ProtectedRoute><CreatePersonalEvent /></ProtectedRoute>} />
 
-          {/* --- EDIT EVENT --- */}
           <Route path="/edit/public/:id" element={<ProtectedRoute><EditPublicEvent /></ProtectedRoute>} />
           <Route path="/edit/wedding/:id" element={<ProtectedRoute><EditWeddingEvent /></ProtectedRoute>} />
           <Route path="/edit/personal/:id" element={<ProtectedRoute><EditPersonalEvent /></ProtectedRoute>} />
           
-          {/* HALAMAN 404 FALLBACK */}
+          {/* 404 Fallback */}
           <Route path="*" element={<div className="text-center py-20 font-bold text-gray-400">Halaman tidak ditemukan.</div>} />
         </Routes>
       </main>
@@ -267,7 +259,6 @@ export default function App() {
       <LoginModal 
         isOpen={isLoginOpen} 
         onClose={() => setIsLoginOpen(false)} 
-        // 🔥 Cukup panggil handleLoginSuccess, karena urusan lempar melempar URL udah dihandle di dalamnya
         onLoginSuccess={handleLoginSuccess}
       />
 
