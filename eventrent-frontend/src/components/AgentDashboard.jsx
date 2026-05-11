@@ -53,6 +53,10 @@ export default function AgentDashboard() {
   
   const [attendees, setAttendees] = useState([]);
   const [loadingAttendees, setLoadingAttendees] = useState(false);
+  
+  // 🔥 TAMBAHAN: State biar event card keliatan loading pas diklik
+  const [openingEventId, setOpeningEventId] = useState(null);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSessionFilter, setSelectedSessionFilter] = useState('All Sessions');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('All Status');
@@ -67,13 +71,15 @@ export default function AgentDashboard() {
 
   const [confirmCheckIn, setConfirmCheckIn] = useState({ isOpen: false, ticketId: null, eventId: null });
 
+  // 🔥 PERBAIKAN: Array kosong [] biar dipanggil 1 KALI SAJA (Nggak bakal refresh terus)
   useEffect(() => {
     if (!user || user.role !== 'agent') {
       navigate('/');
       return;
     }
     fetchAssignedEvents();
-  }, [user?.id, user?.role, navigate]); 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); 
 
   const fetchAssignedEvents = async (silent = false) => {
     try {
@@ -96,12 +102,15 @@ export default function AgentDashboard() {
     }
   };
 
+  // 🔥 PERBAIKAN: Instant UI Update pas event diklik
   const handleEventClick = async (eventData) => {
+    if (openingEventId) return; // Cegah spam klik
+    
+    setOpeningEventId(eventData.id);
     setSelectedEvent(eventData);
     setSearchQuery('');
     setSelectedStatusFilter('All Status');
     setCurrentPage(1);
-    setLoadingAttendees(true);
 
     try {
       const token = localStorage.getItem('supabase_token');
@@ -113,19 +122,21 @@ export default function AgentDashboard() {
 
       if (sessions && sessions.length > 1) {
         setViewMode('sessions');
-        setLoadingAttendees(false);
       } else {
         setSelectedSessionFilter(sessions[0]?.name || 'All Sessions');
-        fetchGuestList(eventData.id);
+        setViewMode('guests'); // LANGSUNG PINDAH LAYAR (Instan!)
+        fetchGuestList(eventData.id); // Data di-fetch di background (Skeleton muncul)
       }
     } catch (err) {
-      toast.error("Gagal mengecek sesi event.");
-      setLoadingAttendees(false);
+      toast.error("Failed to load event data.");
+    } finally {
+      setOpeningEventId(null);
     }
   };
 
   const handleSessionClick = (sessionName) => {
     setSelectedSessionFilter(sessionName);
+    setViewMode('guests'); // LANGSUNG PINDAH LAYAR
     fetchGuestList(selectedEvent.id);
   };
 
@@ -142,7 +153,6 @@ export default function AgentDashboard() {
       if (res.ok) {
         const data = await res.json();
         setAttendees(data);
-        setViewMode('guests'); 
       } else {
         toast.error("Failed to fetch guest list.");
       }
@@ -395,7 +405,6 @@ export default function AgentDashboard() {
             </div>
 
             {loading ? (
-              // 🔥 TAMPILIN SKELETON PAS LOADING DAFTAR EVENT 🔥
               <div className="bg-[#152036]/50 rounded-[20px] md:rounded-[32px] border border-[#1E2D4A]/50 overflow-hidden shadow-xl">
                  <div className="hidden md:flex items-center justify-between px-8 py-4 bg-[#0B1426]/50 border-b border-[#1E2D4A]/50 text-[10px] font-black text-slate-500 uppercase tracking-widest">
                   <div className="w-[45%]">Event Details</div>
@@ -424,7 +433,7 @@ export default function AgentDashboard() {
                   {displayedEvents.map((ev, index) => (
                     <div 
                       key={ev.id} 
-                      onClick={() => activeTab === 'active' && handleEventClick(ev)} 
+                      onClick={() => activeTab === 'active' && !openingEventId && handleEventClick(ev)} 
                       className={`group flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-8 md:py-6 transition-all duration-300 gap-3 md:gap-0 relative overflow-hidden ${index !== displayedEvents.length - 1 ? 'border-b border-[#1E2D4A]/50 hover:border-transparent' : ''} ${activeTab === 'active' ? 'cursor-pointer hover:bg-[#152036]/80' : 'cursor-default'}`}
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-[45%]">
@@ -483,9 +492,22 @@ export default function AgentDashboard() {
                               View Details <svg className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"></path></svg>
                             </div>
                             <div className="flex items-center gap-3">
-                              <button onClick={(e) => { e.stopPropagation(); handleEventClick(ev); }} className="hidden md:flex flex-1 md:flex-none items-center justify-center gap-1.5 px-3 py-2.5 bg-[#1E2D4A] text-white rounded-xl hover:bg-[#2A3F63] transition-colors text-[10px] font-black uppercase tracking-widest border border-[#2A3F63] relative z-10">
-                                <span className="md:hidden lg:inline">Select</span>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"></path></svg>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); handleEventClick(ev); }} 
+                                disabled={openingEventId === ev.id}
+                                className="hidden md:flex flex-1 md:flex-none items-center justify-center gap-1.5 px-3 py-2.5 bg-[#1E2D4A] text-white rounded-xl hover:bg-[#2A3F63] transition-colors text-[10px] font-black uppercase tracking-widest border border-[#2A3F63] relative z-10 disabled:opacity-50"
+                              >
+                                {openingEventId === ev.id ? (
+                                  <>
+                                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                    <span className="md:hidden lg:inline">Loading</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="md:hidden lg:inline">Select</span>
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7"></path></svg>
+                                  </>
+                                )}
                               </button>
                               <button onClick={(e) => { e.stopPropagation(); navigate(`/scanner/${ev.id}`); }} className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3 py-2.5 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 relative z-10">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
