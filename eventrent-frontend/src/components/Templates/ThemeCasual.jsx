@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   CalendarDays, Clock, MapPin, ExternalLink, Copy, Check, Send,
-  ChevronLeft, ChevronRight, Briefcase, Users, Mic, Building, CreditCard, MessageSquare
+  ChevronLeft, ChevronRight, CreditCard, MessageSquare
 } from "lucide-react";
 
 /* ─── CUSTOM STYLES: PROFESSIONAL THEME ─── */
@@ -162,7 +162,7 @@ export default function ThemeProfessional({ eventData, guestName, isOpen, onOpen
             <div className="absolute inset-0 bg-gradient-to-b from-slate-900/80 via-slate-900/50 to-slate-900/90" /> 
           </div>
 
-          <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, ease: "easeOut" }} className="relative z-10 w-full px-6 flex flex-col items-center mt-[-10vh]">
+          <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, ease: "easeOut" }} className="relative z-10 w-full px-6 flex flex-col items-center mt-[-15vh]">
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="text-blue-400 text-sm font-bold uppercase tracking-[0.3em] mb-4">
               Formal Invitation
             </motion.p>
@@ -181,7 +181,7 @@ export default function ThemeProfessional({ eventData, guestName, isOpen, onOpen
             </motion.p>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.3 }} className="absolute bottom-12 left-0 right-0 z-20 flex flex-col items-center w-full px-6">
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.3 }} className="absolute bottom-28 md:bottom-32 left-0 right-0 z-20 flex flex-col items-center w-full px-6">
             <div className="text-center mb-6 bg-slate-900/80 backdrop-blur-md py-4 px-10 rounded-2xl border border-slate-700">
               <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Kepada Yth.</p>
               <p className="text-lg text-white font-bold tracking-wide">{guestName}</p>
@@ -224,23 +224,13 @@ export default function ThemeProfessional({ eventData, guestName, isOpen, onOpen
                 <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-8 uppercase tracking-widest">Informasi Penyelenggara</h2>
 
                 <motion.div initial={{ scale: 0.95, opacity: 0 }} whileInView={{ scale: 1, opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.5 }} className="card-professional p-8 sm:p-10">
-                  <div className="w-32 h-32 mx-auto mb-6 rounded-full overflow-hidden border-4 border-white shadow-lg">
-                    <img src={hostPhoto} alt={hostName} className="w-full h-full object-cover" />
+                  <div className="w-32 h-32 mx-auto mb-6 rounded-full overflow-hidden border-4 border-white shadow-lg bg-white flex items-center justify-center">
+                    {/* 🔥 PERBAIKAN FOTO PROFIL: object-contain & p-2 biar logo bulat sempurna dan nggak ketarik 🔥 */}
+                    <img src={hostPhoto} alt={hostName} className="w-full h-full object-contain p-2" />
                   </div>
 
                   <h3 className="text-2xl font-black text-slate-900 mb-2">{hostName}</h3>
-                  {companyInfo && <p className="text-sm text-slate-500 font-medium uppercase tracking-wider mb-6">{companyInfo}</p>}
-
-                  <div className="w-full h-px bg-slate-100 my-6"></div>
-
-                  <div className="flex flex-wrap justify-center gap-3">
-                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg">
-                      <Briefcase className="w-4 h-4 text-blue-600" /> Profesional
-                    </div>
-                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg">
-                      <Users className="w-4 h-4 text-blue-600" /> Networking
-                    </div>
-                  </div>
+                  {companyInfo && <p className="text-sm text-slate-500 font-medium uppercase tracking-wider">{companyInfo}</p>}
                 </motion.div>
               </motion.div>
             </section>
@@ -321,18 +311,6 @@ export default function ThemeProfessional({ eventData, guestName, isOpen, onOpen
                     </motion.div>
                   ))}
                 </div>
-
-                {/* Additional Info Icons */}
-                <div className="flex justify-center gap-8 mt-16 pt-10 border-t border-slate-200">
-                  {[{ icon: Building, label: "Indoor Venue" }, { icon: Mic, label: "Presentations" }, { icon: Users, label: "Networking" }].map((item, i) => (
-                    <div key={i} className="flex flex-col items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400">
-                        <item.icon className="w-5 h-5" />
-                      </div>
-                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{item.label}</span>
-                    </div>
-                  ))}
-                </div>
               </motion.div>
             </section>
 
@@ -341,7 +319,7 @@ export default function ThemeProfessional({ eventData, guestName, isOpen, onOpen
               <section className="py-24 px-6 bg-corporate-alt">
                 <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-4xl mx-auto text-center">
                   <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-2">Dokumentasi</p>
-                  <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-10 uppercase tracking-widest">Galeri Acara</h2>
+                  <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-10 uppercase tracking-widest">Galeri</h2>
 
                   <div className="relative overflow-hidden rounded-2xl shadow-lg border border-slate-200 bg-white">
                     <AnimatePresence mode="wait">
