@@ -87,7 +87,7 @@ export default function Footer() {
         {/* ════ COPYRIGHT SECTION (Paling Bawah) ════ */}
         <div className="mt-12 pt-6 border-t border-gray-700/50 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm font-medium text-gray-500 text-center w-full">
-            Copyright © {new Date().getFullYear()} EventRent. All rights reserved.
+            Copyright © {new Date().getFullYear()} EventRent. cah 4
           </p>
         </div>
 
