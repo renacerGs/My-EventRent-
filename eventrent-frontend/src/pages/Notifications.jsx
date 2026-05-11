@@ -3,6 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { supabase } from '../supabase';
 
+// 🔥 KOMPONEN SKELETON NOTIFIKASI 🔥
+const NotificationSkeleton = ({ isAgentMode }) => (
+  <div className={`p-5 md:p-7 flex gap-3 md:gap-5 border-b ${isAgentMode ? 'border-slate-700/50' : 'border-gray-100'} animate-pulse`}>
+    <div className={`w-10 h-10 rounded-full shrink-0 ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+    <div className="flex-1">
+      <div className="flex justify-between items-start mb-2">
+        <div className={`w-1/2 h-5 rounded ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+        <div className={`w-3 h-3 rounded-full ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+      </div>
+      <div className={`w-full h-4 rounded mb-2 ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+      <div className={`w-3/4 h-4 rounded mb-3 ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+      <div className={`w-1/4 h-3 rounded ${isAgentMode ? 'bg-slate-700' : 'bg-gray-200'}`}></div>
+    </div>
+  </div>
+);
+
 export default function Notifications() {
   const navigate = useNavigate();
   
@@ -20,7 +36,7 @@ export default function Notifications() {
   const [deleteType, setDeleteType] = useState('selected'); 
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // 🔥 RADAR PEMISAH KASTA NOTIFIKASI MUTLAK 🔥
+  // 🔥 RADAR PEMISAH KASTA (KEMBALI KE VERSI PERFECT LU) 🔥
   const checkIsAgentNotif = (notif) => {
     if (!notif) return false;
     const type = notif.type || '';
@@ -471,8 +487,9 @@ export default function Notifications() {
 
         <div className={`${isAgentMode ? 'bg-slate-800/50 border-slate-700/50 backdrop-blur-sm' : 'bg-white border-gray-200'} rounded-[24px] md:rounded-[32px] shadow-sm border overflow-hidden relative transition-colors duration-300`}>
           {loading ? (
-            <div className="py-20 flex justify-center">
-              <div className={`w-8 h-8 border-4 ${isAgentMode ? 'border-slate-700 border-t-orange-500' : 'border-gray-200 border-t-[#FF6B35]'} rounded-full animate-spin`}></div>
+            <div className="flex flex-col">
+              {/* 🔥 TAMPILIN SKELETON PAS LOADING 🔥 */}
+              {[...Array(4)].map((_, i) => <NotificationSkeleton key={i} isAgentMode={isAgentMode} />)}
             </div>
           ) : notifications.length === 0 ? (
             <div className="py-20 text-center">
@@ -491,7 +508,7 @@ export default function Notifications() {
                   return (
                     <React.Fragment key={notif.id}>
                       <div 
-                        className={`p-5 md:p-7 transition-all flex gap-3 md:gap-5 cursor-pointer ${style.wrapperClass} ${isSelected ? (isAgentMode ? '!bg-rose-500/10' : '!bg-red-50/50') : ''} ${index >= 5 && !isShowingAll ? 'hidden' : ''}`}
+                        className={`p-5 md:p-7 transition-all flex gap-3 md:gap-5 cursor-pointer ${style.wrapperClass} ${isSelected ? (isAgentMode ? '!bg-rose-500/10' : '!bg-red-50/50') : ''} ${index >= visibleCount && !isShowingAll ? 'hidden' : ''}`}
                         onClick={() => handleNotifClick(notif)}
                       >
                         {isEditMode && (

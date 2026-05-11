@@ -2,6 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
+// 🔥 KOMPONEN SKELETON PAYOUT ROW (DARK MODE) 🔥
+const WalletSkeletonRow = () => (
+  <div className="p-5 md:p-6 flex flex-col sm:flex-row justify-between gap-4 border-b border-slate-700/50 last:border-none animate-pulse">
+    <div>
+      <div className="w-24 h-5 bg-slate-700 rounded-md mb-3"></div>
+      <div className="w-40 md:w-56 h-5 bg-slate-700 rounded-md mb-2"></div>
+      <div className="w-28 h-3 bg-slate-700 rounded-md"></div>
+    </div>
+    <div className="flex flex-col sm:items-end gap-2 shrink-0 mt-2 sm:mt-0">
+      <div className="w-32 h-6 bg-slate-700 rounded-md mb-1"></div>
+      <div className="w-20 h-3 bg-slate-700 rounded-md"></div>
+    </div>
+  </div>
+);
+
 export default function AgentWallet() {
   const navigate = useNavigate();
   const [user] = useState(() => JSON.parse(localStorage.getItem('user')) || null);
@@ -64,7 +79,14 @@ export default function AgentWallet() {
         <div className="bg-emerald-500 rounded-[24px] md:rounded-[32px] p-6 md:p-8 text-white shadow-[0_10px_40px_-10px_rgba(16,185,129,0.3)] mb-8 relative overflow-hidden">
           <div className="relative z-10">
             <p className="text-emerald-100 text-sm font-bold uppercase tracking-widest mb-1">Total Earnings</p>
-            <h2 className="text-4xl md:text-5xl font-black">Rp {totalPendapatan.toLocaleString('en-US')}</h2>
+            {/* 🔥 SKELETON BUAT ANGKA DUIT 🔥 */}
+            <h2 className="text-4xl md:text-5xl font-black min-h-[48px] flex items-center">
+              {loading ? (
+                <div className="w-48 h-10 md:h-12 bg-emerald-400/50 rounded-xl animate-pulse mt-1"></div>
+              ) : (
+                `Rp ${totalPendapatan.toLocaleString('en-US')}`
+              )}
+            </h2>
           </div>
           <svg className="absolute right-0 bottom-0 opacity-20 w-40 h-40 transform translate-x-8 translate-y-8" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
         </div>
@@ -76,7 +98,10 @@ export default function AgentWallet() {
           </div>
 
           {loading ? (
-            <div className="py-20 flex justify-center"><div className="w-8 h-8 border-4 border-slate-700 border-t-emerald-500 rounded-full animate-spin"></div></div>
+            /* 🔥 SKELETON BUAT LIST GAJIAN 🔥 */
+            <div className="flex flex-col">
+              {[...Array(4)].map((_, i) => <WalletSkeletonRow key={i} />)}
+            </div>
           ) : payouts.length === 0 ? (
             <div className="py-20 text-center">
               <h3 className="text-lg font-bold text-white">No earnings yet</h3>

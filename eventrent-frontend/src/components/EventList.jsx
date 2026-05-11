@@ -1,4 +1,4 @@
-// Versi 2: Pagination (Angka Halaman)
+// Versi 3: Pagination + Skeleton Loading Elegan 🔥
 import React, { useState, useEffect, useRef } from 'react'; 
 import { Link } from 'react-router-dom';
 import { motion, LayoutGroup } from 'framer-motion';
@@ -48,15 +48,59 @@ const getEventLink = (event) => {
   }
 };
 
+// 🔥 KOMPONEN SKELETON LOADING 🔥
+const SkeletonCard = () => (
+  <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 overflow-hidden flex flex-col h-[380px]">
+    {/* Gambar Skeleton */}
+    <div className="relative h-44 bg-gray-200 animate-pulse"></div>
+    
+    <div className="p-5 flex flex-col flex-1">
+      {/* Judul Skeleton */}
+      <div className="h-5 bg-gray-200 rounded-lg w-3/4 mb-3 animate-pulse"></div>
+      <div className="h-5 bg-gray-200 rounded-lg w-1/2 mb-5 animate-pulse"></div>
+      
+      {/* Tanggal & Lokasi Skeleton */}
+      <div className="space-y-3 mb-5 flex-1 mt-2">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded-full bg-gray-200 animate-pulse shrink-0"></div>
+          <div className="h-3 bg-gray-100 rounded w-1/2 animate-pulse"></div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded-full bg-gray-200 animate-pulse shrink-0"></div>
+          <div className="h-3 bg-gray-100 rounded w-2/3 animate-pulse"></div>
+        </div>
+      </div>
+
+      {/* Footer (Kategori & Harga) Skeleton */}
+      <div className="pt-4 border-t border-gray-100 mt-auto flex items-center justify-between">
+        <div className="h-6 bg-gray-200 rounded-lg w-16 animate-pulse"></div>
+        <div className="h-4 bg-gray-200 rounded w-20 animate-pulse"></div>
+      </div>
+    </div>
+  </div>
+);
+
 export default function EventList({ events, searchQuery, onClearSearch }) {
   const [activeCategory, setActiveCategory] = useState('All');
-  
-  // 🔥 STATE BARU BUAT PAGINATION 🔥
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 9; 
   
+  // 🔥 STATE DETEKTOR LOADING 🔥
+  const [isDataReady, setIsDataReady] = useState(false);
+  
   const categories = ['All', 'Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports'];
   const isCategoryClicked = useRef(false);
+
+  // Efek pintar buat ngebaca kapan data event masuk
+  useEffect(() => {
+    if (events && events.length > 0) {
+      setIsDataReady(true);
+    } else {
+      // Pura-pura nunggu sebentar. Kalau lewat 1.5 detik tetep kosong, berarti emang gak ada event
+      const timer = setTimeout(() => setIsDataReady(true), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [events]);
 
   useEffect(() => {
     if (isCategoryClicked.current) {
@@ -66,12 +110,12 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
 
     if (!searchQuery || searchQuery.trim() === '') {
       setActiveCategory('All');
-      setCurrentPage(1); // Reset ke Hal 1
+      setCurrentPage(1); 
       return; 
     }
 
     const queryLower = searchQuery.trim().toLowerCase();
-    const matchedEvent = events.find(e => e.title.toLowerCase().includes(queryLower));
+    const matchedEvent = events?.find(e => e.title.toLowerCase().includes(queryLower));
     
     if (matchedEvent && matchedEvent.category) {
       if (categories.includes(matchedEvent.category)) {
@@ -89,7 +133,7 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
         setActiveCategory('All');
       }
     }
-    setCurrentPage(1); // Reset ke Hal 1 tiap search
+    setCurrentPage(1); 
   }, [searchQuery, events]); 
 
   const handleCategoryClick = (cat) => {
@@ -97,13 +141,13 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
       isCategoryClicked.current = true; 
     }
     setActiveCategory(cat); 
-    setCurrentPage(1); // Reset ke Hal 1 tiap ganti tab
+    setCurrentPage(1); 
     if (onClearSearch) {
       onClearSearch(''); 
     }
   };
 
-  const filteredEvents = events.filter(event => {
+  const filteredEvents = (events || []).filter(event => {
     if (isEventPassed(event)) return false;
 
     if (searchQuery && searchQuery.trim() !== '') {
@@ -116,7 +160,6 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
     return event.category === activeCategory;
   });
 
-  // 🔥 LOGIC MATH PAGINATION 🔥
   const indexOfLastEvent = currentPage * itemsPerPage;
   const indexOfFirstEvent = indexOfLastEvent - itemsPerPage;
   const currentEvents = filteredEvents.slice(indexOfFirstEvent, indexOfLastEvent);
@@ -125,7 +168,6 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
 
   const paginate = (pageNumber) => {
     setCurrentPage(pageNumber);
-    // Scroll mulus ke atas daftar event pas ganti halaman
     window.scrollTo({ top: document.getElementById('event-grid').offsetTop - 100, behavior: 'smooth' });
   };
 
@@ -171,7 +213,13 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
       </div>
 
       <div id="event-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
-        {currentEvents.length > 0 ? (
+        
+        {/* 🔥 TAMPILIN SKELETON KALAU DATA BELUM READY 🔥 */}
+        {!isDataReady ? (
+          [...Array(6)].map((_, i) => <SkeletonCard key={i} />)
+        ) : currentEvents.length > 0 ? (
+          
+          /* DATA ASLI */
           currentEvents.map(event => (
             <Link 
               to={getEventLink(event)} 
@@ -214,14 +262,15 @@ export default function EventList({ events, searchQuery, onClearSearch }) {
             </Link>
           ))
         ) : (
+          /* KALAU BENERAN KOSONG */
           <div className="col-span-full text-center py-20 text-gray-400 font-bold bg-white rounded-3xl border border-gray-100">
             No events found.
           </div>
         )}
       </div>
 
-      {/* 🔥 TOMBOL PAGINATION 🔥 */}
-      {totalPages > 1 && (
+      {/* TAMPILIN PAGINATION KALAU DATA UDAH READY */}
+      {isDataReady && totalPages > 1 && (
         <div className="mt-12 flex justify-center items-center gap-2">
           <button 
             onClick={() => paginate(currentPage - 1)} 

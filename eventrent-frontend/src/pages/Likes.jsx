@@ -19,6 +19,40 @@ const formatPrettyDate = (dateString) => {
   }
 };
 
+// 🔥 KOMPONEN SKELETON LIKES CARD 🔥
+const LikesSkeletonCard = () => (
+  <div className="bg-white rounded-[32px] overflow-hidden shadow-sm border border-gray-100 flex flex-col h-[350px] animate-pulse">
+    {/* Skeleton Gambar */}
+    <div className="relative aspect-[4/3] w-full bg-gray-200">
+       <div className="absolute top-4 left-4 w-20 h-6 bg-gray-300 rounded-lg"></div>
+       <div className="absolute top-4 right-4 w-10 h-10 bg-gray-300 rounded-full"></div>
+    </div>
+
+    <div className="p-6 flex flex-col flex-1">
+      {/* Skeleton Judul */}
+      <div className="w-3/4 h-6 bg-gray-200 rounded-md mb-4"></div>
+      
+      {/* Skeleton Info Waktu & Tempat */}
+      <div className="space-y-3 mb-6 flex-1 mt-2">
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded-full bg-gray-200 shrink-0"></div>
+          <div className="h-4 bg-gray-100 rounded w-1/2"></div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded-full bg-gray-200 shrink-0"></div>
+          <div className="h-4 bg-gray-100 rounded w-2/3"></div>
+        </div>
+      </div>
+
+      {/* Skeleton Footer */}
+      <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-auto">
+        <div className="w-24 h-5 bg-gray-200 rounded"></div>
+        <div className="w-10 h-10 bg-gray-200 rounded-xl"></div>
+      </div>
+    </div>
+  </div>
+);
+
 export default function Likes() {
   const [likedEvents, setLikedEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -142,14 +176,6 @@ export default function Likes() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA]">
-        <div className="w-12 h-12 border-4 border-gray-200 border-t-[#FF6B35] rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#F8F9FA] py-10 px-4 md:px-8 font-sans text-left relative">
       
@@ -205,11 +231,16 @@ export default function Likes() {
           </span>
         </div>
 
-        {/* EMPTY STATES */}
+        {/* EMPTY STATES ATAU SKELETON */}
         {!user ? (
           <div className="text-center py-24 bg-white rounded-[40px] shadow-sm border border-gray-100">
             <p className="text-gray-500 mb-6 font-bold uppercase tracking-widest text-sm">Please login to see your liked events.</p>
             <Link to="/" className="bg-gray-900 text-white px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-xs hover:bg-black transition-all shadow-xl">Login Now</Link>
+          </div>
+        ) : loading ? (
+          /* 🔥 TAMPILIN SKELETON PAS LOADING 🔥 */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+            {[...Array(3)].map((_, i) => <LikesSkeletonCard key={i} />)}
           </div>
         ) : likedEvents.length === 0 ? (
           <div className="text-center py-24 bg-white rounded-[40px] shadow-sm border border-gray-100">

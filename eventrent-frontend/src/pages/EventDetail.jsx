@@ -17,6 +17,47 @@ const formatPrettyDate = (dateString) => {
   }
 };
 
+// 🔥 KOMPONEN SKELETON DETAIL EVENT 🔥
+const EventDetailSkeleton = () => (
+  <div className="min-h-screen bg-[#F8F9FA] pb-20 font-sans relative">
+    {/* Skeleton Banner */}
+    <div className="relative w-full h-[280px] md:h-[500px] bg-gray-200 animate-pulse"></div>
+
+    <div className="max-w-6xl mx-auto px-4 md:px-8 relative z-10 -mt-20 md:-mt-32">
+      {/* Skeleton Konten Utama */}
+      <div className="bg-white rounded-[28px] md:rounded-[40px] shadow-sm p-6 md:p-12 flex flex-col lg:flex-row gap-8 md:gap-12 mb-8 md:mb-12 border border-gray-100">
+        <div className="flex-1 text-left relative">
+          <div className="w-24 h-6 bg-gray-200 rounded-lg mb-4 md:mb-6 animate-pulse"></div>
+          <div className="w-3/4 h-10 md:h-12 bg-gray-200 rounded-xl mb-3 md:mb-4 animate-pulse"></div>
+          <div className="w-1/2 h-8 bg-gray-200 rounded-xl mb-6 md:mb-8 animate-pulse"></div>
+          
+          <div className="space-y-6 md:space-y-8 mb-8 md:mb-10">
+            <div>
+              <div className="w-20 h-4 bg-gray-200 rounded mb-2 md:mb-3 animate-pulse"></div>
+              <div className="w-full h-24 bg-gray-100 rounded-2xl animate-pulse"></div>
+            </div>
+            <div>
+              <div className="w-20 h-4 bg-gray-200 rounded mb-2 md:mb-3 animate-pulse"></div>
+              <div className="w-1/2 h-12 bg-gray-100 rounded-2xl animate-pulse"></div>
+            </div>
+          </div>
+
+          <div>
+             <div className="w-24 h-4 bg-gray-200 rounded mb-2 md:mb-3 animate-pulse"></div>
+             <div className="w-full h-32 bg-gray-100 rounded-[24px] animate-pulse"></div>
+          </div>
+        </div>
+
+        {/* Skeleton Kotak Kanan (Ticket) */}
+        <div className="w-full lg:w-[320px] flex flex-col md:items-end gap-4 md:gap-6 shrink-0">
+          <div className="w-full h-40 bg-gray-100 rounded-[32px] animate-pulse mt-10 md:mt-14"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+
 export default function EventDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -29,10 +70,8 @@ export default function EventDetail() {
   const scrollContainerRef = useRef(null);
   const [popup, setPopup] = useState({ isOpen: false, message: '', type: 'info' });
   
-  // 👇 STATE BARU BUAT MODAL SHARE 👇
   const [showShareModal, setShowShareModal] = useState(false);
 
-  // 👇 CEK APAKAH INI WEDDING / PRIVATE 👇
   const isWed = event?.is_private || event?.isPrivate;
 
   const showPopup = (message, type = 'info') => {
@@ -46,26 +85,22 @@ export default function EventDetail() {
   useEffect(() => {
     const fetchEventDetail = async () => {
       try {
-        // 🔥 AMBIL TOKEN DARI LOKAL STORAGE (Buat jaga-jaga kalau eventnya Private)
         const token = localStorage.getItem('supabase_token');
         const headers = {};
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
         }
 
-        // 🔥 TAMBAHIN HEADER TOKEN (OPSIONAL BAGI GUEST)
         const response = await fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}`, { headers });
         if (!response.ok) throw new Error('Gagal mengambil data event');
         const data = await response.json();
         setEvent(data);
         
-        // Hit API View (Boleh bawa token juga biar akurat)
         fetch(`${import.meta.env.VITE_API_URL}/api/events/${id}/view`, { 
           method: 'POST',
           headers: headers 
         }).catch(() => {});
         
-        // 👇👇 FIX LIKES (SABUK PENGAMAN KETAT) 👇👇
         const parsedLikes = JSON.parse(localStorage.getItem('likedEvents'));
         const savedLikes = Array.isArray(parsedLikes) ? parsedLikes : [];
         setIsLiked(savedLikes.some(item => String(item.id) === String(id)));
@@ -80,9 +115,8 @@ export default function EventDetail() {
 
     fetchEventDetail();
     window.scrollTo(0, 0);
-  }, [id, navigate]); // 👈 Aman sentosa, gak bakal infinite loop!
+  }, [id, navigate]); 
 
-  // 🔥 FUNGSI YANG DIUBAH: Pake Token & Buang userId
   const handleLikeClick = async () => {
     if (!user) return showPopup("Login dulu bro buat nyimpen ke Wishlist!", "error");
     
@@ -93,15 +127,14 @@ export default function EventDetail() {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` // 👈 KTP SUPABASE!
+          'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify({ eventId: event.id }) // 👈 userId DIHAPUS DARI SINI
+        body: JSON.stringify({ eventId: event.id }) 
       });
       if (res.ok) setIsLiked(!isLiked);
     } catch (error) { console.error(error); }
   };
 
-  // 👇 FUNGSI BARU: SHARE KE PLATFORM TERTENTU 👇
   const shareToPlatform = async (platform) => {
     const url = window.location.href;
     const text = isWed ? `Undangan Spesial: ${event.title}. Mohon konfirmasi kehadiran Anda.` : `Yuk ikut event ${event.title}!`;
@@ -147,7 +180,8 @@ export default function EventDetail() {
     }
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-400 tracking-widest uppercase">Memuat Acara...</div>;
+  // 🔥 GANTI TEKS LOADING DENGAN SKELETON 🔥
+  if (loading) return <EventDetailSkeleton />;
   if (!event) return null;
 
   return (

@@ -3,6 +3,42 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
+// 🔥 KOMPONEN SKELETON EVENT (DARK MODE) 🔥
+const AgentEventSkeleton = () => (
+  <div className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 md:px-8 md:py-6 border-b border-[#1E2D4A]/50 animate-pulse gap-3 md:gap-0">
+    <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full md:w-[45%]">
+      <div className="w-full sm:w-20 h-36 sm:h-20 rounded-xl bg-[#1E2D4A] shrink-0"></div>
+      <div className="flex-1 w-full">
+        <div className="h-5 w-3/4 bg-[#1E2D4A] rounded mb-2.5"></div>
+        <div className="h-3 w-1/3 bg-[#1E2D4A] rounded mt-2"></div>
+        <div className="h-3 w-1/2 bg-[#1E2D4A] rounded mt-2"></div>
+      </div>
+    </div>
+    <div className="w-full md:w-[30%] flex flex-row items-center justify-start md:justify-between gap-2 border-t md:border-none border-[#1E2D4A] pt-3 md:pt-0">
+       <div className="w-20 h-6 bg-[#1E2D4A] rounded-lg"></div>
+       <div className="w-16 h-6 bg-[#1E2D4A] rounded-full"></div>
+    </div>
+    <div className="w-full md:w-[25%] flex flex-row items-center justify-between md:justify-end gap-3 mt-3 md:mt-0">
+       <div className="w-24 h-9 bg-[#1E2D4A] rounded-xl hidden md:block"></div>
+       <div className="w-24 h-9 bg-[#1E2D4A] rounded-xl hidden md:block"></div>
+    </div>
+  </div>
+);
+
+// 🔥 KOMPONEN SKELETON GUEST LIST / ATTENDEES (DARK MODE) 🔥
+const AgentGuestSkeleton = () => (
+  <tr className="border-b border-[#1E2D4A]/50 animate-pulse">
+    <td className="px-6 py-4"><div className="w-16 h-4 bg-[#1E2D4A] rounded"></div></td>
+    <td className="px-6 py-4">
+      <div className="w-32 h-4 bg-[#1E2D4A] rounded mb-2"></div>
+      <div className="w-24 h-3 bg-[#1E2D4A] rounded"></div>
+    </td>
+    <td className="px-6 py-4"><div className="w-24 h-6 bg-[#1E2D4A] rounded-md"></div></td>
+    <td className="px-6 py-4 text-center"><div className="w-16 h-6 bg-[#1E2D4A] rounded-full mx-auto"></div></td>
+    <td className="px-6 py-4 text-right"><div className="w-24 h-8 bg-[#1E2D4A] rounded-lg ml-auto"></div></td>
+  </tr>
+);
+
 export default function AgentDashboard() {
   const navigate = useNavigate();
   const [user] = useState(() => JSON.parse(localStorage.getItem('user')) || null);
@@ -201,13 +237,6 @@ export default function AgentDashboard() {
     }
   };
 
-  if (loading) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#0B1426]">
-      <div className="w-12 h-12 border-4 border-[#1E2D4A] border-t-blue-500 rounded-full animate-spin mb-4"></div>
-      <p className="uppercase tracking-widest text-xs font-bold text-slate-500">Loading Dashboard...</p>
-    </div>
-  );
-
   const uniqueSessions = ['All Sessions', ...new Set(attendees.map(t => t.session_name))];
 
   const filteredAttendees = attendees.filter(t => {
@@ -320,7 +349,7 @@ export default function AgentDashboard() {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 pt-6 md:pt-16 relative z-10">
         
-        {/* 🔥 HEADER PROFILE BARU: DITAMBAH AVERAGE RATING 🔥 */}
+        {/* 🔥 HEADER PROFILE (TAMPIL TERUS WALAUPUN LOADING) 🔥 */}
         <div className="flex flex-col md:flex-row items-center md:items-end justify-between gap-6 mb-8 md:mb-10 bg-[#152036]/50 p-6 md:p-8 rounded-[24px] md:rounded-[32px] border border-[#1E2D4A]/50 backdrop-blur-sm">
           <div className="flex flex-col md:flex-row items-center gap-4 md:gap-6 text-center md:text-left">
             <div className="w-16 h-16 md:w-24 md:h-24 rounded-full overflow-hidden border-4 border-[#1E2D4A] shadow-xl shrink-0">
@@ -339,14 +368,22 @@ export default function AgentDashboard() {
             {/* BLOK TOTAL EVENTS */}
             <div className="text-center md:text-right">
               <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Total Events</p>
-              <p className="text-2xl md:text-3xl font-black text-white">{assignedEvents.length}</p>
+              {loading ? (
+                <div className="w-10 h-8 bg-[#1E2D4A] rounded animate-pulse md:ml-auto"></div>
+              ) : (
+                <p className="text-2xl md:text-3xl font-black text-white">{assignedEvents.length}</p>
+              )}
             </div>
             {/* BLOK AVERAGE RATING */}
             <div className="text-center md:text-right">
               <p className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Rating</p>
               <div className="flex items-center justify-center md:justify-end gap-1.5 md:gap-2">
                 <svg className="w-5 h-5 md:w-6 md:h-6 text-yellow-400 fill-current" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
-                <p className="text-2xl md:text-3xl font-black text-white">{averageRating}</p>
+                {loading ? (
+                  <div className="w-12 h-8 bg-[#1E2D4A] rounded animate-pulse"></div>
+                ) : (
+                  <p className="text-2xl md:text-3xl font-black text-white">{averageRating}</p>
+                )}
               </div>
             </div>
           </div>
@@ -373,7 +410,22 @@ export default function AgentDashboard() {
               </div>
             </div>
 
-            {displayedEvents.length > 0 ? (
+            {loading ? (
+              // 🔥 TAMPILIN SKELETON PAS LOADING DAFTAR EVENT 🔥
+              <div className="bg-[#152036]/50 rounded-[20px] md:rounded-[32px] border border-[#1E2D4A]/50 overflow-hidden shadow-xl">
+                 <div className="hidden md:flex items-center justify-between px-8 py-4 bg-[#0B1426]/50 border-b border-[#1E2D4A]/50 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                  <div className="w-[45%]">Event Details</div>
+                  <div className="w-[30%] flex justify-between">
+                    <div className="w-[60%] text-center">Role & Time</div>
+                    <div className="w-[40%] text-center">Status</div>
+                  </div>
+                  <div className="w-[25%] text-right">Action</div>
+                </div>
+                <div className="flex flex-col">
+                  {[...Array(3)].map((_, i) => <AgentEventSkeleton key={i} />)}
+                </div>
+              </div>
+            ) : displayedEvents.length > 0 ? (
               <div className="bg-[#152036]/50 rounded-[20px] md:rounded-[32px] border border-[#1E2D4A]/50 overflow-hidden shadow-xl">
                 <div className="hidden md:flex items-center justify-between px-8 py-4 bg-[#0B1426]/50 border-b border-[#1E2D4A]/50 text-[10px] font-black text-slate-500 uppercase tracking-widest">
                   <div className="w-[45%]">Event Details</div>
@@ -386,7 +438,6 @@ export default function AgentDashboard() {
 
                 <div className="flex flex-col">
                   {displayedEvents.map((ev, index) => (
-                    {/* 🔥 PERBAIKAN: ONCLICK MATI KALAU DI HISTORY BIAR GA LARI KE SCAN, KURSOR JUGA DEFAULT 🔥 */},
                     <div 
                       key={ev.id} 
                       onClick={() => activeTab === 'active' && handleEventClick(ev)} 
@@ -442,7 +493,6 @@ export default function AgentDashboard() {
                       </div>
 
                       <div className="w-full md:w-[25%] flex flex-row items-center justify-between md:justify-end gap-4 mt-3 md:mt-0">
-                        {/* 🔥 PERBAIKAN: ACTION BUTTONS HILANG KALAU DI HISTORY 🔥 */}
                         {activeTab === 'active' ? (
                           <>
                             <div className="md:hidden flex items-center text-slate-400 group-hover:text-blue-500 text-[10px] font-black uppercase tracking-widest transition-colors">
@@ -595,74 +645,71 @@ export default function AgentDashboard() {
             </div>
 
             <div className="bg-[#152036]/50 md:bg-[#152036] rounded-[20px] md:rounded-[24px] border border-transparent md:border-[#1E2D4A] overflow-hidden md:shadow-xl">
-              {loadingAttendees ? (
-                <div className="py-20 text-center"><p className="text-slate-400 font-bold text-xs md:text-sm">Fetching guest data...</p></div>
-              ) : (
-                <>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[700px]">
-                      <thead>
-                        <tr className="bg-[#0B1426]/50 border-b border-[#1E2D4A] text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                          <th className="px-6 py-5">Ticket ID</th>
-                          <th className="px-6 py-5">Guest Name</th>
-                          <th className="px-6 py-5">Session</th>
-                          <th className="px-6 py-5 text-center">Status</th>
-                          <th className="px-6 py-5 text-right">Action</th>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[700px]">
+                  <thead>
+                    <tr className="bg-[#0B1426]/50 border-b border-[#1E2D4A] text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <th className="px-6 py-5">Ticket ID</th>
+                      <th className="px-6 py-5">Guest Name</th>
+                      <th className="px-6 py-5">Session</th>
+                      <th className="px-6 py-5 text-center">Status</th>
+                      <th className="px-6 py-5 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* 🔥 TAMPILIN SKELETON GUEST PAS LOADING 🔥 */}
+                    {loadingAttendees ? (
+                       [...Array(5)].map((_, i) => <AgentGuestSkeleton key={i} />)
+                    ) : currentItems.length > 0 ? (
+                      currentItems.map((t) => (
+                        <tr key={t.ticket_id} className="border-b border-[#1E2D4A]/50 hover:bg-[#1A2844] transition-colors">
+                          <td className="px-6 py-4 text-xs font-bold text-slate-400 font-mono">#{t.ticket_id.slice(-6)}</td>
+                          <td className="px-6 py-4">
+                            <p className="font-bold text-white text-sm">{t.attendee_name || t.buyer_name}</p>
+                            <p className="text-[10px] text-slate-500">{t.attendee_email || t.buyer_email}</p>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="px-2.5 py-1 bg-[#0B1426] rounded-md text-[10px] font-bold text-slate-300 border border-[#1E2D4A] uppercase truncate max-w-[150px] inline-block">{t.session_name}</span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            {t.is_attending === false ? (
+                              <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-red-500/30">Declined</span>
+                            ) : t.is_scanned ? (
+                              <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-500/30">Present</span>
+                            ) : (
+                              <span className="px-3 py-1 bg-[#1E2D4A] text-slate-300 rounded-full text-[10px] font-bold uppercase tracking-widest">Absent</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            {!t.is_scanned && t.is_attending !== false && activeTab === 'active' ? (
+                              <button onClick={() => setConfirmCheckIn({ isOpen: true, ticketId: t.ticket_id, eventId: selectedEvent.id })} className="bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-blue-500/30 whitespace-nowrap shadow-sm hover:shadow-blue-500/20">
+                                Check-In
+                              </button>
+                            ) : (
+                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest italic">Completed</span>
+                            )}
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {currentItems.length > 0 ? (
-                          currentItems.map((t) => (
-                            <tr key={t.ticket_id} className="border-b border-[#1E2D4A]/50 hover:bg-[#1A2844] transition-colors">
-                              <td className="px-6 py-4 text-xs font-bold text-slate-400 font-mono">#{t.ticket_id.slice(-6)}</td>
-                              <td className="px-6 py-4">
-                                <p className="font-bold text-white text-sm">{t.attendee_name || t.buyer_name}</p>
-                                <p className="text-[10px] text-slate-500">{t.attendee_email || t.buyer_email}</p>
-                              </td>
-                              <td className="px-6 py-4">
-                                <span className="px-2.5 py-1 bg-[#0B1426] rounded-md text-[10px] font-bold text-slate-300 border border-[#1E2D4A] uppercase truncate max-w-[150px] inline-block">{t.session_name}</span>
-                              </td>
-                              <td className="px-6 py-4 text-center">
-                                {t.is_attending === false ? (
-                                  <span className="px-3 py-1 bg-red-500/20 text-red-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-red-500/30">Declined</span>
-                                ) : t.is_scanned ? (
-                                  <span className="px-3 py-1 bg-emerald-500/20 text-emerald-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-500/30">Present</span>
-                                ) : (
-                                  <span className="px-3 py-1 bg-[#1E2D4A] text-slate-300 rounded-full text-[10px] font-bold uppercase tracking-widest">Absent</span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 text-right">
-                                {!t.is_scanned && t.is_attending !== false && activeTab === 'active' ? (
-                                  <button onClick={() => setConfirmCheckIn({ isOpen: true, ticketId: t.ticket_id, eventId: selectedEvent.id })} className="bg-blue-500/10 text-blue-500 hover:bg-blue-500 hover:text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-blue-500/30 whitespace-nowrap shadow-sm hover:shadow-blue-500/20">
-                                    Check-In
-                                  </button>
-                                ) : (
-                                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest italic">Completed</span>
-                                )}
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan="5" className="px-6 py-12 text-center text-slate-500 font-bold text-sm">No matching guest data found.</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="5" className="px-6 py-12 text-center text-slate-500 font-bold text-sm">No matching guest data found.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
-                  {totalPages > 1 && (
-                    <div className="px-6 py-4 border-t border-[#1E2D4A] bg-transparent md:bg-[#0B1426]/30 flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-500">
-                        Page <span className="text-white">{currentPage}</span> of <span className="text-white">{totalPages}</span>
-                      </span>
-                      <div className="flex gap-2">
-                        <button onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1} className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-[#152036] border border-[#1E2D4A] text-slate-300 hover:bg-[#1E2D4A] disabled:opacity-50 transition-colors">Prev</button>
-                        <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages} className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-[#152036] border border-[#1E2D4A] text-slate-300 hover:bg-[#1E2D4A] disabled:opacity-50 transition-colors">Next</button>
-                      </div>
-                    </div>
-                  )}
-                </>
+              {totalPages > 1 && !loadingAttendees && (
+                <div className="px-6 py-4 border-t border-[#1E2D4A] bg-transparent md:bg-[#0B1426]/30 flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-500">
+                    Page <span className="text-white">{currentPage}</span> of <span className="text-white">{totalPages}</span>
+                  </span>
+                  <div className="flex gap-2">
+                    <button onClick={() => setCurrentPage(p => p - 1)} disabled={currentPage === 1} className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-[#152036] border border-[#1E2D4A] text-slate-300 hover:bg-[#1E2D4A] disabled:opacity-50 transition-colors">Prev</button>
+                    <button onClick={() => setCurrentPage(p => p + 1)} disabled={currentPage === totalPages} className="px-3 py-1.5 rounded-lg text-[10px] font-bold bg-[#152036] border border-[#1E2D4A] text-slate-300 hover:bg-[#1E2D4A] disabled:opacity-50 transition-colors">Next</button>
+                  </div>
+                </div>
               )}
             </div>
           </motion.div>
