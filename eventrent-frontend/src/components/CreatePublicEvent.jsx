@@ -43,32 +43,49 @@ export default function CreatePublicEvent() {
 
   const categoriesList = ['Music', 'Food', 'Tech', 'Religious', 'Arts', 'Sports'];
 
-  const [formData, setFormData] = useState({
-    title: '', description: '', eventStart: '', eventEnd: '', phone: '', category: '',
-    isPrivate: false, 
-    location: { namePlace: '', place: '', city: '', province: '', mapUrl: '' },
-    // 🔥 UPDATE: VA Dihapus, Tambah objek bankDetails
-    paymentMethods: {
-      qris: true,
-      transferBank: false,
-      bankDetails: {
-        bankName: '',
-        accountNumber: '',
-        accountName: ''
-      }
-    },
-    sessions: [
-      {
-        id: crypto.randomUUID(), name: '', description: '', date: '', startTime: '', endTime: '', 
-        contactPerson: '', typeEvent: 'Paid', price: '', stock: '', ticketDesc: '',
-        location: { namePlace: '', place: '', city: '', province: '', mapUrl: '' }, 
-        questions: [{ id: crypto.randomUUID(), text: '', type: 'Text', isRequired: true, options: [''] }]
-      }
-    ]
+  // 🔥 AUTO-SAVE DRAFT: Tarik data dari localStorage kalau ada sisa ketikan
+  const [formData, setFormData] = useState(() => {
+    const savedDraft = localStorage.getItem('draft_public_event');
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed.formData) return parsed.formData;
+      } catch (e) { console.error("Failed to parse draft", e); }
+    }
+    return {
+      title: '', description: '', eventStart: '', eventEnd: '', phone: '', category: '',
+      isPrivate: false, 
+      location: { namePlace: '', place: '', city: '', province: '', mapUrl: '' },
+      paymentMethods: {
+        qris: true,
+        transferBank: false,
+        bankDetails: {
+          bankName: '',
+          accountNumber: '',
+          accountName: ''
+        }
+      },
+      sessions: [
+        {
+          id: crypto.randomUUID(), name: '', description: '', date: '', startTime: '', endTime: '', 
+          contactPerson: '', typeEvent: 'Paid', price: '', stock: '', ticketDesc: '',
+          location: { namePlace: '', place: '', city: '', province: '', mapUrl: '' }, 
+          questions: [{ id: crypto.randomUUID(), text: '', type: 'Text', isRequired: true, options: [''] }]
+        }
+      ]
+    };
   });
 
-  const [imagePreview, setImagePreview] = useState(null);
-  const [imageBase64, setImageBase64] = useState(''); 
+  const [imagePreview, setImagePreview] = useState(() => {
+    const savedDraft = localStorage.getItem('draft_public_event');
+    return savedDraft ? JSON.parse(savedDraft).imagePreview : null;
+  });
+  
+  const [imageBase64, setImageBase64] = useState(() => {
+    const savedDraft = localStorage.getItem('draft_public_event');
+    return savedDraft ? JSON.parse(savedDraft).imageBase64 : '';
+  });
+
   const [isLoading, setIsLoading] = useState(false);
 
   const [showCropModal, setShowCropModal] = useState(false);
@@ -77,13 +94,18 @@ export default function CreatePublicEvent() {
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
 
+  // 🔥 AUTO-SAVE DRAFT: Simpan otomatis ke localStorage setiap ada perubahan ketikan
+  useEffect(() => {
+    const draftData = { formData, imagePreview, imageBase64 };
+    localStorage.setItem('draft_public_event', JSON.stringify(draftData));
+  }, [formData, imagePreview, imageBase64]);
+
   const handleEventChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
   
   const handleLocationChange = (e) => {
     setFormData({ ...formData, location: { ...formData.location, [e.target.name]: e.target.value }});
   };
 
-  // 🔥 FUNGSI UPDATE BANK DETAILS
   const handleBankDetailsChange = (e) => {
     setFormData({
       ...formData,
@@ -214,7 +236,6 @@ export default function CreatePublicEvent() {
       return toast.error("Please select at least one payment method for paid tickets!");
     }
 
-    // 🔥 VALIDASI: Jika pilih Transfer Bank, detail bank EO wajib diisi
     if (hasPaidSession && formData.paymentMethods.transferBank) {
       const { bankName, accountNumber, accountName } = formData.paymentMethods.bankDetails;
       if (!bankName || !accountNumber || !accountName) {
@@ -241,7 +262,7 @@ export default function CreatePublicEvent() {
       
       const payload = {
           ...formData,
-          userId: user.id, // Menambahkan ID EO pembuat acara
+          userId: user.id, 
           img: publicUrlData.publicUrl 
       };
 
@@ -255,6 +276,8 @@ export default function CreatePublicEvent() {
       });
 
       if (response.ok) {
+          // 🔥 HAPUS DRAFT JIKA SUKSES SUBMIT!
+          localStorage.removeItem('draft_public_event'); 
           toast.success("Event successfully created!"); 
           navigate('/manage'); 
       } else {
