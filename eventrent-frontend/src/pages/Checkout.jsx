@@ -74,9 +74,15 @@ export default function Checkout() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState('idle'); 
 
-  // State untuk Cahaya Pay QR Code Modal
   const [qrData, setQrData] = useState(null);
   const [showQrModal, setShowQrModal] = useState(false);
+  
+  // 🔥 TAMBAHAN: State untuk nge-track Order ID yang baru aja dibuat via QRIS
+  const [currentOrderId, setCurrentOrderId] = useState(null);
+  // 🔥 TAMBAHAN: State buat muter-muter pas ngecek status
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false);
+  // 🔥 TAMBAHAN: State buat nampilin animasi "Sukses" di dalam modal QRIS
+  const [qrisPaymentSuccess, setQrisPaymentSuccess] = useState(false);
 
   const [popup, setPopup] = useState({ isOpen: false, message: '', type: 'info' });
 
@@ -132,6 +138,54 @@ export default function Checkout() {
     };
     fetchEvent();
   }, [id, navigate, preferredSessionId]);
+
+  // ========================================================
+  // 🔥 FUNGSI JEMPUT BOLA (CHECK PAYMENT STATUS)
+  // ========================================================
+  const checkPaymentStatus = async (autoCheck = false) => {
+    if (!currentOrderId || qrisPaymentSuccess) return;
+    
+    if (!autoCheck) setIsCheckingPayment(true);
+    
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/${currentOrderId}/check-status`);
+      const data = await res.json();
+      
+      if (res.ok && data.status === 'SUCCESS') {
+        // Hore Lunas! Tampilkan animasi sukses
+        setQrisPaymentSuccess(true);
+        setTimeout(() => {
+          setShowQrModal(false);
+          navigate(`/event/${id}`); // Arahin balik ke halaman event (atau kemana aja bebas)
+        }, 2000); // Tunggu 2 detik biar animasinya diliat user
+      } else if (!autoCheck) {
+        // Kalau manual klik tapi belum lunas, kasih tau
+        showPopup(data.message || "We haven't received the payment yet.", "info");
+      }
+    } catch (err) {
+      console.error(err);
+      if (!autoCheck) showPopup("Failed to check payment status.", "error");
+    } finally {
+      if (!autoCheck) setIsCheckingPayment(false);
+    }
+  };
+
+  // ========================================================
+  // 🔥 AUTO-REFRESH (POLLING) SETIAP 5 DETIK
+  // ========================================================
+  useEffect(() => {
+    let intervalId;
+    if (showQrModal && currentOrderId && !qrisPaymentSuccess) {
+      // Jalanin fungsi checkPaymentStatus (secara auto) tiap 5 detik
+      intervalId = setInterval(() => {
+        checkPaymentStatus(true);
+      }, 5000);
+    }
+    
+    // Bersihin interval kalau modal ketutup atau komponen hancur
+    return () => clearInterval(intervalId);
+  }, [showQrModal, currentOrderId, qrisPaymentSuccess]);
+
 
   const handleAddCartItem = () => {
     const availableSession = event.sessions.find(s => s.stock > 0 && !cart.some(item => String(item.sessionId) === String(s.id)));
@@ -218,12 +272,14 @@ export default function Checkout() {
       if (!res.ok) throw new Error(data.message || "Failed to create order");
 
       if (paymentMethod === 'MANUAL_TRANSFER') {
-        showPopup("Order Successful! Please upload your payment proof.", "success");
+        showPopup("Order Successful! Please check your email for payment instructions.", "success");
         setTimeout(() => navigate(`/upload-proof/${data.orderId}`), 2000);
       } 
       else {
         if (data.checkoutUrl) {
           setQrData(data.checkoutUrl);
+          setCurrentOrderId(data.orderId); // 🔥 Simpan Order ID buat dilacak nanti
+          setQrisPaymentSuccess(false); // Reset animasi
           setShowQrModal(true);
         } else {
           showPopup("An error occurred, the payment QR URL was not found.", "error");
@@ -288,7 +344,6 @@ export default function Checkout() {
   const inputStyle = `w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-1 bg-white text-gray-900 border border-gray-300 placeholder-gray-400 focus:border-[#FF6B35] focus:ring-[#FF6B35]`;
   const labelStyle = `block text-xs font-bold mb-2 uppercase tracking-widest text-gray-700`;
 
-  // 🔥 Mengambil detail metode pembayaran dari database (jika ada)
   const paymentOptions = event?.paymentMethods || { qris: true, transferBank: false };
   const bankDetails = paymentOptions.bankDetails || { bankName: '', accountNumber: '', accountName: '' };
 
@@ -513,7 +568,6 @@ export default function Checkout() {
                    </h2>
                    
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Opsi QRIS (Hanya muncul jika EO mengaktifkannya) */}
                       {paymentOptions.qris && (
                         <div 
                           onClick={() => setPaymentMethod('QRIS')}
@@ -530,7 +584,6 @@ export default function Checkout() {
                         </div>
                       )}
 
-                      {/* Opsi Transfer Bank (Hanya muncul jika EO mengaktifkannya) */}
                       {paymentOptions.transferBank && (
                         <div 
                           onClick={() => setPaymentMethod('MANUAL_TRANSFER')}
@@ -549,7 +602,6 @@ export default function Checkout() {
                             {paymentMethod === 'MANUAL_TRANSFER' && <div className="w-6 h-6 bg-[#FF6B35] rounded-full flex items-center justify-center shrink-0"><svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg></div>}
                           </div>
                           
-                          {/* 🔥 KOTAK INFORMASI REKENING EO (MUNCUL SAAT DIKLIK) */}
                           {paymentMethod === 'MANUAL_TRANSFER' && bankDetails && (
                             <div className="mt-4 pt-4 border-t border-orange-100 w-full">
                               <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Please transfer to:</p>
@@ -567,7 +619,6 @@ export default function Checkout() {
                       )}
                    </div>
 
-                   {/* Peringatan Jika EO Tidak Mengatur Satupun Metode Pembayaran */}
                    {(!paymentOptions.qris && !paymentOptions.transferBank) && (
                      <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-center">
                         <p className="text-sm font-bold text-red-600">The Event Organizer has not set up any payment methods.</p>
@@ -624,7 +675,7 @@ export default function Checkout() {
         </div>
       )}
 
-      {/* MODAL QR CODE PEMBAYARAN (CAHAYA PAY) */}
+      {/* 🔥 MODAL QR CODE PEMBAYARAN (DENGAN ANIMASI SUKSES & AUTO-REFRESH) 🔥 */}
       <AnimatePresence>
         {showQrModal && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -634,41 +685,62 @@ export default function Checkout() {
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className="w-full max-w-sm bg-white rounded-[32px] shadow-2xl p-8 text-center relative overflow-hidden"
             >
-              <h2 className="text-2xl font-black text-gray-900 mb-1 uppercase tracking-tight">Scan QRIS</h2>
-              <p className="text-xs font-bold text-gray-500 mb-6 uppercase tracking-widest">Open your e-Wallet or Mobile Banking</p>
-              
-              <div className="flex justify-center p-6 bg-gray-50 rounded-2xl mb-6 border border-gray-100 shadow-inner">
-                 {qrData ? (
-                   <QRCodeSVG value={qrData} size={220} level="H" />
-                 ) : (
-                   <div className="w-[220px] h-[220px] flex items-center justify-center animate-pulse bg-gray-200 rounded-xl">
-                      <span className="text-sm font-bold text-gray-400 uppercase">Loading...</span>
-                   </div>
-                 )}
-              </div>
+              {qrisPaymentSuccess ? (
+                // --- TAMPILAN JIKA SUDAH LUNAS ---
+                <div className="flex flex-col items-center justify-center py-6">
+                  <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 border-[6px] animate-bounce bg-green-50 text-green-500 border-green-100">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                  </div>
+                  <h2 className="text-2xl font-black text-gray-900 mb-1 uppercase tracking-tight">Payment Successful!</h2>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-2">Redirecting to your tickets...</p>
+                </div>
+              ) : (
+                // --- TAMPILAN QRIS NORMAL ---
+                <>
+                  <h2 className="text-2xl font-black text-gray-900 mb-1 uppercase tracking-tight">Scan QRIS</h2>
+                  <p className="text-xs font-bold text-gray-500 mb-6 uppercase tracking-widest">Open your e-Wallet or Mobile Banking</p>
+                  
+                  <div className="flex justify-center p-6 bg-gray-50 rounded-2xl mb-6 border border-gray-100 shadow-inner relative">
+                    {qrData ? (
+                      <QRCodeSVG value={qrData} size={220} level="H" />
+                    ) : (
+                      <div className="w-[220px] h-[220px] flex items-center justify-center animate-pulse bg-gray-200 rounded-xl">
+                          <span className="text-sm font-bold text-gray-400 uppercase">Loading...</span>
+                      </div>
+                    )}
 
-              <div className="space-y-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowQrModal(false);
-                    navigate('/my-orders'); 
-                  }}
-                  className="w-full py-4 bg-[#FF6B35] text-white rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-[#e85b2a] transition-all active:scale-95 shadow-lg"
-                >
-                  I Have Paid / Refresh
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowQrModal(false);
-                    navigate('/my-orders'); 
-                  }}
-                  className="w-full py-3 text-gray-500 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-gray-100 transition-colors"
-                >
-                  Close & Pay Later
-                </button>
-              </div>
+                    {/* OVERLAY LOADING SAAT CEK STATUS */}
+                    {isCheckingPayment && (
+                      <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center rounded-2xl z-10">
+                        <div className="w-10 h-10 border-4 border-gray-200 border-t-[#FF6B35] rounded-full animate-spin mb-3"></div>
+                        <span className="text-xs font-bold text-[#FF6B35] uppercase tracking-widest">Verifying...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      disabled={isCheckingPayment}
+                      onClick={() => checkPaymentStatus(false)}
+                      className="w-full py-4 bg-[#FF6B35] text-white rounded-xl font-bold uppercase tracking-widest text-sm hover:bg-[#e85b2a] transition-all active:scale-95 shadow-lg disabled:opacity-70"
+                    >
+                      {isCheckingPayment ? 'Checking...' : 'I Have Paid / Refresh'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isCheckingPayment}
+                      onClick={() => {
+                        setShowQrModal(false);
+                        navigate('/my-orders'); 
+                      }}
+                      className="w-full py-3 text-gray-500 rounded-xl font-bold text-xs uppercase tracking-widest hover:bg-gray-100 transition-colors disabled:opacity-50"
+                    >
+                      Close & Pay Later
+                    </button>
+                  </div>
+                </>
+              )}
             </motion.div>
           </div>
         )}

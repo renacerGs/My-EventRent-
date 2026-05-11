@@ -1060,13 +1060,12 @@ export class AppService implements OnModuleInit {
 
   async deleteNotifications(notifIds: number[], userId: number) {
     try {
-      // 🔥 Tambahin ::int[] agar PostgreSQL secara eksplisit mencocokkan Integer Array
       const query = 'DELETE FROM notifications WHERE id = ANY($1::int[]) AND user_id = $2 RETURNING id';
       const res = await this.pool.query(query, [notifIds, userId]);
       
       return { 
         message: 'Notifications successfully deleted!', 
-        deleted_count: res.rowCount // Kasih tau Flutter berapa data yang beneran lenyap
+        deleted_count: res.rowCount 
       };
     } catch (error) {
       console.error("Error Delete Notif:", error);
@@ -1434,7 +1433,8 @@ export class AppService implements OnModuleInit {
         terminal_no: TERMINAL_NO,
         terminal_time: Math.floor(Date.now() / 1000).toString(),
         pay_type: "2", 
-        total_fee: amount.toString(), 
+        // 🔥 TRIK Rp 1: Semua tagihan ke Cahaya Pay dipaksa jadi 1 Rupiah buat testing
+        total_fee: "1", 
         terminal_ip: ip || "127.0.0.1", 
         notify_url: `${process.env.BACKEND_URL || 'https://my-event-rent.vercel.app'}/api/payment/webhook`
       };
@@ -1714,7 +1714,7 @@ export class AppService implements OnModuleInit {
             
             <div style="text-align: center; margin-top: 30px;">
               <p style="font-size: 14px; color: #475569;">Already transferred? Click the button below to upload your proof:</p>
-              <a href="${uploadLink}" style="background-color: #FF6B35; color: white; padding: 16px 30px; text-decoration: none; border-radius: 12px; font-weight: 900; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);">Upload Proof Now</a>
+              <a href="${uploadLink}" target="_blank" rel="noopener noreferrer" style="background-color: #FF6B35; color: white; padding: 16px 30px; text-decoration: none; border-radius: 12px; font-weight: 900; display: inline-block; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 15px rgba(255, 107, 53, 0.3);">Upload Proof Now</a>
             </div>
 
             <p style="margin-top: 40px; font-size: 12px; color: #94a3b8; text-align: center;">If the button is not clickable, open this link:<br>${uploadLink}</p>
