@@ -580,7 +580,7 @@ export default function About() {
         style={{ background: BRAND.darker, color: "#94a3b8" }}
       >
         © {new Date().getFullYear()} EventRent — Built for organizers,
-        powered by people.
+        powered by cah 4.
       </footer>
     </div>
   );
