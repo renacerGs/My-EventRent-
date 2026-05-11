@@ -339,7 +339,7 @@ export default function CreateWeddingEvent() {
               <div>
                 <label className={labelStyle}>Main Invitation Cover Photo <span className="normal-case ml-1 font-normal text-[#D4AF37]">(Required)</span></label>
                 <label className="flex flex-col items-center justify-center w-full h-56 border-2 border-dashed rounded-xl cursor-pointer transition-all overflow-hidden border-slate-700 bg-slate-800/50 hover:bg-slate-800">
-                  {imagePreview ? <img src={imagePreview} alt="Preview Cover" className="w-full h-full object-cover" /> : <span className="text-4xl opacity-50">🖼️</span>}
+                  {imagePreview ? <img src={imagePreview} alt="Preview Cover" className="w-full h-full object-cover" /> : <span className="text-4xl opacity-50">+</span>}
                   <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageChange(e, 'cover')} />
                 </label>
               </div>

@@ -64,37 +64,66 @@ export default function CreatePersonalEvent() {
     setOpenSection(prev => prev === sectionName ? null : sectionName);
   };
 
-  const [formData, setFormData] = useState({
-    title: '', description: '', eventStart: '', eventEnd: '', phone: '', 
-    category: 'Personal',
-    isPrivate: true, 
-    location: { namePlace: '', place: '', city: '', province: '', mapUrl: '' }, 
-    sessions: [
-      {
-        id: crypto.randomUUID(), name: '', description: '', date: '', startTime: '', endTime: '', 
-        contactPerson: '', typeEvent: 'Free', price: '0', stock: '', ticketDesc: '', 
-        location: { namePlace: '', place: '', city: '', province: '', mapUrl: '' }, 
-        questions: [{ id: crypto.randomUUID(), text: '', type: 'Text', isRequired: true, options: [''] }]
-      }
-    ]
+  // 🔥 AUTO-SAVE DRAFT: Tarik data awal formData dari localStorage
+  const [formData, setFormData] = useState(() => {
+    const savedDraft = localStorage.getItem('draft_create_personal_event');
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed.formData) return parsed.formData;
+      } catch (e) { console.error("Failed to parse draft", e); }
+    }
+    return {
+      title: '', description: '', eventStart: '', eventEnd: '', phone: '', 
+      category: 'Personal',
+      isPrivate: true, 
+      location: { namePlace: '', place: '', city: '', province: '', mapUrl: '' }, 
+      sessions: [
+        {
+          id: crypto.randomUUID(), name: '', description: '', date: '', startTime: '', endTime: '', 
+          contactPerson: '', typeEvent: 'Free', price: '0', stock: '', ticketDesc: '', 
+          location: { namePlace: '', place: '', city: '', province: '', mapUrl: '' }, 
+          questions: [{ id: crypto.randomUUID(), text: '', type: 'Text', isRequired: true, options: [''] }]
+        }
+      ]
+    };
   });
 
-  const [eventDetails, setEventDetails] = useState({
-    templateType: 'ThemeBirthday',
-    quote: '',
-    openingMessage: '',
-    closingMessage: '',
-    profiles: [
-      { id: crypto.randomUUID(), fullName: '', nickName: '', role: 'Host', address: '', parentsInfo: '', photoUrl: null }
-    ],
-    digitalGifts: [
-      { id: crypto.randomUUID(), bankName: '', accountNumber: '', accountName: '' }
-    ]
+  // 🔥 AUTO-SAVE DRAFT: Tarik data awal eventDetails dari localStorage
+  const [eventDetails, setEventDetails] = useState(() => {
+    const savedDraft = localStorage.getItem('draft_create_personal_event');
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed.eventDetails) return parsed.eventDetails;
+      } catch (e) { console.error("Failed to parse draft", e); }
+    }
+    return {
+      templateType: 'ThemeBirthday',
+      quote: '',
+      openingMessage: '',
+      closingMessage: '',
+      profiles: [
+        { id: crypto.randomUUID(), fullName: '', nickName: '', role: 'Host', address: '', parentsInfo: '', photoUrl: null }
+      ],
+      digitalGifts: [
+        { id: crypto.randomUUID(), bankName: '', accountNumber: '', accountName: '' }
+      ]
+    };
   });
 
   const [galleryFiles, setGalleryFiles] = useState([]); 
-  const [imagePreview, setImagePreview] = useState(null);
-  const [imageBase64, setImageBase64] = useState(''); 
+  
+  // 🔥 AUTO-SAVE DRAFT: Tarik gambar cover dari localStorage
+  const [imagePreview, setImagePreview] = useState(() => {
+    const savedDraft = localStorage.getItem('draft_create_personal_event');
+    return savedDraft ? JSON.parse(savedDraft).imagePreview : null;
+  });
+  const [imageBase64, setImageBase64] = useState(() => {
+    const savedDraft = localStorage.getItem('draft_create_personal_event');
+    return savedDraft ? JSON.parse(savedDraft).imageBase64 : '';
+  });
+
   const [isLoading, setIsLoading] = useState(false);
 
   const [showCropModal, setShowCropModal] = useState(false);
@@ -103,6 +132,26 @@ export default function CreatePersonalEvent() {
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
   const [cropTarget, setCropTarget] = useState(null); 
+
+  // 🔥 AUTO-SAVE DRAFT: Simpan otomatis ke localStorage setiap ada perubahan ketikan
+  useEffect(() => {
+    try {
+      const draftData = { formData, eventDetails, imagePreview, imageBase64 };
+      localStorage.setItem('draft_create_personal_event', JSON.stringify(draftData));
+    } catch (error) {
+      console.warn("Draft too large for localStorage, saving text data only.");
+      const textOnlyDraft = { 
+        formData, 
+        eventDetails: { 
+          ...eventDetails, 
+          profiles: eventDetails.profiles.map(p => ({...p, photoUrl: null})) 
+        }, 
+        imagePreview: null, 
+        imageBase64: '' 
+      };
+      localStorage.setItem('draft_create_personal_event', JSON.stringify(textOnlyDraft));
+    }
+  }, [formData, eventDetails, imagePreview, imageBase64]);
 
   const handleEventChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
   const handleDetailsChange = (e) => setEventDetails({ ...eventDetails, [e.target.name]: e.target.value });
@@ -319,6 +368,7 @@ export default function CreatePersonalEvent() {
 
       const payload = {
           ...formData,
+          userId: user.id, // Pastikan userId terkirim
           img: coverUrl,
           eventDetails: finalEventDetails 
       };
@@ -333,6 +383,8 @@ export default function CreatePersonalEvent() {
       });
 
       if (response.ok) {
+          // 🔥 HAPUS DRAFT JIKA SUKSES SUBMIT!
+          localStorage.removeItem('draft_create_personal_event');
           toast.success("Party invitation successfully created!");
           navigate('/manage'); 
       } else {
@@ -437,7 +489,7 @@ export default function CreatePersonalEvent() {
                     <img src={imagePreview} alt="Preview Cover" className="w-full h-full object-cover" />
                   ) : (
                     <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center">
-                      <span className="text-4xl mb-2">🎉</span>
+                      <span className="text-4xl mb-2">+</span>
                       <p className="text-xs font-bold uppercase tracking-widest text-purple-600">Upload Poster/Cover Photo</p>
                     </div>
                   )}
