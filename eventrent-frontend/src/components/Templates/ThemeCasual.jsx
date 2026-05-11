@@ -1,52 +1,48 @@
 import React, { useState, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  CalendarDays, Clock, MapPin, ExternalLink, Gift, Copy, Check, Send,
-  ChevronLeft, ChevronRight, Heart, Leaf, Sun, Camera, Star
+  CalendarDays, Clock, MapPin, ExternalLink, Copy, Check, Send,
+  ChevronLeft, ChevronRight, Briefcase, Users, Mic, Building, CreditCard, MessageSquare
 } from "lucide-react";
 
-/* ─── CUSTOM ANIMATIONS & SAGE GREEN STYLES ─── */
+/* ─── CUSTOM STYLES: PROFESSIONAL THEME ─── */
 const CustomStyles = () => (
   <style dangerouslySetInnerHTML={{__html: `
-    @keyframes sway { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
-    .animate-sway { animation: sway 3s ease-in-out infinite; }
-    @keyframes gentle-bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5%); } }
-    .animate-gentle-bounce { animation: gentle-bounce 2s ease-in-out infinite; }
+    /* Corporate Color Palette */
+    .bg-corporate-light { background-color: #F8FAFC; }
+    .bg-corporate-alt { background-color: #F1F5F9; }
+    .text-corporate-accent { color: #2563EB; }
+    .bg-corporate-accent { background-color: #2563EB; }
     
-    .text-gradient-sage { 
-      background: linear-gradient(to right, #4C8360, #609F79); 
-      -webkit-background-clip: text; 
-      -webkit-text-fill-color: transparent; 
+    /* Sleek Cards */
+    .card-professional { 
+      background-color: #FFFFFF; 
+      border-radius: 1rem; 
+      border: 1px solid #E2E8F0; 
+      box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04); 
+      transition: all 0.3s ease;
     }
-    .divider-floral { height: 2px; background: linear-gradient(to right, transparent, #609F79, transparent); }
-    
-    /* Custom Background Colors - Sage Theme */
-    .bg-background { background-color: #FAFCFB; }
-    .bg-sage-glow { background-color: #F4F7F4; }
-    .bg-sage-pattern { background-color: #FAFCFB; background-image: radial-gradient(#DCE5DE 1px, transparent 1px); background-size: 20px 20px; }
-    .bg-sage-section { background-color: #EDF2EE; }
-    
-    .card-casual { background-color: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); border-radius: 1.5rem; border: 1px solid #DCE5DE; box-shadow: 0 10px 30px rgba(96, 159, 121, 0.08); }
-    .shadow-sage { box-shadow: 0 10px 25px rgba(96, 159, 121, 0.25); }
-    .shadow-soft { box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); }
+    .card-professional:hover {
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+      border-color: #CBD5E1;
+    }
 
-    /* Shadow yang lebih tebel biar tulisan makin terang/terbaca */
+    /* Clean Divider */
+    .divider-clean { 
+      height: 3px; 
+      background: #2563EB; 
+      border-radius: 4px;
+    }
+
+    /* Elegant Text Shadows for Hero */
     .text-shadow-elegant { text-shadow: 0px 4px 15px rgba(0,0,0,0.8), 0px 2px 5px rgba(0,0,0,0.5); }
     .text-shadow-sm { text-shadow: 0px 2px 6px rgba(0,0,0,0.7); }
+    
+    /* Scrollbar */
+    .scrollbar-professional::-webkit-scrollbar { width: 6px; }
+    .scrollbar-professional::-webkit-scrollbar-track { background: transparent; }
+    .scrollbar-professional::-webkit-scrollbar-thumb { background-color: #CBD5E1; border-radius: 10px; }
   `}} />
-);
-
-/* ─── Floating Emoji ─── */
-const FloatingEmoji = ({ emoji, left, delay }) => (
-  <motion.div
-    className="absolute text-xl sm:text-2xl pointer-events-none opacity-40 z-10"
-    style={{ left }}
-    initial={{ y: "110vh" }}
-    animate={{ y: "-10vh" }}
-    transition={{ delay, duration: 15, repeat: Infinity, repeatDelay: 2, ease: "linear" }}
-  >
-    <div className="animate-sway" style={{ animationDelay: `${delay}s` }}>{emoji}</div>
-  </motion.div>
 );
 
 /* ─── Countdown Hook ─── */
@@ -69,19 +65,19 @@ const useCountdown = (targetDate) => {
   return timeLeft;
 };
 
-/* 🔥 KOMPONEN DAFTAR UCAPAN TAMU 🔥 */
-const DaftarUcapanTamuCasual = ({ greetings }) => {
+/* 🔥 KOMPONEN DAFTAR PESAN / KONFIRMASI TAMU 🔥 */
+const GuestMessagesProfessional = ({ greetings }) => {
   const safeGreetings = Array.isArray(greetings) ? greetings : [];
   const daftarUcapan = safeGreetings
     .map((item, index) => ({
       id: item.id || index,
-      nama: item.name || item.attendee_name || "Kerabat",
+      nama: item.name || item.attendee_name || "Peserta",
       pesan: item.greeting || item.pesan || ""
     }))
     .filter(item => item.pesan.trim() !== "");
 
   return (
-    <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-[#609F79]/50 scrollbar-track-transparent text-left">
+    <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2 scrollbar-professional text-left">
       {daftarUcapan.length > 0 ? (
         daftarUcapan.map((item) => (
           <motion.div 
@@ -89,20 +85,20 @@ const DaftarUcapanTamuCasual = ({ greetings }) => {
             whileInView={{ opacity: 1, y: 0 }} 
             viewport={{ once: true }}
             key={item.id} 
-            className="card-casual p-6 text-left border border-[#609F79]/30"
+            className="card-professional p-6 text-left border-l-4 border-l-blue-600"
           >
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-full bg-[#609F79]/10 flex items-center justify-center">
-                <Heart className="w-3.5 h-3.5 text-[#609F79]" />
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center border border-blue-100">
+                <MessageSquare className="w-4 h-4 text-blue-600" />
               </div>
-              <p className="font-bold text-sm text-[#4C8360]">{item.nama}</p>
+              <p className="font-bold text-sm text-slate-800">{item.nama}</p>
             </div>
-            <p className="text-sm text-stone-500 pl-10 leading-relaxed font-medium">{item.pesan}</p>
+            <p className="text-sm text-slate-600 pl-11 leading-relaxed">{item.pesan}</p>
           </motion.div>
         ))
       ) : (
-        <div className="text-center text-stone-400 italic card-casual p-6 shadow-sm">
-          Belum ada ucapan hangat. Jadilah yang pertama memberikan pesan! ✨
+        <div className="text-center text-slate-400 card-professional p-6">
+          Belum ada pesan atau konfirmasi yang masuk.
         </div>
       )}
     </div>
@@ -111,9 +107,9 @@ const DaftarUcapanTamuCasual = ({ greetings }) => {
 
 
 /* ═══════════════════════════════════════════════════════════════
-   MAIN COMPONENT — Theme Casual (Sage Green Edition)
+   MAIN COMPONENT — Theme Professional (Corporate / Formal Edition)
    ═══════════════════════════════════════════════════════════════ */
-export default function ThemeCasual({ eventData, guestName, isOpen, onOpen, navigate, id }) {
+export default function ThemeProfessional({ eventData, guestName, isOpen, onOpen, navigate, id }) {
   let details = eventData?.eventDetails || eventData?.event_details || {};
   if (typeof details === 'string') {
     try { details = JSON.parse(details); } catch (e) { details = {}; }
@@ -124,25 +120,22 @@ export default function ThemeCasual({ eventData, guestName, isOpen, onOpen, navi
     try { profilesList = JSON.parse(profilesList); } catch (e) { profilesList = []; }
   }
 
-  const coverImg = eventData?.img || "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?q=80&w=1000&auto=format&fit=crop";
+  const coverImg = eventData?.img || "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?q=80&w=1000&auto=format&fit=crop";
   const profile = profilesList[0] || {};
   
-  const hostName = profile.fullName || profile.full_name || eventData?.title || "Keluarga Besar";
-  const splitName = String(hostName).split(' ');
-  const firstName = splitName[0];
-  const restName = splitName.slice(1).join(' ') || "Gathering";
-
-  const hostPhoto = profile.photoUrl || profile.photo_url || "https://api.dicebear.com/7.x/avataaars/svg?seed=Casual";
-  const parentsInfo = profile.parentsInfo || profile.parents_info || "";
+  const hostName = profile.fullName || profile.full_name || eventData?.title || "Organisasi/Perusahaan";
+  const roleName = profile.role || "Penyelenggara";
+  const hostPhoto = profile.photoUrl || profile.photo_url || "https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=500&auto=format&fit=crop";
+  const companyInfo = profile.parentsInfo || profile.parents_info || "";
 
   const sessions = Array.isArray(eventData?.sessions) ? eventData.sessions : [];
   const gallery = Array.isArray(details.galleryImages || details.gallery_images) ? (details.galleryImages || details.gallery_images) : [];
   const gifts = Array.isArray(details.digitalGifts || details.digital_gifts) ? (details.digitalGifts || details.digital_gifts) : [];
   
-  const heroDateText = sessions[0]?.date || eventData?.date_start || "20 • 12 • 2026";
+  const heroDateText = sessions[0]?.date || eventData?.date_start || "TBA";
   const targetDate = eventData?.date_start || sessions[0]?.date || new Date(Date.now() + 864000000).toISOString();
 
-  const defaultCaptions = ["Sore yang indah bersama 🌅", "Tawa & kebersamaan 😄", "Momen berharga ✨", "Garden vibes 🌿", "Memories to keep 💛"];
+  const defaultCaptions = ["Suasana Acara", "Sesi Diskusi", "Dokumentasi", "Networking", "Presentasi Materi"];
   const galleryCaptions = Array.isArray(details.galleryCaptions) && details.galleryCaptions.length > 0 ? details.galleryCaptions : defaultCaptions;
 
   const countdown = useCountdown(targetDate);
@@ -158,60 +151,49 @@ export default function ThemeCasual({ eventData, guestName, isOpen, onOpen, navi
   };
 
   return (
-    <div className="min-h-screen bg-background text-stone-800 overflow-x-hidden font-sans selection:bg-[#609F79] selection:text-white">
+    <div className="min-h-screen bg-corporate-light text-slate-800 overflow-x-hidden font-sans selection:bg-blue-600 selection:text-white">
       <CustomStyles />
       
       {/* 🔥 HERO / COVER 🔥 */}
       {!isOpen && (
-        <section className="relative min-h-screen flex flex-col justify-center items-center overflow-hidden">
+        <section className="relative min-h-screen flex flex-col justify-center items-center overflow-hidden bg-slate-900">
           <div className="absolute inset-0 z-0">
-            <img src={coverImg} alt="Casual event" className="w-full h-full object-cover object-center" />
-            <div className="absolute inset-0 bg-black/30" /> 
-            <div className="absolute bottom-0 left-0 right-0 h-56 bg-gradient-to-t from-[#FAFCFB] via-[#FAFCFB]/60 to-transparent" />
+            <img src={coverImg} alt="Professional event" className="w-full h-full object-cover object-center opacity-40" />
+            <div className="absolute inset-0 bg-gradient-to-b from-slate-900/80 via-slate-900/50 to-slate-900/90" /> 
           </div>
 
-          <FloatingEmoji emoji="🌸" left="8%" delay={0} />
-          <FloatingEmoji emoji="🍃" left="88%" delay={3} />
-          <FloatingEmoji emoji="🌿" left="18%" delay={6} />
-
           <motion.div initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, ease: "easeOut" }} className="relative z-10 w-full px-6 flex flex-col items-center mt-[-10vh]">
-            <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.3, type: "spring", stiffness: 150 }} className="text-4xl mb-2 drop-shadow-md">
-              🌿
-            </motion.div>
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="text-white text-sm font-extrabold uppercase tracking-[0.3em] mb-4 text-shadow-sm">
-              You're Invited
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="text-blue-400 text-sm font-bold uppercase tracking-[0.3em] mb-4">
+              Formal Invitation
             </motion.p>
             
-            <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7, duration: 0.8 }} className="text-center font-display text-6xl sm:text-7xl lg:text-8xl font-black leading-tight mb-2 tracking-tight">
-              <span className="text-white text-shadow-elegant block mb-1">{firstName}</span>
-              <span className="text-[#88B89C] text-shadow-elegant block">{restName}</span> 
+            <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5, duration: 0.8 }} className="text-center text-4xl sm:text-5xl lg:text-6xl font-black leading-tight mb-6 tracking-tight text-white px-4">
+              {eventData?.title || "Professional Event Gathering"}
             </motion.h1>
             
-            <motion.div initial={{ opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }} transition={{ delay: 0.9, duration: 0.6 }} className="w-24 h-[2px] bg-gradient-to-r from-transparent via-[#88B89C] to-transparent my-4 opacity-80" />
+            <motion.div initial={{ opacity: 0, scaleX: 0 }} animate={{ opacity: 1, scaleX: 1 }} transition={{ delay: 0.7, duration: 0.6 }} className="w-24 h-[2px] bg-blue-500 my-4" />
             
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }} className="text-xl sm:text-2xl text-white font-serif font-semibold italic text-shadow-sm mb-2">
-              Celebrate life's little moments
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.9 }} className="text-base sm:text-lg text-slate-300 font-medium tracking-wide mb-2 max-w-xl text-center">
+              {details.quote || "Menghadirkan inovasi dan kolaborasi untuk masa depan yang lebih baik."}
             </motion.p>
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.1 }} className="text-white text-sm font-extrabold tracking-[0.2em] mb-12 text-shadow-sm">
+            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.1 }} className="text-white text-sm font-bold tracking-[0.1em] mt-4 mb-12 bg-white/10 px-6 py-2 rounded-full border border-white/20 backdrop-blur-sm">
               {heroDateText}
             </motion.p>
           </motion.div>
 
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.3 }} className="absolute bottom-10 left-0 right-0 z-20 flex flex-col items-center w-full px-6">
-            
-            <div className="text-center mb-6 bg-white/70 backdrop-blur-sm py-3 px-8 rounded-2xl shadow-sm border border-white/50">
-              <p className="text-[#609F79] text-[10px] font-extrabold uppercase tracking-[0.2em] mb-1">Kepada Yth.</p>
-              <p className="text-xl text-stone-800 font-black">{guestName}</p>
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.3 }} className="absolute bottom-12 left-0 right-0 z-20 flex flex-col items-center w-full px-6">
+            <div className="text-center mb-6 bg-slate-900/80 backdrop-blur-md py-4 px-10 rounded-2xl border border-slate-700">
+              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Kepada Yth.</p>
+              <p className="text-lg text-white font-bold tracking-wide">{guestName}</p>
             </div>
             
-            {/* 🔥 TOMBOL IJO SAGE 🔥 */}
             <motion.button 
               whileHover={{ scale: 1.05 }} 
               whileTap={{ scale: 0.95 }} 
               onClick={onOpen} 
-              className="px-10 py-4 bg-[#609F79] hover:bg-[#4C8360] text-white text-sm font-extrabold uppercase tracking-wider rounded-full shadow-sage transition-all duration-300 flex items-center gap-2 border border-[#4C8360]/30"
+              className="px-10 py-4 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold uppercase tracking-[0.15em] rounded-full shadow-lg transition-all duration-300 border border-blue-500 flex items-center gap-3"
             >
-              <span className="text-lg">🌸</span> Buka Undangan
+               Buka Undangan
             </motion.button>
           </motion.div>
         </section>
@@ -223,119 +205,132 @@ export default function ThemeCasual({ eventData, guestName, isOpen, onOpen, navi
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8 }}>
 
             {/* ─── OPENING ─── */}
-            <section className="py-24 px-6 bg-sage-glow">
-              <motion.div initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-2xl mx-auto text-center">
-                <motion.div initial={{ scale: 0 }} whileInView={{ scale: 1 }} viewport={{ once: true }} transition={{ type: "spring", stiffness: 200 }} className="text-5xl mb-4 inline-block">🌿</motion.div>
-                <h2 className="text-3xl sm:text-4xl font-black text-stone-800 mb-3">
-                  Hai, Selamat Datang! <span className="text-gradient-sage">🎉</span>
+            <section className="py-24 px-6 bg-white">
+              <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-3xl mx-auto text-center">
+                <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-6 tracking-tight">
+                  Selamat Datang
                 </h2>
-                <div className="divider-floral w-28 mx-auto mb-6" />
-                <p className="text-stone-500 font-medium leading-relaxed text-base sm:text-lg max-w-md mx-auto">
-                  {details.openingMessage || "Terima kasih sudah membuka undangan ini. Kehadiranmu akan sangat berarti di hari spesial kami 💛"}
+                <div className="divider-clean w-16 mx-auto mb-8" />
+                <p className="text-slate-600 leading-relaxed text-base sm:text-lg max-w-2xl mx-auto">
+                  {details.openingMessage || "Terima kasih atas perhatian Anda. Kehadiran dan partisipasi Anda merupakan suatu kehormatan bagi kami. Mari bersama-sama menyukseskan acara ini."}
                 </p>
               </motion.div>
             </section>
 
-            {/* ─── PROFILE ─── */}
-            <section className="py-24 px-6 bg-sage-pattern">
-              <motion.div initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-md mx-auto text-center">
-                <p className="text-xs uppercase tracking-[0.3em] text-[#609F79] mb-2 font-bold">The Celebrant</p>
-                <h2 className="text-2xl sm:text-3xl font-black text-stone-800 mb-1 uppercase tracking-widest">Tuan Rumah</h2>
-                <div className="divider-floral w-20 mx-auto mb-10" />
+            {/* ─── PROFILE (HOST / SPEAKER) ─── */}
+            <section className="py-24 px-6 bg-corporate-alt">
+              <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-2xl mx-auto text-center">
+                <p className="text-xs uppercase tracking-[0.2em] text-blue-600 mb-2 font-bold">{roleName}</p>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-8 uppercase tracking-widest">Informasi Penyelenggara</h2>
 
-                <motion.div initial={{ scale: 0.9, opacity: 0 }} whileInView={{ scale: 1, opacity: 1 }} viewport={{ once: true }} transition={{ type: "spring", stiffness: 100 }} className="card-casual p-8 sm:p-10">
-                  <div className="relative w-36 h-36 mx-auto mb-6">
-                    <motion.div className="absolute -inset-1.5 rounded-full bg-gradient-to-r from-[#4C8360] via-[#609F79] to-[#9DC4AB] opacity-40 blur-sm" animate={{ rotate: 360 }} transition={{ duration: 12, repeat: Infinity, ease: "linear" }} />
-                    <div className="relative w-full h-full rounded-full overflow-hidden border-4 border-white shadow-sage">
-                      <img src={hostPhoto} alt={hostName} className="w-full h-full object-cover" />
-                    </div>
+                <motion.div initial={{ scale: 0.95, opacity: 0 }} whileInView={{ scale: 1, opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.5 }} className="card-professional p-8 sm:p-10">
+                  <div className="w-32 h-32 mx-auto mb-6 rounded-full overflow-hidden border-4 border-white shadow-lg">
+                    <img src={hostPhoto} alt={hostName} className="w-full h-full object-cover" />
                   </div>
 
-                  <h3 className="text-3xl font-black text-gradient-sage mb-1 uppercase tracking-wider">{hostName}</h3>
-                  <p className="text-xl text-stone-400 mb-4 font-serif italic">~ Warming the hearts ~</p>
-                  {parentsInfo && <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mb-4">{parentsInfo}</p>}
+                  <h3 className="text-2xl font-black text-slate-900 mb-2">{hostName}</h3>
+                  {companyInfo && <p className="text-sm text-slate-500 font-medium uppercase tracking-wider mb-6">{companyInfo}</p>}
 
-                  <div className="flex flex-wrap justify-center gap-2 mt-4">
-                    {["Nature 🌿", "Good Food 🍰", "Family 💛"].map((tag, i) => (
-                      <span key={i} className="px-3 py-1.5 bg-[#609F79]/10 border border-[#609F79]/20 text-[#4C8360] text-xs font-bold uppercase tracking-wider rounded-full">
-                        {tag}
-                      </span>
-                    ))}
+                  <div className="w-full h-px bg-slate-100 my-6"></div>
+
+                  <div className="flex flex-wrap justify-center gap-3">
+                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg">
+                      <Briefcase className="w-4 h-4 text-blue-600" /> Profesional
+                    </div>
+                    <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 text-slate-600 text-xs font-bold rounded-lg">
+                      <Users className="w-4 h-4 text-blue-600" /> Networking
+                    </div>
                   </div>
                 </motion.div>
               </motion.div>
             </section>
 
             {/* ─── COUNTDOWN ─── */}
-            <section className="py-20 px-6 bg-sage-section">
-              <motion.div initial={{ opacity: 0, y: 40 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-lg mx-auto text-center">
-                <p className="text-xl text-[#609F79] mb-2 font-serif italic">Menuju Hari Bahagia ⏳</p>
-                <h2 className="text-2xl font-black text-stone-800 mb-8 uppercase tracking-widest">Hitung Mundur</h2>
+            <section className="py-20 px-6 bg-slate-900 text-white">
+              <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-3xl mx-auto text-center">
+                <h2 className="text-2xl font-black mb-10 uppercase tracking-widest text-slate-100">Menuju Pelaksanaan Acara</h2>
 
-                <div className="grid grid-cols-4 gap-3">
+                <div className="grid grid-cols-4 gap-4 max-w-2xl mx-auto">
                   {[{ label: "Hari", value: countdown.days }, { label: "Jam", value: countdown.hours }, { label: "Menit", value: countdown.minutes }, { label: "Detik", value: countdown.seconds }].map((item, i) => (
-                    <motion.div key={item.label} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.1 }} className="card-casual p-4">
-                      <motion.p initial={{ scale: 1.2, opacity: 0.5 }} animate={{ scale: 1, opacity: 1 }} className="text-3xl sm:text-4xl font-black text-gradient-sage">
+                    <div key={item.label} className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 p-4 sm:p-6 rounded-2xl">
+                      <p className="text-3xl sm:text-5xl font-black text-blue-400 mb-2">
                         {String(item.value).padStart(2, "0")}
-                      </motion.p>
-                      <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest mt-1">{item.label}</p>
-                    </motion.div>
+                      </p>
+                      <p className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-widest">{item.label}</p>
+                    </div>
                   ))}
                 </div>
               </motion.div>
             </section>
 
-            {/* ─── EVENT DETAILS ─── */}
-            <section className="py-24 px-6 bg-sage-glow">
-              <motion.div initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-2xl mx-auto text-center">
-                <p className="text-xs uppercase tracking-[0.3em] text-stone-400 font-bold mb-2">Save The Date</p>
-                <h2 className="text-2xl sm:text-3xl font-black text-stone-800 mb-1 uppercase tracking-widest">Kapan & Dimana</h2>
-                <div className="divider-floral w-24 mx-auto mb-12" />
-
-                <div className="space-y-6">
+            {/* ─── EVENT DETAILS (SESSIONS) ─── */}
+            <section className="py-24 px-6 bg-white">
+              <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-3xl mx-auto text-center">
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-400 font-bold mb-2">Agenda Kegiatan</p>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-8 uppercase tracking-widest">Waktu & Lokasi</h2>
+                
+                <div className="space-y-6 text-left">
                   {sessions.map((session, idx) => (
-                    <motion.div key={idx} initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.2, duration: 0.7 }} className="card-casual p-8 sm:p-10">
-                      <motion.p animate={{ y: [0, -5, 0] }} transition={{ duration: 3, repeat: Infinity }} className="text-5xl mb-4 inline-block">{session.emoji || "🌿"}</motion.p>
-                      <h3 className="text-2xl text-[#609F79] font-black mb-8 uppercase tracking-widest">{session.name}</h3>
-
-                      <div className="space-y-3 text-sm">
-                        <div className="flex items-center justify-center gap-3 bg-stone-50/50 rounded-xl py-3 px-5 border border-stone-200">
-                          <CalendarDays className="w-4 h-4 text-[#609F79] flex-shrink-0" />
-                          <span className="text-stone-600 font-medium">{session.date}</span>
-                        </div>
-                        <div className="flex items-center justify-center gap-3 bg-stone-50/50 rounded-xl py-3 px-5 border border-stone-200">
-                          <Clock className="w-4 h-4 text-[#609F79] flex-shrink-0" />
-                          <span className="text-stone-600 font-medium">{session.start_time || session.startTime} - {session.end_time || session.endTime}</span>
-                        </div>
-                        <div className="flex items-center justify-center gap-3 bg-stone-50/50 rounded-xl py-3 px-5 border border-stone-200">
-                          <MapPin className="w-4 h-4 text-[#609F79] flex-shrink-0" />
-                          <span className="text-stone-600 font-medium">{session.name_place || session.location?.namePlace || session.place || session.location?.place}</span>
-                        </div>
+                    <motion.div key={idx} initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 * idx, duration: 0.5 }} className="card-professional p-8">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 mb-6">
+                        <h3 className="text-xl font-black text-slate-800 uppercase tracking-wide">{session.name}</h3>
+                        <span className="mt-2 sm:mt-0 inline-block px-3 py-1 bg-blue-50 text-blue-700 text-[10px] font-bold uppercase tracking-widest rounded-full border border-blue-100 w-max">
+                          Sesi {idx + 1}
+                        </span>
                       </div>
 
-                      <div className="flex flex-wrap justify-center gap-2 mt-7">
-                        {session.highlights && Array.isArray(session.highlights) && session.highlights.map((h, i) => (
-                          <motion.span key={i} initial={{ opacity: 0, scale: 0.8 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ delay: 0.4 + i * 0.1 }} className="px-4 py-2 bg-[#609F79]/10 border border-[#609F79]/20 text-[#4C8360] text-xs font-bold uppercase rounded-full">
-                            {h}
-                          </motion.span>
-                        ))}
-                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                        <div className="space-y-4">
+                          <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center border border-slate-200 shrink-0">
+                                <CalendarDays className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Tanggal</p>
+                              <p className="text-slate-800 font-semibold">{session.date}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center border border-slate-200 shrink-0">
+                                <Clock className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Waktu</p>
+                              <p className="text-slate-800 font-semibold">{session.start_time || session.startTime} - {session.end_time || session.endTime} WIB</p>
+                            </div>
+                          </div>
+                        </div>
 
-                      <motion.a href={session.map_url || session.location?.mapUrl || "#"} target="_blank" rel="noopener noreferrer" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="inline-flex items-center gap-2 mt-8 px-8 py-3 bg-[#609F79] text-white text-xs font-black uppercase tracking-wider rounded-full shadow-sage hover:bg-[#4C8360] transition-all duration-300">
-                        <ExternalLink className="w-3.5 h-3.5" /> Lihat Lokasi
-                      </motion.a>
+                        <div className="flex items-start gap-4">
+                           <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center border border-slate-200 shrink-0">
+                              <MapPin className="w-5 h-5 text-blue-600" />
+                           </div>
+                           <div>
+                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Lokasi Acara</p>
+                             <p className="text-slate-800 font-bold mb-1">{session.name_place || session.location?.namePlace || "Venue Utama"}</p>
+                             <p className="text-slate-500 leading-relaxed">{session.place || session.location?.place}</p>
+                             
+                             {(session.map_url || session.location?.mapUrl) && (
+                               <a href={session.map_url || session.location?.mapUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 mt-4 px-5 py-2 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg hover:bg-blue-600 transition-colors">
+                                 <ExternalLink className="w-3 h-3" /> Buka Google Maps
+                               </a>
+                             )}
+                           </div>
+                        </div>
+                      </div>
                     </motion.div>
                   ))}
                 </div>
 
-                <div className="flex justify-center gap-6 mt-14">
-                  {[{ icon: Leaf, label: "Outdoor" }, { icon: Sun, label: "Sore Hari" }, { icon: Camera, label: "Photos" }, { icon: Heart, label: "Love" }].map((item, i) => (
-                    <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.5 + i * 0.1 }} whileHover={{ y: -5 }} className="flex flex-col items-center gap-2">
-                      <div className="w-14 h-14 rounded-xl bg-white border border-stone-100 flex items-center justify-center shadow-soft">
-                        <item.icon className="w-6 h-6 text-[#609F79]" />
+                {/* Additional Info Icons */}
+                <div className="flex justify-center gap-8 mt-16 pt-10 border-t border-slate-200">
+                  {[{ icon: Building, label: "Indoor Venue" }, { icon: Mic, label: "Presentations" }, { icon: Users, label: "Networking" }].map((item, i) => (
+                    <div key={i} className="flex flex-col items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400">
+                        <item.icon className="w-5 h-5" />
                       </div>
-                      <span className="text-[10px] text-stone-400 font-bold uppercase tracking-wider">{item.label}</span>
-                    </motion.div>
+                      <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{item.label}</span>
+                    </div>
                   ))}
                 </div>
               </motion.div>
@@ -343,81 +338,81 @@ export default function ThemeCasual({ eventData, guestName, isOpen, onOpen, navi
 
             {/* ─── GALLERY ─── */}
             {gallery && gallery.length > 0 && (
-              <section className="py-24 px-6 bg-sage-pattern">
-                <motion.div initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-2xl mx-auto text-center">
-                  <p className="text-xs font-bold uppercase tracking-[0.3em] text-stone-400 mb-2">Gallery</p>
-                  <h2 className="text-2xl sm:text-3xl font-black text-stone-800 mb-2 uppercase tracking-widest">Momen Indah 📸</h2>
-                  <div className="divider-floral w-20 mx-auto mb-10" />
+              <section className="py-24 px-6 bg-corporate-alt">
+                <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-4xl mx-auto text-center">
+                  <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400 mb-2">Dokumentasi</p>
+                  <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-10 uppercase tracking-widest">Galeri Acara</h2>
 
-                  <div className="relative overflow-hidden rounded-3xl shadow-sage border-4 border-white bg-white">
+                  <div className="relative overflow-hidden rounded-2xl shadow-lg border border-slate-200 bg-white">
                     <AnimatePresence mode="wait">
                       {gallery[current] && (
-                        <motion.img key={current} src={gallery[current]} alt={`Gallery ${current + 1}`} initial={{ opacity: 0, scale: 1.05 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }} transition={{ duration: 0.5 }} className="w-full h-72 sm:h-96 object-cover" />
+                        <motion.img key={current} src={gallery[current]} alt={`Gallery ${current + 1}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="w-full h-80 sm:h-[500px] object-cover" />
                       )}
                     </AnimatePresence>
-                    <div className="absolute inset-0 bg-gradient-to-t from-stone-900/30 via-transparent to-transparent pointer-events-none" />
-
-                    <button onClick={prev} className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition shadow-soft"><ChevronLeft className="w-5 h-5 text-stone-700" /></button>
-                    <button onClick={next} className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition shadow-soft"><ChevronRight className="w-5 h-5 text-stone-700" /></button>
                     
-                    <div className="absolute bottom-4 right-4 px-3 py-1 bg-white/80 backdrop-blur-sm rounded-full text-xs font-bold text-stone-600 shadow-sm">
-                      {current + 1} / {gallery.length}
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-900/80 to-transparent p-6 text-left">
+                       {galleryCaptions && galleryCaptions.length > 0 && (
+                         <p className="text-white font-medium text-sm sm:text-base">{galleryCaptions[current % galleryCaptions.length]}</p>
+                       )}
                     </div>
+
+                    <button onClick={prev} className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center hover:bg-white shadow-md border border-slate-200"><ChevronLeft className="w-5 h-5 text-slate-700" /></button>
+                    <button onClick={next} className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center hover:bg-white shadow-md border border-slate-200"><ChevronRight className="w-5 h-5 text-slate-700" /></button>
                   </div>
 
-                  {galleryCaptions && galleryCaptions.length > 0 && (
-                    <p className="text-xl text-[#609F79] mt-5 italic font-serif">{galleryCaptions[current % galleryCaptions.length]}</p>
-                  )}
-
-                  <div className="flex justify-center gap-2 mt-5">
+                  <div className="flex justify-center gap-2 mt-6">
                     {gallery.map((_, i) => (
-                      <button key={i} onClick={() => setCurrent(i)} className={`h-2 rounded-full transition-all duration-300 ${i === current ? "bg-[#609F79] w-10" : "bg-[#DCE5DE] w-3 hover:bg-[#609F79]/50"}`} />
+                      <button key={i} onClick={() => setCurrent(i)} className={`h-2 rounded-full transition-all duration-300 ${i === current ? "bg-blue-600 w-8" : "bg-slate-300 w-2 hover:bg-blue-400"}`} />
                     ))}
                   </div>
                 </motion.div>
               </section>
             )}
 
-            {/* ─── RSVP & WISHES ─── */}
-            <section className="py-24 px-6 bg-sage-section">
-              <motion.div initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-lg mx-auto text-center">
-                <p className="text-4xl mb-2">💌</p>
-                <h2 className="text-2xl sm:text-3xl font-black text-stone-800 mb-1 uppercase tracking-widest">Kehadiran & Doa</h2>
-                <p className="text-sm text-stone-500 font-medium mb-8">Mohon konfirmasi kehadiran Anda agar kami dapat mempersiapkan acara dengan baik 🌿</p>
+            {/* ─── RSVP & MESSAGES ─── */}
+            <section className="py-24 px-6 bg-white">
+              <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-2xl mx-auto text-center">
+                <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-blue-100">
+                  <Send className="w-8 h-8" />
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-2 uppercase tracking-widest">Registrasi & Kehadiran</h2>
+                <p className="text-sm text-slate-500 font-medium mb-10">Kami mohon ketersediaan Anda untuk melakukan konfirmasi kehadiran melalui tautan berikut.</p>
 
-                <div className="card-casual p-8 mb-10 text-center">
-                  <h3 className="text-xl font-black text-[#609F79] mb-3">RSVP Sekarang</h3>
-                  <p className="text-xs text-stone-400 font-medium mb-6">Bantu kami mencatat kehadiran Anda melalui form di bawah ini.</p>
-                  <button onClick={() => navigate(`/party-rsvp/${id}`)} className="w-full flex items-center justify-center gap-2 py-4 bg-gradient-to-r from-[#4C8360] to-[#609F79] text-white font-black text-sm tracking-widest uppercase rounded-xl shadow-sage hover:opacity-90 transition-all">
-                    <Send className="w-5 h-5" /> Isi Form RSVP
+                <div className="card-professional p-8 mb-12 border-t-4 border-t-blue-600">
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">Formulir Konfirmasi</h3>
+                  <p className="text-xs text-slate-500 mb-6 leading-relaxed">Pendaftaran diperlukan untuk manajemen kuota peserta dan persiapan akomodasi acara.</p>
+                  <button onClick={() => navigate(`/party-rsvp/${id}`)} className="w-full flex items-center justify-center gap-2 py-4 bg-slate-900 text-white font-bold text-sm tracking-widest uppercase rounded-xl hover:bg-blue-600 transition-colors shadow-md">
+                    Isi Formulir RSVP
                   </button>
                 </div>
 
-                <DaftarUcapanTamuCasual greetings={eventData?.greetings} />
-
+                <GuestMessagesProfessional greetings={eventData?.greetings} />
               </motion.div>
             </section>
 
-            {/* ─── GIFT ─── */}
+            {/* ─── DIGITAL GIFTS / SUPPORT ─── */}
             {gifts.length > 0 && (
-              <section className="py-24 px-6 bg-sage-glow">
-                <motion.div initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-lg mx-auto text-center">
-                  <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 3, repeat: Infinity }} className="text-5xl mb-3 inline-block">🎁</motion.div>
-                  <h2 className="text-2xl sm:text-3xl font-black text-stone-800 mb-2 uppercase tracking-widest">Kirim Hadiah</h2>
-                  <p className="text-sm text-stone-500 font-medium mb-10">Kehadiranmu adalah hadiah terindah 💛<br />Tapi kalau mau kasih lebih... 😊</p>
+              <section className="py-24 px-6 bg-corporate-alt">
+                <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-2xl mx-auto text-center">
+                  <div className="w-16 h-16 bg-slate-200 text-slate-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <CreditCard className="w-8 h-8" />
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-black text-slate-900 mb-3 uppercase tracking-widest">Dukungan & Partisipasi</h2>
+                  <p className="text-sm text-slate-500 font-medium mb-10 leading-relaxed max-w-lg mx-auto">
+                    Bagi Anda yang ingin memberikan kontribusi atau dukungan dana untuk kelancaran acara ini, dapat melalui rekening berikut:
+                  </p>
 
-                  <div className="space-y-5">
+                  <div className="space-y-4 text-left">
                     {gifts.map((acc, idx) => (
-                      <div key={idx} className="card-casual p-7 border-2 border-white">
-                        <p className="text-3xl mb-2">{idx % 2 === 0 ? "💳" : "📱"}</p>
-                        <p className="text-xs text-[#609F79] font-black uppercase tracking-wider mb-1">{acc.bankName || acc.bank_name}</p>
-                        <p className="text-stone-600 text-sm mb-4 font-bold">{acc.accountName || acc.account_name}</p>
-                        <div className="flex items-center justify-center gap-3 bg-stone-50 border border-stone-100 rounded-xl py-3 px-5">
-                          <span className="text-lg text-stone-800 font-black tracking-wider">{acc.accountNumber || acc.account_number}</span>
-                          <motion.button onClick={() => copyNumber(acc.accountNumber || acc.account_number, idx)} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} className="p-2 hover:bg-[#609F79]/10 transition rounded-lg">
-                            {copied === idx ? <Check className="w-5 h-5 text-[#609F79]" /> : <Copy className="w-5 h-5 text-stone-400" />}
-                          </motion.button>
+                      <div key={idx} className="card-professional p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-6 border-l-4 border-l-slate-700">
+                        <div>
+                          <p className="text-xs text-blue-600 font-black uppercase tracking-widest mb-1">{acc.bankName || acc.bank_name}</p>
+                          <p className="text-slate-900 font-bold mb-1">{acc.accountName || acc.account_name}</p>
+                          <p className="text-xl font-mono text-slate-600 tracking-wider">{acc.accountNumber || acc.account_number}</p>
                         </div>
+                        <button onClick={() => copyNumber(acc.accountNumber || acc.account_number, idx)} className={`flex items-center justify-center gap-2 px-6 py-3 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors border ${copied === idx ? 'bg-green-50 text-green-600 border-green-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+                          {copied === idx ? <><Check className="w-4 h-4" /> Tersalin</> : <><Copy className="w-4 h-4" /> Salin No. Rek</>}
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -426,31 +421,20 @@ export default function ThemeCasual({ eventData, guestName, isOpen, onOpen, navi
             )}
 
             {/* ─── CLOSING ─── */}
-            <section className="py-24 px-6 bg-sage-pattern text-center relative overflow-hidden">
-              <motion.div initial={{ opacity: 0, y: 50 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-lg mx-auto relative z-10">
-                <motion.div initial={{ scale: 0 }} whileInView={{ scale: 1 }} viewport={{ once: true }} transition={{ type: "spring", stiffness: 200 }} className="text-5xl mb-5 inline-block">🌸</motion.div>
-                <h2 className="text-2xl sm:text-3xl font-black text-stone-800 mb-4 uppercase tracking-widest">
-                  Sampai Jumpa <span className="text-[#609F79]">Nanti!</span>
+            <section className="py-24 px-6 bg-slate-900 text-center">
+              <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }} className="max-w-2xl mx-auto">
+                <h2 className="text-2xl sm:text-3xl font-black text-white mb-6 uppercase tracking-widest">
+                  Kami Menantikan Kehadiran Anda
                 </h2>
-                <div className="divider-floral w-24 mx-auto mb-6" />
-                <p className="text-stone-500 font-medium leading-relaxed text-base mb-8 max-w-md mx-auto">
-                  {details.closingMessage || details.closing_message || "Kehadiranmu akan membuat hari ini semakin spesial. Terima kasih dari lubuk hati terdalam 💛🌿"}
+                <div className="w-16 h-1 bg-blue-500 mx-auto mb-8 rounded-full" />
+                <p className="text-slate-400 font-medium leading-relaxed text-base mb-12 max-w-lg mx-auto">
+                  {details.closingMessage || details.closing_message || "Kehadiran serta partisipasi aktif Anda akan sangat berkontribusi pada kesuksesan agenda ini. Sampai jumpa di acara."}
                 </p>
                 
-                <motion.div initial={{ scale: 0.8, opacity: 0 }} whileInView={{ scale: 1, opacity: 1 }} viewport={{ once: true }} transition={{ type: "spring" }} className="card-casual p-8 inline-block bg-white/90">
-                  <p className="text-xs text-stone-400 uppercase font-bold tracking-widest mb-2">Dengan Cinta</p>
-                  <p className="text-4xl font-black text-gradient-sage mb-2 uppercase">{hostName}</p>
-                  <p className="text-sm text-stone-400 font-bold">💛🌿🌸</p>
-                </motion.div>
-
-                <div className="divider-floral w-16 mx-auto mt-10 mb-4" />
-                <p className="text-xs text-stone-400 font-bold tracking-widest uppercase">
-                  Gathering & Reunion
-                </p>
-
-                <motion.div className="mt-8 text-2xl" animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 3, repeat: Infinity }}>
-                  🌸🌿💛☀️✨🌻
-                </motion.div>
+                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700 p-8 rounded-2xl inline-block">
+                  <p className="text-xs text-slate-500 uppercase font-bold tracking-widest mb-2">Hormat Kami,</p>
+                  <p className="text-2xl font-black text-white uppercase tracking-wide">{hostName}</p>
+                </div>
               </motion.div>
             </section>
 
