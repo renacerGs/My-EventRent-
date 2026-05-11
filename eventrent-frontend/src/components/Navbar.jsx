@@ -102,7 +102,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     return user || JSON.parse(localStorage.getItem('user')) || null;
   });
 
-  // 🔥 STATE BARU: Buat ngatur animasi Skeleton Loading pas pertama login 🔥
   const [isAuthLoading, setIsAuthLoading] = useState(() => {
     const cachedUser = localStorage.getItem('user');
     return !cachedUser; 
@@ -167,7 +166,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
           
           localStorage.setItem('user', JSON.stringify(richUser));
           setLocalUser(richUser);
-          setIsAuthLoading(false); // Matiin efek loading
+          setIsAuthLoading(false); 
           
           if (onLoginSuccess) onLoginSuccess(richUser, false);
         } else if (res.status === 401) {
@@ -293,7 +292,9 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     }
   };
 
+  // 🔥 JURUS ANTI ZOMBIE BUTTONS (SAMA KAYAK DI NOTIFICATIONS.JSX) 🔥
   const handleRespondNotif = async (notifId, action) => {
+    const toastId = toast.loading('Processing...');
     try {
       const token = localStorage.getItem('supabase_token');
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications/${notifId}/respond`, {
@@ -305,13 +306,18 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
         body: JSON.stringify({ action })
       });
       const data = await res.json();
+      
       if (res.ok) {
-        toast.success(data.message);
+        toast.success(data.message, { id: toastId });
+        // Langsung hajar apus tombolnya dari dropdown Navbar!
+        setNotifications(prev => prev.map(n => 
+          n.id === notifId ? { ...n, is_read: true, type: 'RESPONDED' } : n
+        ));
       } else {
-        toast.error(data.message);
+        toast.error(data.message, { id: toastId });
       }
     } catch (err) {
-      toast.error('Network error, please try again.');
+      toast.error('Network error, please try again.', { id: toastId });
     }
   };
 
@@ -595,6 +601,7 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                                 {new Date(notif.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
                               </p>
                               
+                              {/* 🔥 FIX: DITAMBAHIN !notif.is_read BIAR TOMBOL ZOMBIE MATI 🔥 */}
                               {notif.type === 'INVITATION_AGENT' && !notif.is_read && (
                                 <div className="flex gap-2 mt-3">
                                   <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'reject'); }} className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${isAgentMode ? 'bg-slate-700 text-rose-400 hover:bg-slate-600' : 'bg-red-50 text-red-500 hover:bg-red-100'}`}>Decline</button>
@@ -628,7 +635,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
               <div className="relative shrink-0" ref={profileRef}>
                 <button onClick={() => !isAuthLoading && setIsDropdownOpen(!isDropdownOpen)} className={`flex items-center gap-3 p-0 md:p-1 md:pr-3 rounded-full border hover:bg-gray-50 transition-all shadow-none md:shadow-sm focus:outline-none shrink-0 ${isAgentMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-700' : 'bg-transparent md:bg-white border-transparent md:border-gray-100'}`}>
                   
-                  {/* 🔥 SKELETON LOADING BUAT FOTO PROFIL 🔥 */}
                   <div className={`w-9 h-9 rounded-full overflow-hidden border shadow-inner shrink-0 ${isAgentMode ? 'border-slate-600' : 'border-gray-100'} ${isAuthLoading ? (isAgentMode ? 'bg-slate-700 animate-pulse' : 'bg-gray-200 animate-pulse') : ''}`}>
                     {!isAuthLoading && (
                       <img 
@@ -640,7 +646,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
                   </div>
                   
                   <div className="text-left hidden md:block">
-                    {/* 🔥 SKELETON LOADING BUAT NAMA & EMAIL 🔥 */}
                     {isAuthLoading ? (
                       <div className="flex flex-col gap-1.5 justify-center h-full">
                         <div className={`w-16 h-2 rounded ${isAgentMode ? 'bg-slate-700 animate-pulse' : 'bg-gray-200 animate-pulse'}`}></div>

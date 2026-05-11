@@ -36,7 +36,7 @@ export default function Notifications() {
   const [deleteType, setDeleteType] = useState('selected'); 
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // 🔥 RADAR PEMISAH KASTA (KEMBALI KE VERSI PERFECT LU) 🔥
+  // 🔥 RADAR PEMISAH KASTA 🔥
   const checkIsAgentNotif = (notif) => {
     if (!notif) return false;
     const type = notif.type || '';
@@ -132,8 +132,10 @@ export default function Notifications() {
     };
   }, [userId, isAgentMode]);
 
+  // 🔥 INI DIA JURUS ANTI ZOMBIE (OPTIMISTIC UPDATE) 🔥
   const handleRespondNotif = async (notifId, action) => {
     const token = localStorage.getItem('supabase_token');
+    const toastId = toast.loading('Processing...');
     try {
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/notifications/${notifId}/respond`, {
         method: 'POST',
@@ -141,13 +143,20 @@ export default function Notifications() {
         body: JSON.stringify({ action })
       });
       const data = await res.json();
+      
       if (res.ok) {
-        toast.success(data.message);
+        toast.success(data.message, { id: toastId });
+        
+        // Langsung hajar hapus tombolnya detik itu juga
+        setNotifications(prev => prev.map(n => 
+          n.id === notifId ? { ...n, is_read: true, type: 'RESPONDED' } : n
+        ));
+
       } else {
-        toast.error(data.message);
+        toast.error(data.message, { id: toastId });
       }
     } catch (err) {
-      toast.error('Network error occurred.');
+      toast.error('Network error occurred.', { id: toastId });
     }
   };
 
@@ -488,7 +497,6 @@ export default function Notifications() {
         <div className={`${isAgentMode ? 'bg-slate-800/50 border-slate-700/50 backdrop-blur-sm' : 'bg-white border-gray-200'} rounded-[24px] md:rounded-[32px] shadow-sm border overflow-hidden relative transition-colors duration-300`}>
           {loading ? (
             <div className="flex flex-col">
-              {/* 🔥 TAMPILIN SKELETON PAS LOADING 🔥 */}
               {[...Array(4)].map((_, i) => <NotificationSkeleton key={i} isAgentMode={isAgentMode} />)}
             </div>
           ) : notifications.length === 0 ? (
@@ -537,7 +545,8 @@ export default function Notifications() {
                             {new Date(notif.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
                           </p>
 
-                          {notif.type === 'INVITATION_AGENT' && !isEditMode && (
+                          {/* 🔥 PERBAIKAN DI SINI: Ditambahin !notif.is_read 🔥 */}
+                          {notif.type === 'INVITATION_AGENT' && !notif.is_read && !isEditMode && (
                             <div className="flex gap-3 mt-4">
                               <button 
                                 type="button" 
