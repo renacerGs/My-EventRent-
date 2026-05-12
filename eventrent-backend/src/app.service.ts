@@ -873,16 +873,47 @@ export class AppService implements OnModuleInit {
     }
   }
 
+  // ==========================================
+  // FITUR USER PROFILE & RATING AGEN
+  // ==========================================
+
+  async getMe(userId: number) {
+    try {
+      const query = `
+        SELECT 
+          u.id, u.name, u.email, u.picture, u.role, u.phone,
+          u.bank_name, u.bank_account, u.bank_account_name,
+          COALESCE(
+            (SELECT ROUND(AVG(rating_given), 1) 
+             FROM event_agents 
+             WHERE user_id = u.id AND rating_given > 0), 
+            0
+          )::float as rating
+        FROM users u
+        WHERE u.id = $1
+      `;
+      const { rows } = await this.pool.query(query, [userId]);
+      
+      if (rows.length === 0) throw new NotFoundException('User not found');
+      
+      return rows[0];
+    } catch (err) {
+      if (err instanceof NotFoundException) throw err;
+      console.error("Error getMe:", err);
+      throw new InternalServerErrorException('Failed to fetch profile data');
+    }
+  }
+
   async updateProfile(userId: number, data: any) {
-    const res = await this.pool.query(
+    await this.pool.query(
       `UPDATE users 
        SET name = $1, picture = COALESCE($2, picture), bank_name = COALESCE($3, bank_name),
            bank_account = COALESCE($4, bank_account), bank_account_name = COALESCE($5, bank_account_name), phone = COALESCE($6, phone)
-       WHERE id = $7 
-       RETURNING id, name, email, picture, bank_name, bank_account, bank_account_name, phone`,
+       WHERE id = $7`,
       [data.name, data.img || null, data.bank_name, data.bank_account, data.bank_account_name, data.phone, userId]
     );
-    return res.rows[0];
+    
+    return this.getMe(userId);
   }
 
   async deleteUserAccount(userId: number, email: string) {
