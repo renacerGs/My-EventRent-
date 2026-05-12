@@ -3,17 +3,27 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast'; 
 import { supabase } from '../supabase';
 
-const AnimatedSearchNavbar = ({ events, searchQuery, onSearchSelect }) => {
+const AnimatedSearchNavbar = ({ events, searchQuery, onSearchSelect, isMobileSearchActive }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchQuery || ''); 
   
   const dropdownRef = useRef(null);
+  const inputRef = useRef(null); 
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
     setLocalSearch(searchQuery || '');
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (isMobileSearchActive && inputRef.current) {
+      setTimeout(() => {
+        inputRef.current.focus();
+        setIsOpen(true);
+      }, 100);
+    }
+  }, [isMobileSearchActive]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -51,12 +61,13 @@ const AnimatedSearchNavbar = ({ events, searchQuery, onSearchSelect }) => {
   return (
     <div className="relative w-full" ref={dropdownRef}>
       <div className="relative group">
-        <svg className={`absolute left-3.5 md:left-4 top-2.5 md:top-2.5 w-4 h-4 md:w-5 md:h-5 transition-colors duration-300 ${isOpen ? 'text-[#FF6B35]' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className={`absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 transition-colors duration-300 ${isOpen ? 'text-[#FF6B35]' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
         </svg>
         <input
+          ref={inputRef}
           type="text"
-          placeholder="Search..."
+          placeholder="Cari event atau konser..."
           value={localSearch}
           onFocus={() => setIsOpen(true)}
           onChange={(e) => {
@@ -64,21 +75,21 @@ const AnimatedSearchNavbar = ({ events, searchQuery, onSearchSelect }) => {
             setIsOpen(true);
           }} 
           onKeyDown={handleKeyDown}
-          className={`w-full pl-10 md:pl-11 pr-4 py-2 md:py-2.5 border rounded-full outline-none text-[13px] md:text-sm transition-all duration-300 bg-gray-50/50
+          className={`w-full pl-11 pr-4 py-3 md:py-2.5 border outline-none text-[13px] md:text-sm transition-all duration-300 bg-gray-50/50 rounded-full
             ${isOpen ? 'border-[#FF6B35] ring-4 ring-orange-50 bg-white' : 'border-gray-200 focus:border-[#FF6B35]'}`}
         />
       </div>
 
-      <div className={`absolute z-50 w-[240px] md:w-full mt-2 left-1/2 md:left-0 -translate-x-1/2 md:translate-x-0 bg-white border border-gray-100 rounded-2xl shadow-xl overflow-hidden transition-all duration-300 origin-top ${isOpen && localSearch ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>
+      <div className={`absolute z-[110] w-full mt-2 left-0 bg-white border border-gray-100 rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 origin-top ${isOpen && localSearch ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>
         <ul className="max-h-60 overflow-y-auto py-2">
           {filteredResults.length > 0 ? (
             filteredResults.map((event) => (
               <li 
                 key={event.id} 
                 onClick={() => handleResultClick(event.title)} 
-                className="px-4 py-2.5 text-xs md:text-sm text-gray-600 hover:bg-orange-50 hover:text-[#FF6B35] cursor-pointer flex items-center gap-3"
+                className="px-4 py-3 text-xs md:text-sm text-gray-600 hover:bg-orange-50 hover:text-[#FF6B35] cursor-pointer flex items-center gap-3 border-b border-gray-50 last:border-none"
               >
-                <img src={event.img} alt="" className="w-8 h-8 rounded-md object-cover" />
+                <img src={event.img} alt="" className="w-10 h-10 rounded-md object-cover shrink-0" />
                 <span className="font-semibold truncate">{event.title}</span>
               </li>
             ))
@@ -94,7 +105,7 @@ const AnimatedSearchNavbar = ({ events, searchQuery, onSearchSelect }) => {
 export default function Navbar({ user, events, searchQuery, onSearchSelect, onOpenLogin, onLogout, onLoginSuccess }) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  
+  const [isMobileSearchActive, setIsMobileSearchActive] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [showNotifDropdown, setShowNotifDropdown] = useState(false);
   
@@ -292,7 +303,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
     }
   };
 
-  // 🔥 JURUS ANTI ZOMBIE BUTTONS (SAMA KAYAK DI NOTIFICATIONS.JSX) 🔥
   const handleRespondNotif = async (notifId, action) => {
     const toastId = toast.loading('Processing...');
     try {
@@ -309,7 +319,6 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
       
       if (res.ok) {
         toast.success(data.message, { id: toastId });
-        // Langsung hajar apus tombolnya dari dropdown Navbar!
         setNotifications(prev => prev.map(n => 
           n.id === notifId ? { ...n, is_read: true, type: 'RESPONDED' } : n
         ));
@@ -512,237 +521,264 @@ export default function Navbar({ user, events, searchQuery, onSearchSelect, onOp
 
   return (
     <>
-      <nav className={`backdrop-blur-md flex items-center justify-between px-4 md:px-8 py-3 md:py-4 shadow-sm sticky top-0 z-[100] text-left font-sans transition-all duration-300 gap-3 md:gap-6 ${isAgentMode ? 'bg-slate-900 border-b border-slate-800' : 'bg-white/80'}`}>
+      <nav className={`backdrop-blur-md shadow-sm sticky top-0 z-[100] font-sans transition-all duration-300 ${isAgentMode ? 'bg-slate-900 border-b border-slate-800' : 'bg-white/90'}`}>
         
-        <div className="flex items-center shrink-0">
-          <Link to={isAgentMode ? '/agent' : '/'} className="flex items-center gap-3 select-none cursor-pointer hover:opacity-80 transition-opacity">
-            <img src="/logo.jpeg" alt="EventRent Logo" className="w-9 h-9 md:w-10 md:h-10 rounded-lg shadow-sm object-cover" />
-            <div className="hidden sm:block">
-              <h1 className={`text-xl font-extrabold leading-none tracking-tight ${isAgentMode ? 'text-white' : 'text-[#FF6B35]'}`}>EventRent</h1>
-            </div>
-          </Link>
-        </div>
+        <div className="flex items-center justify-between px-4 md:px-8 py-3 md:py-4 gap-3 md:gap-6 relative">
+          
+          {/* LOGO */}
+          <div className="flex items-center shrink-0">
+            <Link to={isAgentMode ? '/agent' : '/'} className="flex items-center gap-3 select-none cursor-pointer hover:opacity-80 transition-opacity">
+              <img src="/logo.jpeg" alt="EventRent Logo" className="w-9 h-9 md:w-10 md:h-10 rounded-lg shadow-sm object-cover" />
+              <div className="hidden sm:block">
+                <h1 className={`text-xl font-extrabold leading-none tracking-tight ${isAgentMode ? 'text-white' : 'text-[#FF6B35]'}`}>EventRent</h1>
+              </div>
+            </Link>
+          </div>
 
-        <div className="flex-1 max-w-sm md:max-w-md lg:max-w-lg mx-auto flex justify-center">
-           {!isAgentMode ? (
-             <AnimatedSearchNavbar events={events} searchQuery={searchQuery} onSearchSelect={onSearchSelect} />
-           ) : (
-             <div className="bg-slate-800/50 px-6 py-2 rounded-full border border-slate-700/50 flex items-center gap-2">
-               <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-               <span className="text-white text-[10px] sm:text-xs font-black uppercase tracking-widest">Agent Portal</span>
-             </div>
-           )}
-        </div>
+          {/* SEARCH BAR (CUMA MUNCUL DI DESKTOP) */}
+          <div className="hidden md:flex flex-1 max-w-sm md:max-w-md lg:max-w-lg mx-auto justify-center">
+             {!isAgentMode ? (
+               <AnimatedSearchNavbar events={events} searchQuery={searchQuery} onSearchSelect={onSearchSelect} />
+             ) : (
+               <div className="bg-slate-800/50 px-6 py-2 rounded-full border border-slate-700/50 flex items-center gap-2">
+                 <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                 <span className="text-white text-[10px] sm:text-xs font-black uppercase tracking-widest">Agent Portal</span>
+               </div>
+             )}
+          </div>
 
-        <div className="flex items-center gap-2 md:gap-3 shrink-0">
-          {!isAgentMode && (
-            <>
-              <Link to="/cek-tiket" className="flex items-center justify-center gap-1.5 bg-white border border-gray-200 text-gray-500 w-9 h-9 md:w-auto md:px-5 md:py-2.5 rounded-full font-bold text-[10px] md:text-xs uppercase tracking-wider hover:text-[#FF6B35] hover:border-orange-200 hover:bg-orange-50 transition shadow-sm shrink-0">
-                <svg className="w-[16px] h-[16px] md:w-[18px] md:h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path>
-                </svg>
-                <span className="hidden md:inline">Check Ticket</span>
-              </Link>
-              <Link to="/create" className="flex items-center justify-center gap-1.5 bg-[#FF6B35] text-white w-9 h-9 md:w-auto md:px-5 md:py-2.5 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-orange-600 transition shadow-md shadow-orange-100 shrink-0">
-                <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                <span className="hidden md:inline">Create</span>
-              </Link>
-            </>
-          )}
-
-          {localUser ? (
-            <>
-              {!isAgentMode && (
-                <Link to="/likes" className="flex items-center justify-center w-9 h-9 md:w-[42px] md:h-[42px] border border-gray-100 text-gray-400 bg-white rounded-full hover:bg-orange-50 hover:text-[#FF6B35] hover:border-orange-100 transition shadow-sm shrink-0">
-                   <svg className="w-5 h-5 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+          {/* ICONS KANAN (Selalu muncul di Desktop & Mobile) */}
+          <div className="flex items-center gap-2 md:gap-3 shrink-0">
+            {!isAgentMode && (
+              <>
+                {/* 🔥 ICON KACA PEMBESAR KHUSUS MOBILE 🔥 */}
+                <button onClick={() => setIsMobileSearchActive(true)} className="md:hidden flex items-center justify-center w-9 h-9 bg-white border border-gray-200 text-gray-500 rounded-full hover:bg-orange-50 hover:text-[#FF6B35] transition shadow-sm shrink-0">
+                  <svg className="w-[16px] h-[16px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </button>
+                
+                <Link to="/cek-tiket" className="flex items-center justify-center gap-1.5 bg-white border border-gray-200 text-gray-500 w-9 h-9 md:w-auto md:px-5 md:py-2.5 rounded-full font-bold text-[10px] md:text-xs uppercase tracking-wider hover:text-[#FF6B35] hover:border-orange-200 hover:bg-orange-50 transition shadow-sm shrink-0">
+                  <svg className="w-[16px] h-[16px] md:w-[18px] md:h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z"></path>
+                  </svg>
+                  <span className="hidden md:inline">Check Ticket</span>
                 </Link>
-              )}
+                <Link to="/create" className="flex items-center justify-center gap-1.5 bg-[#FF6B35] text-white w-9 h-9 md:w-auto md:px-5 md:py-2.5 rounded-full font-bold text-xs uppercase tracking-wider hover:bg-orange-600 transition shadow-md shadow-orange-100 shrink-0">
+                  <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  <span className="hidden md:inline">Create</span>
+                </Link>
+              </>
+            )}
 
-              <div className="relative shrink-0 flex items-center justify-center" ref={notifRef}>
-                <button onClick={() => setShowNotifDropdown(!showNotifDropdown)} className={`relative flex items-center justify-center w-9 h-9 md:w-[42px] md:h-[42px] border rounded-full transition shadow-sm shrink-0 ${isAgentMode ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700' : 'border-gray-100 bg-white text-gray-400 hover:bg-orange-50 hover:text-[#FF6B35] hover:border-orange-100'}`}>
-                  <svg className="w-5 h-5 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-                  
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4 md:h-5 md:w-5 items-center justify-center rounded-full bg-red-500 border border-white text-[9px] md:text-[10px] font-black text-white shadow-sm z-10">
-                      {unreadCount > 99 ? '99+' : unreadCount}
-                    </span>
-                  )}
-                </button>
+            {localUser ? (
+              <>
+                {!isAgentMode && (
+                  <Link to="/likes" className="flex items-center justify-center w-9 h-9 md:w-[42px] md:h-[42px] border border-gray-100 text-gray-400 bg-white rounded-full hover:bg-orange-50 hover:text-[#FF6B35] hover:border-orange-100 transition shadow-sm shrink-0">
+                     <svg className="w-5 h-5 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                  </Link>
+                )}
 
-                <div className={`absolute right-0 top-full mt-3 w-[280px] md:w-[350px] rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] border transform origin-top-right transition-all duration-300 z-[60] flex flex-col overflow-hidden ${showNotifDropdown ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'} ${isAgentMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-100'}`}>
-                  
-                  <div className={`px-4 py-3 border-b flex justify-between items-center shrink-0 ${isAgentMode ? 'bg-slate-800/50 border-slate-700' : 'bg-gray-50/50 border-gray-100'}`}>
-                    <h3 className={`font-black text-xs uppercase tracking-widest ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>Notifications</h3>
-                    {unreadCount > 0 && <span className="bg-[#FF6B35] text-white px-2 py-0.5 rounded-md text-[9px] font-bold">{unreadCount} New</span>}
-                  </div>
-                  
-                  <div className="max-h-[300px] overflow-y-auto overscroll-contain">
-                    {displayedNotifications.length > 0 ? (
-                      displayedNotifications.map(notif => {
-                        const style = getNotifStyle(notif, notif.is_read);
-
-                        return (
-                          <div 
-                            key={notif.id} 
-                            className={`p-4 border-b cursor-pointer flex gap-3 ${style.wrapperClass} ${isAgentMode ? 'border-b-slate-700/50' : 'border-b-gray-50'}`} 
-                            onClick={() => handleNotifClick(notif)}
-                          >
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1">
-                                <p className={`font-bold text-sm ${style.titleClass}`}>
-                                  {notif.title}
-                                </p>
-                                {!notif.is_read && <span className={`w-2 h-2 rounded-full shadow-sm ${style.dotClass}`}></span>}
-                              </div>
-                              <p className={`text-xs leading-relaxed ${style.descClass}`}>
-                                {notif.message}
-                              </p>
-                              <p className={`text-[10px] mt-1 font-bold uppercase tracking-wider ${style.dateClass}`}>
-                                {new Date(notif.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
-                              </p>
-                              
-                              {/* 🔥 FIX: DITAMBAHIN !notif.is_read BIAR TOMBOL ZOMBIE MATI 🔥 */}
-                              {notif.type === 'INVITATION_AGENT' && !notif.is_read && (
-                                <div className="flex gap-2 mt-3">
-                                  <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'reject'); }} className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${isAgentMode ? 'bg-slate-700 text-rose-400 hover:bg-slate-600' : 'bg-red-50 text-red-500 hover:bg-red-100'}`}>Decline</button>
-                                  <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'accept'); }} className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md transition-colors ${isAgentMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-[#FF6B35] text-white hover:bg-orange-600'}`}>Accept</button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className={`p-6 text-center text-xs font-bold ${isAgentMode ? 'text-slate-500' : 'text-gray-400'}`}>No new notifications.</div>
-                    )}
-                  </div>
-                  
-                  <div className={`border-t p-2 shrink-0 ${isAgentMode ? 'border-slate-700 bg-slate-800/50' : 'border-gray-100 bg-gray-50/50'}`}>
-                    <button 
-                      onClick={() => { 
-                        setShowNotifDropdown(false);
-                        navigate('/notifications'); 
-                      }} 
-                      className={`block w-full text-center py-2.5 text-[10px] md:text-xs font-black uppercase tracking-widest transition-colors rounded-xl ${isAgentMode ? 'text-blue-500 hover:text-blue-400 hover:bg-slate-700' : 'text-[#FF6B35] hover:text-orange-600 hover:bg-orange-50'}`}
-                    >
-                      View All Notifications
-                    </button>
-                  </div>
-
-                </div>
-              </div>
-
-              <div className="relative shrink-0" ref={profileRef}>
-                <button onClick={() => !isAuthLoading && setIsDropdownOpen(!isDropdownOpen)} className={`flex items-center gap-3 p-0 md:p-1 md:pr-3 rounded-full border hover:bg-gray-50 transition-all shadow-none md:shadow-sm focus:outline-none shrink-0 ${isAgentMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-700' : 'bg-transparent md:bg-white border-transparent md:border-gray-100'}`}>
-                  
-                  <div className={`w-9 h-9 rounded-full overflow-hidden border shadow-inner shrink-0 ${isAgentMode ? 'border-slate-600' : 'border-gray-100'} ${isAuthLoading ? (isAgentMode ? 'bg-slate-700 animate-pulse' : 'bg-gray-200 animate-pulse') : ''}`}>
-                    {!isAuthLoading && (
-                      <img 
-                        src={localUser?.picture || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} 
-                        alt="Profile" 
-                        className="w-full h-full object-cover transition-opacity duration-300 opacity-100" 
-                      />
-                    )}
-                  </div>
-                  
-                  <div className="text-left hidden md:block">
-                    {isAuthLoading ? (
-                      <div className="flex flex-col gap-1.5 justify-center h-full">
-                        <div className={`w-16 h-2 rounded ${isAgentMode ? 'bg-slate-700 animate-pulse' : 'bg-gray-200 animate-pulse'}`}></div>
-                        <div className={`w-20 h-1.5 rounded ${isAgentMode ? 'bg-slate-700 animate-pulse' : 'bg-gray-200 animate-pulse'}`}></div>
-                      </div>
-                    ) : (
-                      <>
-                        <p className={`text-[11px] font-bold leading-none uppercase tracking-tight max-w-[100px] truncate ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>{localUser?.name}</p>
-                        <p className={`text-[9px] font-medium mt-0.5 lowercase max-w-[100px] truncate ${isAgentMode ? 'text-slate-400' : 'text-gray-400'}`}>{localUser?.email}</p>
-                      </>
-                    )}
-                  </div>
-                  <svg className={`w-3.5 h-3.5 hidden md:block transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''} ${isAgentMode ? 'text-slate-400' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
-                </button>
-
-                <div className={`absolute right-0 top-full mt-3 w-[220px] md:w-[260px] bg-white rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 transform origin-top-right transition-all duration-300 z-[60] overflow-hidden ${isDropdownOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
-                  <div className="p-2 flex flex-col gap-1">
+                <div className="relative shrink-0 flex items-center justify-center" ref={notifRef}>
+                  <button onClick={() => setShowNotifDropdown(!showNotifDropdown)} className={`relative flex items-center justify-center w-9 h-9 md:w-[42px] md:h-[42px] border rounded-full transition shadow-sm shrink-0 ${isAgentMode ? 'border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700' : 'border-gray-100 bg-white text-gray-400 hover:bg-orange-50 hover:text-[#FF6B35] hover:border-orange-100'}`}>
+                    <svg className="w-5 h-5 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
                     
-                    {!isAgentMode ? (
-                      <>
-                        <button onClick={() => { navigate('/'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname === '/' ? 'bg-orange-50 text-[#FF6B35]' : 'text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35]'}`}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-                          HOME
-                        </button>
-                        <button onClick={() => { navigate('/profile'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/profile') ? 'bg-orange-50 text-[#FF6B35]' : 'text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35]'}`}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                          MY PROFILE
-                        </button>
-                        <button onClick={() => { navigate('/manage'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/manage') ? 'bg-orange-50 text-[#FF6B35]' : 'text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35]'}`}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                          MANAGE EVENTS
-                        </button>
-                        <button onClick={() => { navigate('/my-orders'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/my-orders') ? 'bg-orange-50 text-[#FF6B35]' : 'text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35]'}`}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-                          MY ORDERS
-                        </button>
-                        <button onClick={() => { navigate('/my-tickets'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/my-tickets') ? 'bg-orange-50 text-[#FF6B35]' : 'text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35]'}`}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                          MY TICKETS
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button onClick={() => { navigate('/agent'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname === '/agent' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-blue-500'}`}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
-                          MY TASKS
-                        </button>
-                        
-                        <button onClick={() => { navigate('/profile'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/profile') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-blue-500'}`}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
-                          PROFILE & BANK
-                        </button>
-
-                        <button onClick={() => { navigate('/agent/wallet'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/wallet') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-blue-500'}`}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
-                          EARNINGS WALLET
-                        </button>
-
-                        <button onClick={() => { navigate('/agent/history'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/history') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-blue-500'}`}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                          SCAN HISTORY
-                        </button>
-
-                        <button onClick={() => { navigate('/jobs'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/jobs') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-blue-500'}`}>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                          FIND JOBS (FREELANCE)
-                        </button>
-                      </>
-                    )}
-
-                    <div className="h-px bg-gray-100 my-1 mx-2"></div>
-                    
-                    <button onClick={toggleRole} className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 text-gray-900 rounded-xl hover:bg-gray-100 transition-all group">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 group-hover:text-gray-900 transition-colors">
-                        {isAgentMode ? 'User Mode' : 'Agent Mode'}
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 flex h-4 w-4 md:h-5 md:w-5 items-center justify-center rounded-full bg-red-500 border border-white text-[9px] md:text-[10px] font-black text-white shadow-sm z-10">
+                        {unreadCount > 99 ? '99+' : unreadCount}
                       </span>
-                      <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
-                    </button>
+                    )}
+                  </button>
 
-                    <button 
-                      onClick={() => { setIsDropdownOpen(false); setShowLogoutModal(true); }} 
-                      className="w-full flex items-center gap-3 px-4 py-3 mt-1 text-[11px] font-bold text-red-500 hover:bg-red-50 rounded-xl transition-all group"
-                    >
-                      <svg className="w-4 h-4 text-red-400 group-hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                      LOG OUT
-                    </button>
+                  <div className={`absolute right-0 top-full mt-3 w-[280px] md:w-[350px] rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] border transform origin-top-right transition-all duration-300 z-[60] flex flex-col overflow-hidden ${showNotifDropdown ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'} ${isAgentMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-gray-100'}`}>
+                    
+                    <div className={`px-4 py-3 border-b flex justify-between items-center shrink-0 ${isAgentMode ? 'bg-slate-800/50 border-slate-700' : 'bg-gray-50/50 border-gray-100'}`}>
+                      <h3 className={`font-black text-xs uppercase tracking-widest ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>Notifications</h3>
+                      {unreadCount > 0 && <span className="bg-[#FF6B35] text-white px-2 py-0.5 rounded-md text-[9px] font-bold">{unreadCount} New</span>}
+                    </div>
+                    
+                    <div className="max-h-[300px] overflow-y-auto overscroll-contain">
+                      {displayedNotifications.length > 0 ? (
+                        displayedNotifications.map(notif => {
+                          const style = getNotifStyle(notif, notif.is_read);
+
+                          return (
+                            <div 
+                              key={notif.id} 
+                              className={`p-4 border-b cursor-pointer flex gap-3 ${style.wrapperClass} ${isAgentMode ? 'border-b-slate-700/50' : 'border-b-gray-50'}`} 
+                              onClick={() => handleNotifClick(notif)}
+                            >
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className={`font-bold text-sm ${style.titleClass}`}>
+                                    {notif.title}
+                                  </p>
+                                  {!notif.is_read && <span className={`w-2 h-2 rounded-full shadow-sm ${style.dotClass}`}></span>}
+                                </div>
+                                <p className={`text-xs leading-relaxed ${style.descClass}`}>
+                                  {notif.message}
+                                </p>
+                                <p className={`text-[10px] mt-1 font-bold uppercase tracking-wider ${style.dateClass}`}>
+                                  {new Date(notif.created_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                                </p>
+                                
+                                {notif.type === 'INVITATION_AGENT' && !notif.is_read && (
+                                  <div className="flex gap-2 mt-3">
+                                    <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'reject'); }} className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${isAgentMode ? 'bg-slate-700 text-rose-400 hover:bg-slate-600' : 'bg-red-50 text-red-500 hover:bg-red-100'}`}>Decline</button>
+                                    <button onClick={(e) => { e.stopPropagation(); handleRespondNotif(notif.id, 'accept'); }} className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest shadow-md transition-colors ${isAgentMode ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-[#FF6B35] text-white hover:bg-orange-600'}`}>Accept</button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className={`p-6 text-center text-xs font-bold ${isAgentMode ? 'text-slate-500' : 'text-gray-400'}`}>No new notifications.</div>
+                      )}
+                    </div>
+                    
+                    <div className={`border-t p-2 shrink-0 ${isAgentMode ? 'border-slate-700 bg-slate-800/50' : 'border-gray-100 bg-gray-50/50'}`}>
+                      <button 
+                        onClick={() => { 
+                          setShowNotifDropdown(false);
+                          navigate('/notifications'); 
+                        }} 
+                        className={`block w-full text-center py-2.5 text-[10px] md:text-xs font-black uppercase tracking-widest transition-colors rounded-xl ${isAgentMode ? 'text-blue-500 hover:text-blue-400 hover:bg-slate-700' : 'text-[#FF6B35] hover:text-orange-600 hover:bg-orange-50'}`}
+                      >
+                        View All Notifications
+                      </button>
+                    </div>
+
                   </div>
                 </div>
-              </div>
-            </>
-          ) : (
-            <button onClick={onOpenLogin} className="bg-[#FF6B35] text-white px-6 md:px-8 py-2 md:py-2.5 rounded-full font-bold text-[10px] md:text-xs uppercase tracking-widest hover:bg-orange-600 transition shadow-md shadow-orange-100 active:scale-95 shrink-0">
-              Login
-            </button>
-          )}
+
+                <div className="relative shrink-0" ref={profileRef}>
+                  <button onClick={() => !isAuthLoading && setIsDropdownOpen(!isDropdownOpen)} className={`flex items-center gap-3 p-0 md:p-1 md:pr-3 rounded-full border hover:bg-gray-50 transition-all shadow-none md:shadow-sm focus:outline-none shrink-0 ${isAgentMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-700' : 'bg-transparent md:bg-white border-transparent md:border-gray-100'}`}>
+                    
+                    <div className={`w-9 h-9 rounded-full overflow-hidden border shadow-inner shrink-0 ${isAgentMode ? 'border-slate-600' : 'border-gray-100'} ${isAuthLoading ? (isAgentMode ? 'bg-slate-700 animate-pulse' : 'bg-gray-200 animate-pulse') : ''}`}>
+                      {!isAuthLoading && (
+                        <img 
+                          src={localUser?.picture || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"} 
+                          alt="Profile" 
+                          className="w-full h-full object-cover transition-opacity duration-300 opacity-100" 
+                        />
+                      )}
+                    </div>
+                    
+                    <div className="text-left hidden md:block">
+                      {isAuthLoading ? (
+                        <div className="flex flex-col gap-1.5 justify-center h-full">
+                          <div className={`w-16 h-2 rounded ${isAgentMode ? 'bg-slate-700 animate-pulse' : 'bg-gray-200 animate-pulse'}`}></div>
+                          <div className={`w-20 h-1.5 rounded ${isAgentMode ? 'bg-slate-700 animate-pulse' : 'bg-gray-200 animate-pulse'}`}></div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className={`text-[11px] font-bold leading-none uppercase tracking-tight max-w-[100px] truncate ${isAgentMode ? 'text-white' : 'text-gray-900'}`}>{localUser?.name}</p>
+                          <p className={`text-[9px] font-medium mt-0.5 lowercase max-w-[100px] truncate ${isAgentMode ? 'text-slate-400' : 'text-gray-400'}`}>{localUser?.email}</p>
+                        </>
+                      )}
+                    </div>
+                    <svg className={`w-3.5 h-3.5 hidden md:block transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''} ${isAgentMode ? 'text-slate-400' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+
+                  <div className={`absolute right-0 top-full mt-3 w-[220px] md:w-[260px] bg-white rounded-[24px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.15)] border border-gray-100 transform origin-top-right transition-all duration-300 z-[60] overflow-hidden ${isDropdownOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 -translate-y-2 pointer-events-none'}`}>
+                    <div className="p-2 flex flex-col gap-1">
+                      
+                      {!isAgentMode ? (
+                        <>
+                          <button onClick={() => { navigate('/'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname === '/' ? 'bg-orange-50 text-[#FF6B35]' : 'text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35]'}`}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                            HOME
+                          </button>
+                          <button onClick={() => { navigate('/profile'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/profile') ? 'bg-orange-50 text-[#FF6B35]' : 'text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35]'}`}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                            MY PROFILE
+                          </button>
+                          <button onClick={() => { navigate('/manage'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/manage') ? 'bg-orange-50 text-[#FF6B35]' : 'text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35]'}`}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            MANAGE EVENTS
+                          </button>
+                          <button onClick={() => { navigate('/my-orders'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/my-orders') ? 'bg-orange-50 text-[#FF6B35]' : 'text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35]'}`}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                            MY ORDERS
+                          </button>
+                          <button onClick={() => { navigate('/my-tickets'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/my-tickets') ? 'bg-orange-50 text-[#FF6B35]' : 'text-gray-600 hover:bg-gray-50 hover:text-[#FF6B35]'}`}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                            MY TICKETS
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => { navigate('/agent'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname === '/agent' ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-blue-500'}`}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                            MY TASKS
+                          </button>
+                          
+                          <button onClick={() => { navigate('/profile'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/profile') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-blue-500'}`}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                            PROFILE & BANK
+                          </button>
+
+                          <button onClick={() => { navigate('/agent/wallet'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/wallet') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-blue-500'}`}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                            EARNINGS WALLET
+                          </button>
+
+                          <button onClick={() => { navigate('/agent/history'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/history') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-blue-500'}`}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            SCAN HISTORY
+                          </button>
+
+                          <button onClick={() => { navigate('/jobs'); setIsDropdownOpen(false); }} className={`flex items-center gap-3 px-4 py-3 text-[11px] font-bold rounded-xl transition-all group ${location.pathname.includes('/jobs') ? 'bg-blue-50 text-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-blue-500'}`}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                            FIND JOBS (FREELANCE)
+                          </button>
+                        </>
+                      )}
+
+                      <div className="h-px bg-gray-100 my-1 mx-2"></div>
+                      
+                      <button onClick={toggleRole} className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 text-gray-900 rounded-xl hover:bg-gray-100 transition-all group">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 group-hover:text-gray-900 transition-colors">
+                          {isAgentMode ? 'User Mode' : 'Agent Mode'}
+                        </span>
+                        <svg className="w-4 h-4 text-gray-400 group-hover:text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                      </button>
+
+                      <button 
+                        onClick={() => { setIsDropdownOpen(false); setShowLogoutModal(true); }} 
+                        className="w-full flex items-center gap-3 px-4 py-3 mt-1 text-[11px] font-bold text-red-500 hover:bg-red-50 rounded-xl transition-all group"
+                      >
+                        <svg className="w-4 h-4 text-red-400 group-hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                        LOG OUT
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <button onClick={onOpenLogin} className="bg-[#FF6B35] text-white px-6 md:px-8 py-2 md:py-2.5 rounded-full font-bold text-[10px] md:text-xs uppercase tracking-widest hover:bg-orange-600 transition shadow-md shadow-orange-100 active:scale-95 shrink-0">
+                Login
+              </button>
+            )}
+          </div>
         </div>
       </nav>
+
+      {/* 🔥 OVERLAY SEARCH MOBILE (CLEAN & MINIMALIST) 🔥 */}
+      {isMobileSearchActive && !isAgentMode && (
+        <div className="fixed inset-0 z-[999] flex flex-col bg-black/60 backdrop-blur-sm md:hidden animate-in fade-in duration-200">
+          {/* Hapus tombol back, dibikin full padding biar lega banget */}
+          <div className="bg-white w-full px-5 py-6 shadow-xl rounded-b-[32px] animate-in slide-in-from-top-4 duration-300">
+            <AnimatedSearchNavbar 
+              events={events} 
+              searchQuery={searchQuery} 
+              onSearchSelect={(v) => { onSearchSelect(v); setIsMobileSearchActive(false); }} 
+              isMobileSearchActive={isMobileSearchActive}
+            />
+          </div>
+          {/* Area gelap di bawah kotak pencarian, klik buat batal nyari */}
+          <div className="flex-1 w-full cursor-pointer" onClick={() => setIsMobileSearchActive(false)}></div>
+        </div>
+      )}
 
       {/* POP-UP CONFIRMATION LOGOUT */}
       {showLogoutModal && (
