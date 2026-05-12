@@ -19,7 +19,8 @@ export default function Footer() {
               />
               <h2 className="text-2xl font-extrabold text-[#FF6B35] tracking-tight">EventRent</h2>
             </div>
-            <p className="text-[12px] md:text-sm italic leading-relaxed text-gray-500 max-w-[280px]">
+            {/* Tweak: Italic dicabut dan warna dibikin dikit lebih terang biar clear */}
+            <p className="text-[12px] md:text-sm leading-relaxed text-gray-400 max-w-[280px]">
               "Menghubungkan Anda dengan pengalaman dan komunitas terbaik di sekitar Anda."
             </p>
           </div>
@@ -33,7 +34,27 @@ export default function Footer() {
                   About EventRent
                 </Link>
               </li>
-              {/* Tambahkan link lain di sini nanti */}
+              {/* Dummy Links biar lebih padet & seimbang */}
+              <li>
+                <Link to="/jobs" className="hover:text-[#FF6B35] transition-colors duration-300">
+                  Find Jobs
+                </Link>
+              </li>
+              <li>
+                <Link to="/create" className="hover:text-[#FF6B35] transition-colors duration-300">
+                  Create Event
+                </Link>
+              </li>
+              <li>
+                <Link to="/faq" className="hover:text-[#FF6B35] transition-colors duration-300">
+                  Help Center
+                </Link>
+              </li>
+              <li>
+                <Link to="/terms" className="hover:text-[#FF6B35] transition-colors duration-300">
+                  Terms & Conditions
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -87,7 +108,7 @@ export default function Footer() {
         {/* ════ COPYRIGHT SECTION (Paling Bawah) ════ */}
         <div className="mt-12 pt-6 border-t border-gray-700/50 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm font-medium text-gray-500 text-center w-full">
-            Copyright © {new Date().getFullYear()} EventRent. cah 4
+            Copyright © {new Date().getFullYear()} EventRent.
           </p>
         </div>
 

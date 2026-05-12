@@ -23,6 +23,10 @@ import MyOrders from './pages/MyOrders';
 import UploadProof from './pages/UploadProof';
 import About from './pages/About';
 
+// 🔥 IMPORT HALAMAN FAQ & TERMS BARU 🔥
+import FAQ from './pages/FAQ';
+import Terms from './pages/Terms';
+
 // Import Halaman Job Board
 import JobBoard from './pages/JobBoard';
 
@@ -217,6 +221,10 @@ export default function App() {
           <Route path="/cek-tiket" element={<TrackTicket />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/about" element={<About />} />
+          
+          {/* 🔥 DAFTARIN RUTE FAQ & TERMS DI SINI 🔥 */}
+          <Route path="/faq" element={<FAQ />} />
+          <Route path="/terms" element={<Terms />} />
           
           {/* Rute Undangan */}
           <Route path="/invitation/:id" element={<WeddingInvitation />} />
