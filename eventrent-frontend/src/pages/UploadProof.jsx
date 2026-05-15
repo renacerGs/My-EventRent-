@@ -135,9 +135,20 @@ export default function UploadProof() {
 
       <div className="w-full max-w-md bg-white rounded-[32px] shadow-2xl p-8 md:p-10 relative overflow-hidden">
         
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <h2 className="text-2xl font-black text-gray-900 mb-1 uppercase tracking-tight">Konfirmasi Bayar</h2>
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Order ID: #{orderId}</p>
+        </div>
+
+        {/* 🔥 PERINGATAN PENTING (SOLUSI 2) 🔥 */}
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-xl mb-6 text-left">
+            <p className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1 flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                Penting!
+            </p>
+            <p className="text-xs text-red-800 font-medium">
+                Harap <strong>Screenshot halaman ini</strong>. Jika tiket tidak masuk ke email Anda, segera hubungi panitia dengan menyertakan Order ID di atas.
+            </p>
         </div>
 
         <div className="bg-orange-50 border border-orange-100 rounded-3xl p-6 mb-8 text-center ring-4 ring-orange-50/50">
@@ -193,11 +204,12 @@ export default function UploadProof() {
               type="submit"
               disabled={!file || isUploading}
               className="w-full py-4.5 bg-[#FF6B35] text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-[#e85b2a] hover:shadow-xl hover:shadow-orange-500/30 transition-all active:scale-95 disabled:opacity-50 disabled:grayscale flex justify-center items-center gap-3 shadow-lg shadow-orange-500/20"
+              style={{ padding: '1.125rem' }}
             >
               {isUploading ? (
                 <><div className="w-5 h-5 border-3 border-white border-t-transparent rounded-full animate-spin"></div> Memproses...</>
               ) : (
-                <><svg className="w-4 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg> Kirim Konfirmasi</>
+                <><svg className="w-4 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3" style={{ height: '1.5rem', width: '1.5rem' }}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"></path></svg> Kirim Konfirmasi</>
               )}
             </button>
           </form>

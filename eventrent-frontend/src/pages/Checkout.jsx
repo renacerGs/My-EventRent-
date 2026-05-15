@@ -156,10 +156,9 @@ export default function Checkout() {
         setQrisPaymentSuccess(true);
         setTimeout(() => {
           setShowQrModal(false);
-          navigate(`/event/${id}`); // Arahin balik ke halaman event (atau kemana aja bebas)
-        }, 2000); // Tunggu 2 detik biar animasinya diliat user
+          navigate(`/event/${id}`); 
+        }, 2000); 
       } else if (!autoCheck) {
-        // Kalau manual klik tapi belum lunas, kasih tau
         showPopup(data.message || "We haven't received the payment yet.", "info");
       }
     } catch (err) {
@@ -176,13 +175,10 @@ export default function Checkout() {
   useEffect(() => {
     let intervalId;
     if (showQrModal && currentOrderId && !qrisPaymentSuccess) {
-      // Jalanin fungsi checkPaymentStatus (secara auto) tiap 5 detik
       intervalId = setInterval(() => {
         checkPaymentStatus(true);
       }, 5000);
     }
-    
-    // Bersihin interval kalau modal ketutup atau komponen hancur
     return () => clearInterval(intervalId);
   }, [showQrModal, currentOrderId, qrisPaymentSuccess]);
 
@@ -219,13 +215,26 @@ export default function Checkout() {
   const canAddNewSession = event?.sessions?.some(s => s.stock > 0 && !cart.some(item => String(item.sessionId) === String(s.id)));
 
   // ========================================================
-  // 🔥 FUNGSI PEMBAYARAN HYBRID
+  // 🔥 FUNGSI PEMBAYARAN HYBRID DENGAN VALIDASI EMAIL
   // ========================================================
   const handlePayment = async (e) => {
     e.preventDefault(); 
 
     if (cart.length === 0) return showPopup("Cart is empty!", "error");
     if (cart.find(item => item.qty < 1)) return showPopup("Minimum ticket quantity is 1 per category!", "error");
+
+    // 🔥 VALIDASI: CEK APAKAH EMAIL DAN CONFIRM EMAIL SAMA 🔥
+    for (const item of cart) {
+      for (let qtyIndex = 0; qtyIndex < item.qty; qtyIndex++) {
+        const formKeyPrefix = `cart-${item.id}-ticket-${qtyIndex}`;
+        const email = formAnswers[`${formKeyPrefix}-email`];
+        const confirmEmail = formAnswers[`${formKeyPrefix}-confirmEmail`];
+
+        if (email && confirmEmail && email !== confirmEmail) {
+          return showPopup(`Emails do not match for Ticket ${qtyIndex + 1}! Please check again.`, "error");
+        }
+      }
+    }
 
     const totalAmount = calculateTotal();
 
@@ -278,8 +287,8 @@ export default function Checkout() {
       else {
         if (data.checkoutUrl) {
           setQrData(data.checkoutUrl);
-          setCurrentOrderId(data.orderId); // 🔥 Simpan Order ID buat dilacak nanti
-          setQrisPaymentSuccess(false); // Reset animasi
+          setCurrentOrderId(data.orderId); 
+          setQrisPaymentSuccess(false); 
           setShowQrModal(true);
         } else {
           showPopup("An error occurred, the payment QR URL was not found.", "error");
@@ -480,9 +489,23 @@ export default function Checkout() {
                               <label className={labelStyle}>Full Name <span className="text-red-500">*</span></label>
                               <input type="text" required value={formAnswers[`${formKeyPrefix}-nama`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-nama`]: e.target.value}))} className={inputStyle} placeholder="Enter your full name" />
                             </div>
-                            <div>
-                              <label className={labelStyle}>Email <span className="text-red-500">*</span></label>
-                              <input type="email" required value={formAnswers[`${formKeyPrefix}-email`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-email`]: e.target.value}))} className={inputStyle} placeholder="Enter an active email" />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className={labelStyle}>Email <span className="text-red-500">*</span></label>
+                                <input type="email" required value={formAnswers[`${formKeyPrefix}-email`] || ''} onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-email`]: e.target.value}))} className={inputStyle} placeholder="Enter an active email" />
+                              </div>
+                              {/* 🔥 INPUT BARU: CONFIRM EMAIL 🔥 */}
+                              <div>
+                                <label className={labelStyle}>Confirm Email <span className="text-red-500">*</span></label>
+                                <input 
+                                  type="email" 
+                                  required 
+                                  value={formAnswers[`${formKeyPrefix}-confirmEmail`] || ''} 
+                                  onChange={(e) => setFormAnswers(prev => ({...prev, [`${formKeyPrefix}-confirmEmail`]: e.target.value}))} 
+                                  className={inputStyle} 
+                                  placeholder="Re-enter your email" 
+                                />
+                              </div>
                             </div>
                             
                             {/* --- RENDER CUSTOM QUESTIONS --- */}

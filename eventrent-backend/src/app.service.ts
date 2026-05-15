@@ -396,7 +396,8 @@ export class AppService implements OnModuleInit {
         }
       }
 
-      const boughtTickets: string[] = []; 
+      // 🔥 UPDATE: Array ini sekarang nyimpen objek { code, sessionName }
+      const boughtTickets: { code: string, sessionName: string }[] = []; 
       let totalTransactionPrice = 0;
 
       const evRes = await client.query('SELECT title FROM events WHERE id = $1', [eventId]);
@@ -435,7 +436,8 @@ export class AppService implements OnModuleInit {
         const paxPerTicket = Number(item.pax || formAnswers.pax || 1);
         const totalStockNeeded = qty * paxPerTicket;
 
-        const sessionRes = await client.query('SELECT price, stock FROM event_sessions WHERE id = $1 FOR UPDATE', [sessionId]);
+        // 🔥 UPDATE: Ambil juga nama sesi-nya
+        const sessionRes = await client.query('SELECT name, price, stock FROM event_sessions WHERE id = $1 FOR UPDATE', [sessionId]);
         if (sessionRes.rows.length === 0) throw new BadRequestException('Session not found');
         
         const session = sessionRes.rows[0];
@@ -474,7 +476,9 @@ export class AppService implements OnModuleInit {
           );
           
           const newTicketCode = ticketRes.rows[0].ticket_code;
-          boughtTickets.push(newTicketCode);
+          
+          // 🔥 UPDATE: Masukin object berisi code tiket dan nama sesinya
+          boughtTickets.push({ code: newTicketCode, sessionName: session.name });
         }
       }
 
@@ -489,7 +493,8 @@ export class AppService implements OnModuleInit {
           .catch(e => console.error("Gagal mengirim email struk:", e)); 
       }
 
-      return { message: 'Ticket purchase/RSVP successful', ticketIds: boughtTickets };
+      // Supaya return-nya tetep array of string biar Frontend nggak error
+      return { message: 'Ticket purchase/RSVP successful', ticketIds: boughtTickets.map(t => t.code) };
 
     } catch (err) {
       await client.query('ROLLBACK');
@@ -501,11 +506,15 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  private async sendEmailReceipt(targetEmail: string, eventTitle: string, ticketCodes: string[], totalPrice: number, eventId: number) {
+  // 🔥 UPDATE PARAMETER: tickets array object
+  private async sendEmailReceipt(targetEmail: string, eventTitle: string, tickets: { code: string, sessionName: string }[], totalPrice: number, eventId: number) {
     let qrCodesHtml = '';
     const emailAttachments: any[] = []; 
 
-    for (const code of ticketCodes) {
+    for (const ticket of tickets) {
+      const code = ticket.code;
+      const sessionName = ticket.sessionName; // 🔥 Ambil nama sesi dari object
+
       const qrPayload = JSON.stringify({ ticketId: code, eventId: eventId });
       const qrDataUrl = await QRCode.toDataURL(qrPayload, { errorCorrectionLevel: 'H', margin: 2, color: { dark: '#000000', light: '#ffffff' } });
       const uniqueCid = `qr-ticket-${code}@eventrent.com`;
@@ -514,7 +523,7 @@ export class AppService implements OnModuleInit {
         <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 650px; margin: 20px auto; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.15); border-collapse: collapse; border: 1px solid #e2e8f0;">
           <tr>
             <td width="65%" style="padding: 30px; vertical-align: middle;">
-              <h4 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 2px;">Admit One</h4>
+              <h4 style="color: #FF6B35; margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 2px;">Session: ${sessionName}</h4>
               <h2 style="color: #0f172a; margin: 0 0 15px 0; font-size: 26px; line-height: 1.2; font-weight: 900;">${eventTitle}</h2>
               <p style="color: #64748b; font-size: 13px; margin: 0 0 25px 0; line-height: 1.5;">Please present this QR Code at the entrance.<br/>This ticket is strictly confidential and valid for one-time scan only.</p>
               <table width="100%" cellpadding="0" cellspacing="0">
@@ -808,7 +817,6 @@ export class AppService implements OnModuleInit {
       if (updateRes.rowCount === 0) throw new BadRequestException('Agent not found');
 
       // 🔥 FIX LOGIKA NOTIFIKASI RATING 🔥
-      // Pastiin rating BUKAN null, BUKAN undefined, dan angkanya LEBIH DARI 0
       if (data.rating_given !== undefined && data.rating_given !== null && Number(data.rating_given) > 0) {
         try {
           await this.pool.query(
@@ -1889,7 +1897,8 @@ export class AppService implements OnModuleInit {
         const formAnswers = details.formAnswers || {};
         const buyerEmail = details.buyerEmail || null; 
 
-        const boughtTickets: string[] = [];
+        // 🔥 UPDATE: Array ini sekarang nyimpen objek { code, sessionName }
+        const boughtTickets: { code: string, sessionName: string }[] = [];
         let totalTransactionPrice = 0;
 
         const evRes = await client.query('SELECT title FROM events WHERE id = $1', [order.event_id]);
@@ -1903,8 +1912,10 @@ export class AppService implements OnModuleInit {
         }
         
         for (const item of cart) {
-          const sessionRes = await client.query('SELECT price FROM event_sessions WHERE id = $1 FOR UPDATE', [item.sessionId]);
+          // 🔥 UPDATE: Ambil juga nama sesi-nya
+          const sessionRes = await client.query('SELECT name, price FROM event_sessions WHERE id = $1 FOR UPDATE', [item.sessionId]);
           const singlePrice = sessionRes.rows.length > 0 ? Number(sessionRes.rows[0].price) : 0;
+          const sessionName = sessionRes.rows.length > 0 ? sessionRes.rows[0].name : 'Main Session';
 
           for (let i = 0; i < item.qty; i++) {
             const formKeyPrefix = `cart-${item.id}-ticket-${i}`;
@@ -1920,7 +1931,8 @@ export class AppService implements OnModuleInit {
               [orderId, order.event_id, item.sessionId, order.user_id, attendeeName, attendeeEmail, ticketCode, targetEmail || null, singlePrice]
             );
 
-            boughtTickets.push(ticketRes.rows[0].ticket_code);
+            // 🔥 UPDATE: Masukin object berisi code tiket dan nama sesinya
+            boughtTickets.push({ code: ticketRes.rows[0].ticket_code, sessionName: sessionName });
 
             await client.query(`UPDATE event_sessions SET stock = stock - 1 WHERE id = $1`, [item.sessionId]);
           }
