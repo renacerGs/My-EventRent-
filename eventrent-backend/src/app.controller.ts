@@ -150,6 +150,15 @@ export class AppController {
     return await this.appService.getOrderPaymentInfo(orderId);
   }
 
+  // 🔥 RUTE BARU: Resend E-Ticket by EO 🔥
+  @ApiTags('Orders')
+  @ApiOperation({ summary: 'Kirim ulang email e-ticket ke pembeli' })
+  @UseGuards(SupabaseGuard)
+  @Post('orders/:orderId/resend-email')
+  async resendEmailTicket(@Param('orderId') orderId: string) {
+    return await this.appService.resendTicketEmail(orderId);
+  }
+
   @ApiTags('Payments')
   @ApiOperation({ summary: 'Webhook Gateway Cahaya Pay' })
   @Post('payment/webhook')
@@ -337,31 +346,24 @@ export class AppController {
     return await this.appService.markAllNotificationsRead(req.user.id);
   }
 
-  // 🔥 PERBAIKAN: Fungsi hapus banyak notifikasi digabung buat React & Flutter
   @ApiTags('Notifications')
   @ApiOperation({ summary: 'Menghapus banyak notifikasi berdasarkan ID (Support Web & Mobile)' })
   @UseGuards(SupabaseGuard)
   @Delete('notifications')
   async deleteNotifications(@Req() req: any, @Query('ids') idsQuery: string, @Body() body: any) {
     const userId = req.user.id;
-    
-    // 1. Ambil data mentah (bisa dari body React atau body Flutter)
     let rawIds = body?.notifIds || body?.ids;
 
-    // 2. Fallback: Kalau Body kosong, ambil dari Query String (?ids=1,2,3)
     if (!rawIds || rawIds.length === 0) {
       if (idsQuery) {
         rawIds = idsQuery.split(',');
       }
     }
 
-    // 3. Validasi wujud array
     if (!rawIds || !Array.isArray(rawIds) || rawIds.length === 0) {
       throw new BadRequestException('ID Notification is missing or invalid format!');
     }
 
-    // 🔥 4. KUNCI UTAMA: Paksa semua elemen di dalam array jadi Angka (Integer) murni!
-    // Mau Flutter ngirim ["161", "162"] atau [161, 162], bakal disapu bersih jadi [161, 162]
     const cleanIds = rawIds.map(id => parseInt(String(id).trim(), 10)).filter(id => !isNaN(id));
 
     if (cleanIds.length === 0) {
@@ -415,14 +417,13 @@ export class AppController {
   }
 
   @ApiTags('Recruitment')
-  @UseGuards(SupabaseGuard) // 🔥 KUNCI 1: Harus di-Gembok biar dapet KTP (userId)! 🔥
+  @UseGuards(SupabaseGuard) 
   @Get('jobs')
   async getAllJobs(@Req() req, @Query('page') page?: string, @Query('limit') limit?: string) {
     const pageNum = page ? Number(page) : 1;
     const limitNum = limit ? Number(limit) : 10;
-    const userId = req.user.id; // 🔥 KUNCI 2: Dapet ID si pelamar
+    const userId = req.user.id; 
     
-    // 🔥 KUNCI 3: Lempar ID ke fungsi service yang udah kita benerin kemaren! 🔥
     return await this.appService.getAllActiveJobs(userId, pageNum, limitNum);
   }
 

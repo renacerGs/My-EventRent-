@@ -14,27 +14,60 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const OrderSkeleton = () => (
   <div className="bg-white border border-slate-200 rounded-[24px] p-5 md:p-6 shadow-sm flex flex-col md:flex-row gap-5 md:items-center justify-between animate-pulse">
     <div className="flex items-center gap-4">
-      {/* Skeleton Gambar */}
       <div className="w-16 h-16 md:w-20 md:h-20 bg-slate-200 rounded-xl shrink-0"></div>
       <div>
-        {/* Skeleton ID & Judul */}
         <div className="w-20 h-4 bg-slate-200 rounded mb-2"></div>
         <div className="w-48 md:w-64 h-5 md:h-6 bg-slate-200 rounded mb-2"></div>
         <div className="w-32 h-3 bg-slate-200 rounded"></div>
       </div>
     </div>
-
     <div className="flex flex-row md:flex-col items-center md:items-end justify-between border-t border-slate-100 md:border-none pt-4 md:pt-0 gap-3">
-      {/* Skeleton Harga */}
       <div className="text-left md:text-right">
         <div className="w-24 h-3 bg-slate-200 rounded mb-1 ml-auto"></div>
         <div className="w-32 h-6 bg-slate-200 rounded ml-auto"></div>
       </div>
-      {/* Skeleton Tombol */}
       <div className="w-32 h-10 bg-slate-200 rounded-xl"></div>
     </div>
   </div>
 );
+
+// 🔥 KOMPONEN TIMER COUNTDOWN 🔥
+const CountdownTimer = ({ createdAt, onExpire }) => {
+  const [timeLeft, setTimeLeft] = useState('');
+  const [isExpired, setIsExpired] = useState(false);
+
+  useEffect(() => {
+    // Set batas waktu 30 Menit (1800000 milidetik) dari waktu order dibuat
+    const expireTime = new Date(createdAt).getTime() + (30 * 60 * 1000);
+
+    const interval = setInterval(() => {
+      const now = new Date().getTime();
+      const distance = expireTime - now;
+
+      if (distance <= 0) {
+        clearInterval(interval);
+        setTimeLeft('00:00');
+        setIsExpired(true);
+        if (onExpire) onExpire();
+      } else {
+        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+        setTimeLeft(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [createdAt, onExpire]);
+
+  if (isExpired) return null; // Kalau expired, timernya ilangin aja
+
+  return (
+    <span className="text-[10px] font-mono text-red-500 font-bold bg-red-50 px-2 py-0.5 rounded border border-red-100 mb-1.5 inline-flex items-center gap-1">
+      <svg className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+      {timeLeft}
+    </span>
+  );
+};
 
 export default function MyOrders() {
   const navigate = useNavigate();
@@ -42,10 +75,7 @@ export default function MyOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // State for QR Code Modal
   const [activeQr, setActiveQr] = useState({ url: null, orderId: null });
-
-  // State for Upload Transfer Proof Modal
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [file, setFile] = useState(null);
@@ -82,7 +112,20 @@ export default function MyOrders() {
       });
       
       if (res.ok) {
-        const data = await res.json();
+        let data = await res.json();
+        
+        // 🔥 FRONTEND LOGIC: Cek expired secara manual berdasarkan waktu sekarang 🔥
+        const now = new Date().getTime();
+        data = data.map(order => {
+           if (order.payment_status === 'PENDING') {
+              const expireTime = new Date(order.created_at).getTime() + (30 * 60 * 1000);
+              if (now >= expireTime) {
+                 return { ...order, payment_status: 'EXPIRED' };
+              }
+           }
+           return order;
+        });
+
         setOrders(data);
       } else {
         if (!isBackground) toast.error('Failed to fetch order history.');
@@ -95,9 +138,13 @@ export default function MyOrders() {
     }
   };
 
-  // ========================================================
-  // PAYMENT & PROOF UPLOAD FUNCTIONS
-  // ========================================================
+  // 🔥 FUNGSI BUAT NANGANIN KETIKA TIMER ABIS 🔥
+  const handleOrderExpired = (orderId) => {
+    setOrders(prevOrders => prevOrders.map(o => 
+      o.order_id === orderId ? { ...o, payment_status: 'EXPIRED' } : o
+    ));
+    toast.error(`Order #${orderId} has expired!`);
+  };
 
   const handlePayNow = (order) => {
     if (order.snap_token === 'MANUAL_TRANSFER') {
@@ -244,14 +291,22 @@ export default function MyOrders() {
         ) : (
           <div className="grid grid-cols-1 gap-5">
             {orders.map((order) => (
-              <div key={order.id} className="bg-white border border-slate-200 hover:border-[#FF6B35]/30 rounded-[24px] p-5 md:p-6 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row gap-5 md:items-center justify-between">
+              <div key={order.order_id} className={`bg-white border border-slate-200 rounded-[24px] p-5 md:p-6 shadow-sm transition-all flex flex-col md:flex-row gap-5 md:items-center justify-between ${order.payment_status === 'EXPIRED' ? 'opacity-70 grayscale-[50%]' : 'hover:border-[#FF6B35]/30 hover:shadow-md'}`}>
                 
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 md:w-20 md:h-20 bg-slate-100 rounded-xl overflow-hidden shrink-0 border border-slate-200">
                     <img src={order.event_img || 'https://via.placeholder.com/150'} alt={order.event_title} className="w-full h-full object-cover" />
                   </div>
                   <div>
-                    <span className="text-[10px] font-mono text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200 mb-1.5 inline-block">#{order.order_id}</span>
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">#{order.order_id}</span>
+                      
+                      {/* 🔥 PANGGIL TIMER DISINI JIKA PENDING 🔥 */}
+                      {order.payment_status === 'PENDING' && (
+                        <CountdownTimer createdAt={order.created_at} onExpire={() => handleOrderExpired(order.order_id)} />
+                      )}
+                    </div>
+                    
                     <h3 className="font-black text-slate-900 text-base md:text-lg leading-tight line-clamp-1">{order.event_title}</h3>
                     <p className="text-xs text-slate-500 font-medium mt-1">{order.event_date}</p>
                   </div>
@@ -260,7 +315,7 @@ export default function MyOrders() {
                 <div className="flex flex-row md:flex-col items-center md:items-end justify-between border-t border-slate-100 md:border-none pt-4 md:pt-0 gap-3">
                   <div className="text-left md:text-right">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Total Amount</p>
-                    <p className="font-black text-slate-900 text-lg">Rp {Number(order.total_price).toLocaleString('id-ID')}</p>
+                    <p className={`font-black text-lg ${order.payment_status === 'EXPIRED' ? 'text-slate-400 line-through' : 'text-slate-900'}`}>Rp {Number(order.total_price).toLocaleString('id-ID')}</p>
                   </div>
 
                   {order.payment_status === 'PENDING' ? (
@@ -280,7 +335,7 @@ export default function MyOrders() {
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1.5 bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-red-200 whitespace-nowrap">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg> Cancelled / Expired
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M6 18L18 6M6 6l12 12"></path></svg> EXPIRED
                     </span>
                   )}
                 </div>

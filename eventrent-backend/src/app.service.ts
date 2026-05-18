@@ -396,7 +396,6 @@ export class AppService implements OnModuleInit {
         }
       }
 
-      // 🔥 UPDATE: Array ini sekarang nyimpen objek { code, sessionName }
       const boughtTickets: { code: string, sessionName: string }[] = []; 
       let totalTransactionPrice = 0;
 
@@ -436,7 +435,6 @@ export class AppService implements OnModuleInit {
         const paxPerTicket = Number(item.pax || formAnswers.pax || 1);
         const totalStockNeeded = qty * paxPerTicket;
 
-        // 🔥 UPDATE: Ambil juga nama sesi-nya
         const sessionRes = await client.query('SELECT name, price, stock FROM event_sessions WHERE id = $1 FOR UPDATE', [sessionId]);
         if (sessionRes.rows.length === 0) throw new BadRequestException('Session not found');
         
@@ -477,7 +475,6 @@ export class AppService implements OnModuleInit {
           
           const newTicketCode = ticketRes.rows[0].ticket_code;
           
-          // 🔥 UPDATE: Masukin object berisi code tiket dan nama sesinya
           boughtTickets.push({ code: newTicketCode, sessionName: session.name });
         }
       }
@@ -493,7 +490,6 @@ export class AppService implements OnModuleInit {
           .catch(e => console.error("Gagal mengirim email struk:", e)); 
       }
 
-      // Supaya return-nya tetep array of string biar Frontend nggak error
       return { message: 'Ticket purchase/RSVP successful', ticketIds: boughtTickets.map(t => t.code) };
 
     } catch (err) {
@@ -506,14 +502,13 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // 🔥 UPDATE PARAMETER: tickets array object
   private async sendEmailReceipt(targetEmail: string, eventTitle: string, tickets: { code: string, sessionName: string }[], totalPrice: number, eventId: number) {
     let qrCodesHtml = '';
     const emailAttachments: any[] = []; 
 
     for (const ticket of tickets) {
       const code = ticket.code;
-      const sessionName = ticket.sessionName; // 🔥 Ambil nama sesi dari object
+      const sessionName = ticket.sessionName; 
 
       const qrPayload = JSON.stringify({ ticketId: code, eventId: eventId });
       const qrDataUrl = await QRCode.toDataURL(qrPayload, { errorCorrectionLevel: 'H', margin: 2, color: { dark: '#000000', light: '#ffffff' } });
@@ -816,7 +811,6 @@ export class AppService implements OnModuleInit {
 
       if (updateRes.rowCount === 0) throw new BadRequestException('Agent not found');
 
-      // 🔥 FIX LOGIKA NOTIFIKASI RATING 🔥
       if (data.rating_given !== undefined && data.rating_given !== null && Number(data.rating_given) > 0) {
         try {
           await this.pool.query(
@@ -1125,7 +1119,7 @@ export class AppService implements OnModuleInit {
   }
 
   // ==========================================
-  // FITUR EVENT REPORTS SYSTEM
+  // FITUR REPORTS / KENDALA
   // ==========================================
 
   async createEventReport(eventId: number, agentId: number, message: string) {
@@ -1256,23 +1250,19 @@ export class AppService implements OnModuleInit {
     try {
       await client.query('BEGIN'); 
       
-      // 1. Cari tau job ini buat event yang mana
       const jobRes = await client.query('SELECT event_id FROM job_postings WHERE id = $1', [jobId]);
       if (jobRes.rows.length === 0) throw new BadRequestException('Job posting not found');
       const targetEventId = jobRes.rows[0].event_id;
 
-      // 🔥 SATPAM PENJAGA: Cek apakah dia udah jadi Agen di event ini? 🔥
       const checkAgent = await client.query('SELECT id FROM event_agents WHERE event_id = $1 AND user_id = $2', [targetEventId, userId]);
       if (checkAgent.rows.length > 0) {
         throw new BadRequestException('Kamu sudah terdaftar sebagai panitia/agen di event ini!');
       }
 
-      // 3. Kalau aman (bukan agen), baru lanjut masukin lamaran
       const query = `INSERT INTO job_applications (job_id, user_id, status) VALUES ($1, $2, 'PENDING') RETURNING *`;
       const { rows } = await client.query(query, [jobId, userId]);
       const application = rows[0];
 
-      // 4. Kirim notif ke EO
       const infoQuery = `
         SELECT j.eo_id, j.event_id, j.role, u.name as applicant_name, e.title as event_title
         FROM job_postings j
@@ -1295,7 +1285,6 @@ export class AppService implements OnModuleInit {
       return application;
     } catch (err: any) {
       await client.query('ROLLBACK');
-      // Tangkap pesan error dari satpam biar dilempar ke Frontend
       if (err instanceof BadRequestException) throw err;
       if (err.code === '23505') throw new BadRequestException('Kamu sudah pernah melamar untuk posisi ini!');
       throw new InternalServerErrorException('Failed to submit application');
@@ -1495,7 +1484,6 @@ export class AppService implements OnModuleInit {
         terminal_no: TERMINAL_NO,
         terminal_time: Math.floor(Date.now() / 1000).toString(),
         pay_type: "2", 
-        // 🔥 TRIK Rp 1: Semua tagihan ke Cahaya Pay dipaksa jadi 1 Rupiah buat testing
         total_fee: "1", 
         terminal_ip: ip || "127.0.0.1", 
         notify_url: `${process.env.BACKEND_URL || 'https://my-event-rent.vercel.app'}/api/payment/webhook`
@@ -1576,9 +1564,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // ==========================================
-  // FITUR JEMPUT BOLA: CEK STATUS MANUAL KE CAHAYA
-  // ==========================================
   async checkCahayaPaymentStatus(orderId: string) {
     const client = await this.pool.connect();
     try {
@@ -1688,7 +1673,6 @@ export class AppService implements OnModuleInit {
           
           const targetEmail = data.buyerEmail || 'customer@example.com';
 
-          // 🔥 AMBIL DATA REKENING EO DARI DATABASE EVENTS
           const eventRes = await client.query('SELECT payment_methods FROM events WHERE id = $1', [data.eventId]);
           let bankDetails = null;
           if (eventRes.rows.length > 0 && eventRes.rows[0].payment_methods) {
@@ -1752,7 +1736,6 @@ export class AppService implements OnModuleInit {
     try {
       const uploadLink = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/upload-proof/${orderId}`; 
 
-      // 🔥 Gunakan detail bank EO, fallback jika kosong
       const bankName = bankDetails?.bankName || 'BANK BCA';
       const accNumber = bankDetails?.accountNumber || '123-456-7890';
       const accName = bankDetails?.accountName || 'Admin EventRent';
@@ -1789,8 +1772,46 @@ export class AppService implements OnModuleInit {
     }
   }
 
+  // 🔥 UPDATE: FUNGSI GET MY ORDERS DENGAN RAZIA EXPIRED 🔥
   async getMyOrders(userId: number) {
+    const client = await this.pool.connect();
     try {
+      // 1. LAZY CHECKING: Pas user buka order, kita suruh sistem razia tiket yang PENDING tapi umurnya udah lebih dari 30 menit
+      const expiredQuery = `
+        SELECT order_id, ticket_details 
+        FROM orders 
+        WHERE payment_status = 'PENDING' 
+          AND created_at < NOW() - INTERVAL '30 minutes'
+      `;
+      const expiredOrdersRes = await client.query(expiredQuery);
+      
+      // 2. Kalau nemu yang kadaluarsa, balikin stok tiketnya dan ubah status jadi EXPIRED
+      if (expiredOrdersRes.rows.length > 0) {
+        await client.query('BEGIN');
+        
+        for (const order of expiredOrdersRes.rows) {
+          // Ubah status
+          await client.query(`UPDATE orders SET payment_status = 'EXPIRED' WHERE order_id = $1`, [order.order_id]);
+          
+          // Balikin stok (Baca dari ticket_details cart)
+          if (order.ticket_details) {
+            const details = typeof order.ticket_details === 'string' ? JSON.parse(order.ticket_details) : order.ticket_details;
+            if (details.cart && Array.isArray(details.cart)) {
+              for (const item of details.cart) {
+                 const qty = item.qty || item.quantity || 1;
+                 const paxPerTicket = Number(item.pax || details.formAnswers?.pax || 1);
+                 const totalStockToReturn = qty * paxPerTicket;
+                 
+                 await client.query('UPDATE event_sessions SET stock = stock + $1 WHERE id = $2', [totalStockToReturn, item.sessionId]);
+              }
+            }
+          }
+        }
+        await client.query('COMMIT');
+        console.log(`[SYS] Berhasil merazia dan membatalkan ${expiredOrdersRes.rows.length} order yang kadaluarsa.`);
+      }
+
+      // 3. Setelah razia beres, baru kirim data order ke Frontend
       const query = `
         SELECT o.*, e.title as event_title, e.image_url as event_img, TO_CHAR(e.event_start, 'Dy, DD Mon YYYY') as event_date
         FROM orders o JOIN events e ON o.event_id = e.id WHERE o.user_id = $1
@@ -1799,7 +1820,11 @@ export class AppService implements OnModuleInit {
       const { rows } = await this.pool.query(query, [userId]);
       return rows;
     } catch (err) {
+      await client.query('ROLLBACK');
+      console.error(err);
       throw new InternalServerErrorException('Failed to fetch orders list');
+    } finally {
+      client.release();
     }
   }
 
@@ -1829,9 +1854,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // ========================================================
-  // FUNGSI UPDATE BUKTI TRANSFER MANUAL
-  // ========================================================
   async updateOrderProof(orderId: string, proofUrl: string) {
     const client = await this.pool.connect();
     try {
@@ -1858,9 +1880,6 @@ export class AppService implements OnModuleInit {
     }
   }
 
-  // ========================================================
-  // FUNGSI VERIFIKASI PEMBAYARAN MANUAL OLEH EO/ADMIN
-  // ========================================================
   async verifyManualPayment(orderId: string, isApproved: boolean) {
     const client = await this.pool.connect();
     try {
@@ -1874,7 +1893,6 @@ export class AppService implements OnModuleInit {
         throw new BadRequestException('This order has already been fully paid.');
       }
 
-      // JIKA DITOLAK
       if (!isApproved) {
         await client.query(
           `UPDATE orders SET payment_status = 'PENDING', proof_url = NULL WHERE order_id = $1`,
@@ -1884,27 +1902,23 @@ export class AppService implements OnModuleInit {
         return { message: 'Transfer proof rejected. Status reverted to PENDING.' };
       }
 
-      // JIKA DITERIMA -> UBAH JADI SUCCESS
       await client.query(
         `UPDATE orders SET payment_status = 'SUCCESS' WHERE order_id = $1`,
         [orderId]
       );
 
-      // GENERATE TIKET OTOMATIS & KIRIM EMAIL BARCODE
       if (order.ticket_details) {
         const details = typeof order.ticket_details === 'string' ? JSON.parse(order.ticket_details) : order.ticket_details;
         const cart = details.cart || [];
         const formAnswers = details.formAnswers || {};
         const buyerEmail = details.buyerEmail || null; 
 
-        // 🔥 UPDATE: Array ini sekarang nyimpen objek { code, sessionName }
         const boughtTickets: { code: string, sessionName: string }[] = [];
         let totalTransactionPrice = 0;
 
         const evRes = await client.query('SELECT title FROM events WHERE id = $1', [order.event_id]);
         const eventTitle = evRes.rows.length > 0 ? evRes.rows[0].title : 'Event';
 
-        // Tentukan email tujuan pengiriman
         let targetEmail = buyerEmail;
         if (!targetEmail && order.user_id) {
           const uRes = await client.query('SELECT email FROM users WHERE id = $1', [order.user_id]);
@@ -1912,7 +1926,6 @@ export class AppService implements OnModuleInit {
         }
         
         for (const item of cart) {
-          // 🔥 UPDATE: Ambil juga nama sesi-nya
           const sessionRes = await client.query('SELECT name, price FROM event_sessions WHERE id = $1 FOR UPDATE', [item.sessionId]);
           const singlePrice = sessionRes.rows.length > 0 ? Number(sessionRes.rows[0].price) : 0;
           const sessionName = sessionRes.rows.length > 0 ? sessionRes.rows[0].name : 'Main Session';
@@ -1931,14 +1944,12 @@ export class AppService implements OnModuleInit {
               [orderId, order.event_id, item.sessionId, order.user_id, attendeeName, attendeeEmail, ticketCode, targetEmail || null, singlePrice]
             );
 
-            // 🔥 UPDATE: Masukin object berisi code tiket dan nama sesinya
             boughtTickets.push({ code: ticketRes.rows[0].ticket_code, sessionName: sessionName });
 
             await client.query(`UPDATE event_sessions SET stock = stock - 1 WHERE id = $1`, [item.sessionId]);
           }
         }
         
-        // PANGGIL FUNGSI KIRIM EMAIL
         if (targetEmail && boughtTickets.length > 0) {
           this.sendEmailReceipt(targetEmail, eventTitle, boughtTickets, totalTransactionPrice, order.event_id)
             .catch(e => console.error("Gagal mengirim email struk untuk verifikasi manual:", e)); 
@@ -1955,4 +1966,88 @@ export class AppService implements OnModuleInit {
       client.release();
     }
   }
+
+  // ========================================================
+  // 🔥 FUNGSI BARU: RESEND EMAIL E-TICKET OLEH EO 🔥
+  // ========================================================
+  async resendTicketEmail(identifier: string) {
+    const client = await this.pool.connect();
+    try {
+      let eventId, targetEmail, eventTitle;
+      const ticketsToResend: { code: string, sessionName: string }[] = [];
+      let totalPrice = 0;
+
+      if (identifier.startsWith('ORD')) {
+        const orderRes = await client.query('SELECT * FROM orders WHERE order_id = $1', [identifier]);
+        if (orderRes.rows.length === 0) throw new BadRequestException('Order tidak ditemukan.');
+        const order = orderRes.rows[0];
+
+        if (order.payment_status !== 'SUCCESS') throw new BadRequestException('Order belum lunas, tidak bisa kirim tiket.');
+
+        eventId = order.event_id;
+        const details = typeof order.ticket_details === 'string' ? JSON.parse(order.ticket_details) : order.ticket_details;
+        targetEmail = details.buyerEmail;
+
+        if (!targetEmail && order.user_id) {
+          const uRes = await client.query('SELECT email FROM users WHERE id = $1', [order.user_id]);
+          if (uRes.rows.length > 0) targetEmail = uRes.rows[0].email;
+        }
+
+        const ticketsRes = await client.query(
+          `SELECT t.ticket_code, s.name as session_name, t.price
+           FROM tickets t LEFT JOIN event_sessions s ON t.session_id = s.id
+           WHERE t.order_id = $1`, [identifier]
+        );
+        
+        ticketsRes.rows.forEach(t => {
+          ticketsToResend.push({ code: t.ticket_code, sessionName: t.session_name || 'Main Session' });
+          totalPrice += Number(t.price || 0);
+        });
+
+      } else {
+        const baseTicketRes = await client.query(
+          `SELECT event_id, purchase_date, guest_email, user_id FROM tickets WHERE ticket_code = $1`, [identifier]
+        );
+        if (baseTicketRes.rows.length === 0) throw new BadRequestException('Tiket tidak ditemukan.');
+        
+        const baseTicket = baseTicketRes.rows[0];
+        eventId = baseTicket.event_id;
+        
+        targetEmail = baseTicket.guest_email;
+        if (!targetEmail && baseTicket.user_id) {
+           const uRes = await client.query('SELECT email FROM users WHERE id = $1', [baseTicket.user_id]);
+           if (uRes.rows.length > 0) targetEmail = uRes.rows[0].email;
+        }
+
+        const allTicketsRes = await client.query(
+          `SELECT t.ticket_code, s.name as session_name, t.price
+           FROM tickets t LEFT JOIN event_sessions s ON t.session_id = s.id
+           WHERE t.event_id = $1 AND t.purchase_date = $2 AND (t.guest_email = $3 OR t.user_id = $4)`,
+          [eventId, baseTicket.purchase_date, baseTicket.guest_email, baseTicket.user_id]
+        );
+
+        allTicketsRes.rows.forEach(t => {
+          ticketsToResend.push({ code: t.ticket_code, sessionName: t.session_name || 'Main Session' });
+          totalPrice += Number(t.price || 0);
+        });
+      }
+
+      if (!targetEmail) throw new BadRequestException('Email pembeli tidak ditemukan.');
+      if (ticketsToResend.length === 0) throw new BadRequestException('Tidak ada tiket yang ditemukan untuk dikirim ulang.');
+
+      const evRes = await client.query('SELECT title FROM events WHERE id = $1', [eventId]);
+      eventTitle = evRes.rows[0]?.title || 'Event';
+
+      await this.sendEmailReceipt(targetEmail, eventTitle, ticketsToResend, totalPrice, eventId);
+
+      return { success: true, message: 'E-ticket berhasil dikirim ulang ke email pembeli!' };
+      
+    } catch (err) {
+      console.error("Resend Email Error:", err);
+      throw new InternalServerErrorException(err instanceof Error ? err.message : 'Gagal mengirim ulang e-ticket');
+    } finally {
+      client.release();
+    }
+  }
+
 }

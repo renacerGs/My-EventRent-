@@ -87,7 +87,7 @@ export default function EventDashboard() {
 
   const [agents, setAgents] = useState([]);
   const [agentEmailInput, setAgentEmailInput] = useState('');
-  const [agentRoleInput, setAgentRoleInput] = useState(''); // 🔥 STATE BARU UNTUK INPUT ROLE
+  const [agentRoleInput, setAgentRoleInput] = useState(''); 
   const [agentDetailModal, setAgentDetailModal] = useState(null); 
   const [agentEditRole, setAgentEditRole] = useState({ show: false, agentId: null, role: '', rating_given: 0 });
 
@@ -112,7 +112,7 @@ export default function EventDashboard() {
   const [payoutProcessStatus, setPayoutProcessStatus] = useState('idle'); 
   const [proofFile, setProofFile] = useState(null);
 
-  // 🔥 STATE LIST BUKTI PEMBAYARAN MANUAL
+  // STATE LIST BUKTI PEMBAYARAN MANUAL
   const [paymentVerifications, setPaymentVerifications] = useState([]);
   const [showProofModal, setShowProofModal] = useState({ show: false, url: null });
 
@@ -543,14 +543,12 @@ export default function EventDashboard() {
 
   useEffect(() => { setCurrentPage(1); }, [searchQuery, selectedSessionFilter, selectedStatusFilter]); 
 
-  // 🔥 UPDATE LOGIKA HANDLE ADD AGENT 🔥
   const handleAddAgent = async (e) => {
     e.preventDefault();
     if (!agentEmailInput) return;
     const sessionData = await supabase.auth.getSession();
     const token = sessionData.data.session?.access_token;
     
-    // Ambil role yang diketik, kalau kosong kita kasih default 'Agent'
     const finalRole = agentRoleInput.trim() || 'Agent';
 
     try {
@@ -566,7 +564,7 @@ export default function EventDashboard() {
       if (res.ok) {
         toast.success(data.message);
         setAgentEmailInput('');
-        setAgentRoleInput(''); // Kosongin input role abis disubmit
+        setAgentRoleInput(''); 
         fetchAgents();
         fetchPayouts(); 
       } else {
@@ -653,6 +651,34 @@ export default function EventDashboard() {
     } catch (err) { setPopup({ show: true, message: "Network error.", type: 'error' }); }
   };
 
+  // 🔥 FUNGSI BARU: RESEND EMAIL E-TICKET 🔥
+  const handleResendEmail = async (orderId) => {
+    const toastId = toast.loading('Mengirim ulang e-ticket ke pembeli...');
+    try {
+      const sessionData = await supabase.auth.getSession();
+      const token = sessionData.data.session?.access_token;
+
+      // Pastikan endpoint ini ada di Backend lu bosku
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/orders/${orderId}/resend-email`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const data = await res.json();
+      
+      if (res.ok) {
+        toast.success(data.message || 'E-ticket berhasil dikirim ulang!', { id: toastId });
+      } else {
+        toast.error(data.message || 'Gagal mengirim ulang e-ticket.', { id: toastId });
+      }
+    } catch (err) {
+      toast.error('Terjadi kesalahan jaringan.', { id: toastId });
+    }
+  };
+
   const handleExportCSV = () => {
     const isWed = event?.is_private || event?.category === 'Wedding' || event?.category === 'Personal';
     let csvHeader = isWed 
@@ -690,10 +716,8 @@ export default function EventDashboard() {
     setPopup({ show: true, message: "Event Link copied successfully!", type: 'success' }); 
   };
 
-  // 🔥 TAMPILIN SKELETON KALAU BELUM ADA DATA EVENT 🔥
   if (loading && !event) return <DashboardSkeleton />;
 
-  // AMANIN VARIABEL SETELAH EVENT ADA
   const isWed = event?.is_private || event?.category === 'Wedding' || event?.category === 'Personal';
   const isEventEnded = event ? new Date(event.date_end) < new Date() : false;
 
@@ -1123,13 +1147,11 @@ export default function EventDashboard() {
         </div>
       )}
 
-      {/* ======================= MODAL AGENT PROFILE (SMOOTH NAVY-ORANGE) ======================= */}
+      {/* ======================= MODAL AGENT PROFILE ======================= */}
       {agentDetailModal && (
         <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 animate-fadeIn">
-          {/* Main Card with Smooth Diagonal Gradient Navy to Orange */}
           <div className="bg-gradient-to-br from-[#020024] via-[#090979] to-[#ff8121] rounded-[32px] p-6 max-w-sm w-full shadow-2xl transform relative overflow-hidden text-white border border-white/10">
 
-            {/* Abstract glowing orbs to make it feel alive & dynamic */}
             <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none opacity-50 mix-blend-screen">
                <div className="absolute -top-12 -left-12 w-48 h-48 bg-blue-500/40 rounded-full blur-[60px]"></div>
                <div className="absolute -bottom-8 -right-8 w-48 h-48 bg-orange-400/60 rounded-full blur-[60px]"></div>
@@ -1151,7 +1173,6 @@ export default function EventDashboard() {
                 <p className="text-[10px] font-bold text-white/70 tracking-widest uppercase mt-0.5">{agentDetailModal.email}</p>
               </div>
 
-              {/* Stats Row - Clean & Minimalist */}
               <div className="flex justify-between items-center bg-white/5 backdrop-blur-md rounded-2xl p-4 mb-6 border border-white/10 shadow-inner">
                 <div className="text-center flex-1 border-r border-white/10">
                   <p className="text-lg font-black text-yellow-400 flex items-center justify-center gap-1 drop-shadow-md">
@@ -1167,7 +1188,6 @@ export default function EventDashboard() {
                 </div>
               </div>
 
-              {/* Bank Info Glass Card */}
               <div className="bg-white/5 backdrop-blur-md p-4 rounded-2xl border border-white/10 mb-6 shadow-inner">
                 <p className="text-[9px] font-black text-white/50 uppercase tracking-widest mb-2 pb-2 border-b border-white/10">Payment Info</p>
                 {agentDetailModal.bank_name && agentDetailModal.bank_account ? (
@@ -1257,7 +1277,6 @@ export default function EventDashboard() {
           </div>
         )}
 
-        {/* 🔥 BLOK ALERT VERIFIKASI PEMBAYARAN MANUAL */}
         {paymentVerifications.length > 0 && (
           <div className="mb-6 bg-orange-50 border-2 border-orange-200 rounded-2xl p-4 md:p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm animate-pulse">
              <div>
@@ -1323,7 +1342,7 @@ export default function EventDashboard() {
           </div>
         </div>
 
-        {/* TAB NAVIGATION (SMOOTH SLIDING ANIMATION) */}
+        {/* TAB NAVIGATION */}
         <div className="bg-white p-2 rounded-2xl md:rounded-full shadow-sm border border-gray-100 mb-8 overflow-x-auto hide-scrollbar flex items-center gap-2 relative z-10 w-full sm:w-max">
           
           {[
@@ -1368,7 +1387,6 @@ export default function EventDashboard() {
         {activeTab === 'attendees' && (
           <div className="bg-white rounded-[24px] md:rounded-[32px] shadow-sm border border-gray-200 overflow-hidden mb-10 animate-fadeIn">
             
-            {/* 🔥 BLOK VERIFIKASI PEMBAYARAN MANUAL DI DALAM TAB */}
             {paymentVerifications.length > 0 && (
               <div className="border-b border-gray-200 bg-orange-50/30">
                 <div className="px-5 py-4 border-b border-gray-100">
@@ -1446,7 +1464,24 @@ export default function EventDashboard() {
                         <td className="px-8 py-5 font-bold text-sm">{order.buyer_name} <br/><span className="text-xs font-normal text-gray-400">{order.buyer_email}</span></td>
                         <td className="px-8 py-5 max-w-[200px] truncate" title={order.session_name}><span className="px-3 py-1 bg-gray-100 rounded-lg text-[10px] font-bold uppercase truncate inline-block max-w-full">{order.session_name}</span></td>
                         <td className="px-8 py-5 text-center font-black">{isWed ? order.tickets.reduce((sum, t) => sum + (t.pax || 1), 0) : order.tickets.length}</td>
-                        <td className="px-8 py-5 text-right"><button onClick={() => toggleExpand(order.order_id)} className="text-[10px] font-bold text-gray-500 hover:text-[#FF6B35] uppercase tracking-wider underline">{expandedRow === order.order_id ? 'Close Details' : 'View Data Details'}</button></td>
+                        <td className="px-8 py-5 text-right">
+                          <div className="flex flex-col items-end gap-2">
+                            <button onClick={() => toggleExpand(order.order_id)} className="text-[10px] font-bold text-gray-500 hover:text-[#FF6B35] uppercase tracking-wider underline">
+                              {expandedRow === order.order_id ? 'Close Details' : 'View Data Details'}
+                            </button>
+                            {/* 🔥 TOMBOL RESEND E-TICKET (DESKTOP) 🔥 */}
+                            {!isPending && (
+                              <button 
+                                onClick={() => handleResendEmail(order.order_id)} 
+                                className="text-[9px] font-black text-blue-500 hover:text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-md transition-colors flex items-center gap-1 uppercase tracking-widest border border-blue-100"
+                                title="Kirim ulang email E-Ticket ke pembeli ini"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                                Resend E-Ticket
+                              </button>
+                            )}
+                          </div>
+                        </td>
                       </tr>
                       {expandedRow === order.order_id && (
                         <tr className="bg-gray-50/50">
@@ -1495,7 +1530,23 @@ export default function EventDashboard() {
                         </div>
                         <div className="text-right max-w-[40%]"><span className="px-2 py-0.5 bg-gray-100 rounded-md text-[8px] font-bold uppercase mb-1.5 inline-block truncate max-w-full">{order.session_name}</span><div className="text-[10px] font-bold">{isWed ? 'Pax' : 'Ticket Qty'}: <span className="font-black text-[#FF6B35]">{isWed ? order.tickets.reduce((sum, t) => sum + (t.pax || 1), 0) : order.tickets.length}</span></div></div>
                       </div>
-                      <div className="flex justify-between items-center mt-3"><button onClick={() => toggleExpand(order.order_id)} className="text-[10px] font-black text-[#FF6B35] uppercase tracking-wider flex items-center gap-1 bg-orange-50 px-3 py-1.5 rounded-lg w-full justify-center active:scale-95 transition-all">{expandedRow === order.order_id ? 'Close Details' : 'View Data Details'}</button></div>
+                      
+                      {/* 🔥 TOMBOL RESEND E-TICKET (MOBILE) 🔥 */}
+                      <div className="flex justify-between items-center mt-3 gap-2">
+                        {!isPending && (
+                           <button 
+                             onClick={() => handleResendEmail(order.order_id)} 
+                             className="text-[10px] font-black text-blue-500 uppercase tracking-wider flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg justify-center active:scale-95 transition-all border border-blue-100 shrink-0"
+                             title="Resend E-Ticket"
+                           >
+                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                           </button>
+                        )}
+                        <button onClick={() => toggleExpand(order.order_id)} className="text-[10px] font-black text-[#FF6B35] uppercase tracking-wider flex items-center gap-1 bg-orange-50 px-3 py-1.5 rounded-lg flex-1 justify-center active:scale-95 transition-all">
+                          {expandedRow === order.order_id ? 'Close Details' : 'View Data Details'}
+                        </button>
+                      </div>
+
                       {expandedRow === order.order_id && (
                         <div className="mt-4 pt-4 border-t-2 border-dashed border-gray-100 flex flex-col gap-3">
                           {order.tickets.map((t, idx) => (

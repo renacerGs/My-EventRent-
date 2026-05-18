@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -20,11 +20,9 @@ const formatPrettyDate = (dateString) => {
 // 🔥 KOMPONEN SKELETON DETAIL EVENT 🔥
 const EventDetailSkeleton = () => (
   <div className="min-h-screen bg-[#F8F9FA] pb-20 font-sans relative">
-    {/* Skeleton Banner */}
     <div className="relative w-full h-[280px] md:h-[500px] bg-gray-200 animate-pulse"></div>
 
     <div className="max-w-6xl mx-auto px-4 md:px-8 relative z-10 -mt-20 md:-mt-32">
-      {/* Skeleton Konten Utama */}
       <div className="bg-white rounded-[28px] md:rounded-[40px] shadow-sm p-6 md:p-12 flex flex-col lg:flex-row gap-8 md:gap-12 mb-8 md:mb-12 border border-gray-100">
         <div className="flex-1 text-left relative">
           <div className="w-24 h-6 bg-gray-200 rounded-lg mb-4 md:mb-6 animate-pulse"></div>
@@ -48,7 +46,6 @@ const EventDetailSkeleton = () => (
           </div>
         </div>
 
-        {/* Skeleton Kotak Kanan (Ticket) */}
         <div className="w-full lg:w-[320px] flex flex-col md:items-end gap-4 md:gap-6 shrink-0">
           <div className="w-full h-40 bg-gray-100 rounded-[32px] animate-pulse mt-10 md:mt-14"></div>
         </div>
@@ -67,9 +64,7 @@ export default function EventDetail() {
   const [isLiked, setIsLiked] = useState(false);
   const user = JSON.parse(localStorage.getItem('user'));
   
-  const scrollContainerRef = useRef(null);
   const [popup, setPopup] = useState({ isOpen: false, message: '', type: 'info' });
-  
   const [showShareModal, setShowShareModal] = useState(false);
 
   const isWed = event?.is_private || event?.isPrivate;
@@ -174,20 +169,13 @@ export default function EventDetail() {
     navigate(url);
   };
 
-  const scrollRight = () => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: 300, behavior: 'smooth' });
-    }
-  };
-
-  // 🔥 GANTI TEKS LOADING DENGAN SKELETON 🔥
   if (loading) return <EventDetailSkeleton />;
   if (!event) return null;
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] pb-20 font-sans relative">
       
-      {/* POPUP INFO (BAWAAN LU) */}
+      {/* POPUP INFO */}
       <AnimatePresence>
         {popup.isOpen && (
           <div className="fixed inset-0 z-[120] flex flex-col items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
@@ -222,7 +210,7 @@ export default function EventDetail() {
         )}
       </AnimatePresence>
 
-      {/* 👇 MODAL BAGIKAN EVENT (NEW) 👇 */}
+      {/* MODAL BAGIKAN EVENT */}
       <AnimatePresence>
         {showShareModal && (
           <div className="fixed inset-0 z-[150] flex flex-col items-center justify-end md:justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -233,7 +221,6 @@ export default function EventDetail() {
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
               className="bg-white w-full max-w-sm rounded-[32px] p-6 shadow-2xl relative"
             >
-              {/* Header Modal */}
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-black text-gray-900 uppercase tracking-widest">Bagikan Event</h3>
                 <button onClick={() => setShowShareModal(false)} className="w-8 h-8 flex items-center justify-center bg-gray-100 text-gray-500 rounded-full hover:bg-gray-200 transition-colors">
@@ -241,7 +228,6 @@ export default function EventDetail() {
                 </button>
               </div>
 
-              {/* Preview Event (Card Kecil) */}
               <div className="flex items-center gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100 mb-8">
                 <img src={event.img} alt="Event" className="w-14 h-14 rounded-xl object-cover border border-gray-200" />
                 <div className="overflow-hidden">
@@ -252,10 +238,7 @@ export default function EventDetail() {
                 </div>
               </div>
 
-              {/* Deretan Tombol Sosmed */}
               <div className="flex justify-between items-start gap-2 mb-6 px-2">
-                
-                {/* WhatsApp */}
                 <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={() => shareToPlatform('whatsapp')}>
                   <div className="w-14 h-14 bg-[#E7F9F1] rounded-full flex items-center justify-center hover:scale-105 transition-transform">
                     <svg className="w-7 h-7 text-[#25D366]" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
@@ -263,7 +246,6 @@ export default function EventDetail() {
                   <span className="text-[10px] font-bold text-gray-700">WhatsApp</span>
                 </div>
 
-                {/* X (Twitter) */}
                 <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={() => shareToPlatform('twitter')}>
                   <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center hover:scale-105 transition-transform">
                     <svg className="w-6 h-6 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
@@ -271,7 +253,6 @@ export default function EventDetail() {
                   <span className="text-[10px] font-bold text-gray-700">X (Twitter)</span>
                 </div>
 
-                {/* Facebook */}
                 <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={() => shareToPlatform('facebook')}>
                   <div className="w-14 h-14 bg-[#EAF2FF] rounded-full flex items-center justify-center hover:scale-105 transition-transform">
                     <svg className="w-6 h-6 text-[#1877F2]" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.469h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.469h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
@@ -279,7 +260,6 @@ export default function EventDetail() {
                   <span className="text-[10px] font-bold text-gray-700">Facebook</span>
                 </div>
 
-                {/* Salin Link */}
                 <div className="flex flex-col items-center gap-2 cursor-pointer" onClick={() => shareToPlatform('copy')}>
                   <div className="w-14 h-14 bg-[#FFF5F0] rounded-full flex items-center justify-center hover:scale-105 transition-transform">
                     <svg className="w-6 h-6 text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
@@ -288,7 +268,6 @@ export default function EventDetail() {
                 </div>
               </div>
 
-              {/* Tombol Opsi Lain (Panggil Native Share kalau didukung browser) */}
               {navigator.share && (
                  <button 
                    onClick={() => shareToPlatform('native')} 
@@ -301,7 +280,6 @@ export default function EventDetail() {
           </div>
         )}
       </AnimatePresence>
-      {/* 👆 AKHIR MODAL BAGIKAN EVENT 👆 */}
 
       <div className="relative w-full h-[280px] md:h-[500px] bg-gray-900">
         <img src={event.img} className="w-full h-full object-cover opacity-50" alt="Banner" />
@@ -366,11 +344,9 @@ export default function EventDetail() {
             </div>
           </div>
 
-          {/* KANAN: CARD TICKET & SHARE/LIKE */}
           <div className="w-full lg:w-[320px] flex flex-col md:items-end gap-4 md:gap-6 text-left shrink-0">
             
             <div className="flex gap-3 absolute top-4 right-4 md:relative md:top-0 md:right-0 z-20">
-              {/* 👇 TOMBOL PEMICU MODAL SHARE 👇 */}
               <button onClick={() => setShowShareModal(true)} className={`w-10 h-10 md:w-14 md:h-14 flex items-center justify-center rounded-full border-2 transition-all active:scale-95 shadow-sm bg-white border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-900`} title="Share Link Undangan">
                 <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
               </button>
@@ -397,26 +373,17 @@ export default function EventDetail() {
 
         </div>
 
-        {/* CONTAINER SESI / RANGKAIAN ACARA */}
+        {/* CONTAINER SESI / RANGKAIAN ACARA - 🔥 FIX: TANPA SCROLL DALEM 🔥 */}
         <div className="bg-white rounded-[28px] md:rounded-[40px] shadow-sm border border-gray-100 p-6 md:p-12 mb-10 overflow-hidden relative">
           
           <div className="flex items-center justify-between mb-6 md:mb-8">
             <h2 className="text-xl md:text-2xl font-black text-gray-900 uppercase tracking-tight">
               {isWed ? 'Rangkaian Acara' : 'Session'}
             </h2>
-            
-            {event.sessions && event.sessions.length > 1 && (
-               <button onClick={scrollRight} className={`md:hidden flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full active:scale-95 transition-transform ${isWed ? 'text-[#D4AF37] bg-[#D4AF37]/10' : 'text-[#FF6B35] bg-orange-50'}`}>
-                 <span>Geser</span>
-                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-               </button>
-            )}
           </div>
 
-          <div 
-            ref={scrollContainerRef}
-            className="flex flex-nowrap md:grid md:grid-cols-1 gap-4 md:gap-6 overflow-x-auto md:overflow-y-auto md:overflow-x-hidden max-h-none md:max-h-[800px] pb-6 md:pb-0 snap-x snap-mandatory scroll-smooth overscroll-x-contain md:overscroll-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] -mx-6 px-6 md:mx-0 md:px-0"
-          >
+          {/* 👇 INI YANG PENTING: max-h dan overflow-y-auto GUA ILANGIN 👇 */}
+          <div className="flex flex-col gap-4 md:gap-6 w-full">
             {event.sessions && event.sessions.length > 0 ? (
               event.sessions.map((session, index) => {
                 const isSoldOut = session.stock < 1;
@@ -424,85 +391,82 @@ export default function EventDetail() {
                 return (
                   <motion.div 
                     key={session.id} 
-                    initial={{ opacity: 0.3, scale: 0.9 }}
-                    whileInView={{ opacity: 1, scale: 1 }}
-                    viewport={{ amount: 0.5, margin: "0px", once: false }}
-                    transition={{ duration: 0.4, ease: "easeOut" }}
-                    className={`shrink-0 snap-center w-[85vw] md:w-auto border-2 rounded-[20px] md:rounded-[24px] p-5 md:p-8 relative flex flex-col justify-between items-start gap-5 transition-colors ${isSoldOut ? 'border-gray-200 bg-gray-50 opacity-70' : `bg-white border-gray-100 hover:border-${isWed ? '[#D4AF37]' : '[#FF6B35]'}`}`}
+                    initial={{ opacity: 0.3, y: 10 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ amount: 0.3, once: false }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                    className={`w-full border-2 rounded-[20px] md:rounded-[24px] p-5 md:p-8 flex flex-col md:flex-row justify-between items-start gap-4 md:gap-6 transition-colors ${isSoldOut ? 'border-gray-200 bg-gray-50 opacity-70' : `bg-white border-gray-100 hover:border-${isWed ? '[#D4AF37]' : '[#FF6B35]'}`}`}
                   >
                     
-                    <div className="flex flex-col md:flex-row w-full justify-between items-start gap-6">
+                    {/* INFO ACARA */}
+                    <div className="flex-1 w-full">
+                      <div className="flex items-center gap-2 md:gap-3 mb-3">
+                         <span className={`text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${isWed ? 'bg-[#D4AF37]' : 'bg-gray-900'}`}>
+                           {isWed ? 'Acara' : 'Session'} {index + 1}
+                         </span>
+                         {isSoldOut && <span className="bg-red-100 text-red-600 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg">Kuota Penuh</span>}
+                      </div>
                       
-                      <div className="flex-1 w-full">
-                        <div className="flex items-center gap-2 md:gap-3 mb-3">
-                           <span className={`text-white text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg ${isWed ? 'bg-[#D4AF37]' : 'bg-gray-900'}`}>
-                             {isWed ? 'Acara' : 'Session'} {index + 1}
-                           </span>
-                           {isSoldOut && <span className="bg-red-100 text-red-600 text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg">Kuota Penuh</span>}
+                      <h3 className="text-xl md:text-2xl font-bold text-gray-900 uppercase mb-3 md:mb-4">{session.name}</h3>
+                      
+                      <div className="flex flex-wrap gap-x-6 gap-y-2 mb-3 md:mb-4">
+                        <div className="flex items-center text-[11px] md:text-xs font-bold text-gray-600">
+                          <svg className="w-3.5 h-3.5 md:w-4 md:h-4 mr-2 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          <span className="truncate">{session.start_time.slice(0,5)} - {session.end_time.slice(0,5)} WIB</span>
                         </div>
-                        
-                        <h3 className="text-xl md:text-2xl font-bold text-gray-900 uppercase mb-3 md:mb-4">{session.name}</h3>
-                        
-                        <div className="flex flex-wrap gap-x-6 gap-y-2 mb-3 md:mb-4">
-                          <div className="flex items-center text-[11px] md:text-xs font-bold text-gray-600">
-                            <svg className="w-3.5 h-3.5 md:w-4 md:h-4 mr-2 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                            <span className="truncate">{session.start_time.slice(0,5)} - {session.end_time.slice(0,5)} WIB</span>
-                          </div>
-                          <div className="flex items-center text-[11px] md:text-xs font-bold text-gray-600">
-                            <svg className="w-3.5 h-3.5 md:w-4 md:h-4 mr-2 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                            <span className="truncate">{formatPrettyDate(session.date)}</span>
-                          </div>
+                        <div className="flex items-center text-[11px] md:text-xs font-bold text-gray-600">
+                          <svg className="w-3.5 h-3.5 md:w-4 md:h-4 mr-2 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                          <span className="truncate">{formatPrettyDate(session.date)}</span>
                         </div>
-
-                        <p className="text-[11px] md:text-xs text-gray-500 leading-relaxed max-w-xl mb-4">{session.description || "Tidak ada detail."}</p>
-
-                        {/* 👇 LOKASI SPESIFIK TIAP SESI (MUNCUL KHUSUS WEDDING) 👇 */}
-                        {isWed && session.name_place && (
-                          <div className="mt-4 pt-4 border-t border-gray-100">
-                            <div className="flex items-start gap-3">
-                               <div className="mt-0.5 w-6 h-6 rounded-full bg-[#D4AF37]/10 flex items-center justify-center shrink-0">
-                                 <svg className="w-3.5 h-3.5 text-[#D4AF37]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                               </div>
-                               <div>
-                                  <span className="block text-xs font-black text-gray-900 mb-0.5">{session.name_place}</span>
-                                  <span className="block text-[10px] md:text-xs text-gray-500 font-medium">{session.place}, {session.city}</span>
-                                  {session.map_url && (
-                                    <a href={session.map_url} target="_blank" rel="noreferrer" className="inline-block mt-1.5 text-[10px] font-bold text-[#D4AF37] hover:text-[#B5952F] underline underline-offset-2">Buka G-Maps</a>
-                                  )}
-                               </div>
-                            </div>
-                          </div>
-                        )}
                       </div>
 
-                      <div className="w-full md:w-auto flex flex-row md:flex-col items-center md:items-end justify-between md:border-l border-gray-100 md:pl-8 shrink-0 border-t md:border-t-0 pt-4 md:pt-0">
-                        
-                        {/* HARGA TIKET DIHILANGKAN JIKA WEDDING */}
-                        {!isWed ? (
-                          <div className="text-left md:text-right">
-                            <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">TICKET PRICE</p>
-                            <p className="font-black text-xl md:text-3xl text-gray-900 mb-0 md:mb-4">
-                              {Number(session.price) === 0 ? <span className="text-[#27AE60]">FREE</span> : `Rp ${parseInt(session.price).toLocaleString('id-ID')}`}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="text-left md:text-right mb-0 md:mb-4">
-                             <span className="inline-block px-3 py-1 bg-green-50 text-green-600 text-[10px] font-black uppercase tracking-widest rounded-lg border border-green-100">
-                               Undangan Gratis
-                             </span>
-                          </div>
-                        )}
-                        
-                        <button 
-                          onClick={() => handleGoToCheckout(session.id)} 
-                          disabled={isSoldOut}
-                          className={`w-auto md:w-full px-5 py-2.5 md:px-8 md:py-3 rounded-xl font-bold text-[10px] md:text-xs uppercase tracking-widest transition-all ${isSoldOut ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : (isWed ? 'bg-[#D4AF37] text-white hover:bg-[#B5952F] active:scale-95' : 'bg-[#FF6B35] text-white hover:bg-[#E85526] shadow-md shadow-orange-100 active:scale-95')}`}
-                        >
-                          {isSoldOut ? 'FULL' : (isWed ? 'SEND RSVP' : 'CHOOSE TICKET')}
-                        </button>
-                      </div>
+                      <p className="text-[11px] md:text-xs text-gray-500 leading-relaxed max-w-xl mb-4">{session.description || "Tidak ada detail."}</p>
 
+                      {isWed && session.name_place && (
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                          <div className="flex items-start gap-3">
+                             <div className="mt-0.5 w-6 h-6 rounded-full bg-[#D4AF37]/10 flex items-center justify-center shrink-0">
+                               <svg className="w-3.5 h-3.5 text-[#D4AF37]" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                             </div>
+                             <div>
+                                <span className="block text-xs font-black text-gray-900 mb-0.5">{session.name_place}</span>
+                                <span className="block text-[10px] md:text-xs text-gray-500 font-medium">{session.place}, {session.city}</span>
+                                {session.map_url && (
+                                  <a href={session.map_url} target="_blank" rel="noreferrer" className="inline-block mt-1.5 text-[10px] font-bold text-[#D4AF37] hover:text-[#B5952F] underline underline-offset-2">Buka G-Maps</a>
+                                )}
+                             </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
+
+                    {/* HARGA & TOMBOL */}
+                    <div className="w-full md:w-auto flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center md:border-l border-gray-100 md:pl-8 pt-4 mt-2 md:pt-0 md:mt-0 border-t md:border-t-0 shrink-0 gap-3">
+                      
+                      {!isWed ? (
+                        <div className="text-left md:text-right">
+                          <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-0.5 md:mb-1">TICKET PRICE</p>
+                          <p className="font-black text-xl md:text-3xl text-gray-900">
+                            {Number(session.price) === 0 ? <span className="text-[#27AE60]">FREE</span> : `Rp ${parseInt(session.price).toLocaleString('id-ID')}`}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-left md:text-right">
+                           <span className="inline-block px-3 py-1 bg-green-50 text-green-600 text-[10px] font-black uppercase tracking-widest rounded-lg border border-green-100">
+                             Undangan Gratis
+                           </span>
+                        </div>
+                      )}
+                      
+                      <button 
+                        onClick={() => handleGoToCheckout(session.id)} 
+                        disabled={isSoldOut}
+                        className={`w-auto px-5 py-2.5 md:px-8 md:py-3 rounded-xl font-bold text-[10px] md:text-xs uppercase tracking-widest transition-all ${isSoldOut ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : (isWed ? 'bg-[#D4AF37] text-white hover:bg-[#B5952F] active:scale-95' : 'bg-[#FF6B35] text-white hover:bg-[#E85526] shadow-md shadow-orange-100 active:scale-95')}`}
+                      >
+                        {isSoldOut ? 'FULL' : (isWed ? 'SEND RSVP' : 'CHOOSE TICKET')}
+                      </button>
+                    </div>
+
                   </motion.div>
                 );
               })
